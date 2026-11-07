@@ -1,0 +1,4 @@
+# Gitignored files copied into each new Claude Code worktree (.gitignore syntax).
+# settings.local.json carries each dev's local permissions and, optionally, GH_TOKEN
+# (gh access for agents, docs/CONTRIBUTING.md §2). Never commit it.
+.claude/settings.local.json

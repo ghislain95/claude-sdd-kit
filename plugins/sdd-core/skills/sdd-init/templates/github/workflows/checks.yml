@@ -1,0 +1,41 @@
+# sdd:note: generated only with the `ci` option, ONCE PER MODULE as .github/workflows/checks-{{MODULE_NAME}}.yml (one workflow per module keeps the path filter per module: a PR that touches only one module runs only its checks). For a single-module repo ({{MODULE_PATH}} = .): name it checks.yml or checks-{{MODULE_NAME}}.yml, REMOVE both `paths:` filters (every PR runs the checks — './**' would be the same, but noisier) and drop the `defaults.run.working-directory` block.
+# {{MODULE_NAME}} checks.
+#
+# Runs exactly what developers and agents run before a commit (CLAUDE.md §7):
+#   {{MODULE_CHECK}}
+# No test is skipped or filtered here: a red build is a real finding. Never add
+# `continue-on-error` or `|| true` to a check step to get a green run.
+name: Checks ({{MODULE_NAME}})
+
+on:
+  pull_request:
+    paths: [ '{{MODULE_PATH}}/**', '.github/workflows/checks-{{MODULE_NAME}}.yml' ]
+  push:
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+    paths: [ '{{MODULE_PATH}}/**', '.github/workflows/checks-{{MODULE_NAME}}.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # sdd:fill: realistic ceiling for the suite (e.g. 15 for unit tests, 45 with containers)
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: '{{MODULE_PATH}}'
+    steps:
+      - uses: actions/checkout@v4
+
+      # sdd:fill: toolchain setup for {{MODULE_STACK}}, version read from the repo when possible
+      # (e.g. actions/setup-python + astral-sh/setup-uv reading .python-version; actions/setup-node
+      # with `node-version-file`; actions/setup-java with the version from the build file), with the
+      # dependency cache keyed on the lockfile.
+
+      # sdd:fill: dependency install with a frozen/locked lockfile (fail when manifest and lockfile disagree)
+
+      - name: Checks (same as local)
+        run: |
+          {{MODULE_CHECK}}

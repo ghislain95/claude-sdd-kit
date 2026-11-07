@@ -1,0 +1,28 @@
+# sdd:note: generated only with the `ci` option.
+# Agent tooling guard.
+#
+# git-guardrail - .claude/hooks/block-git-writes.sh is the only thing keeping agents from
+#                 committing on or pushing a protected branch (when the remote has no server-side branch
+#                 protection). Its regression suite runs on every change to it.
+name: Tooling
+
+on:
+  pull_request:
+    paths: [ '.claude/hooks/**', '.github/workflows/tooling.yml' ]
+  push:
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+    paths: [ '.claude/hooks/**', '.github/workflows/tooling.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  git-guardrail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git guardrail regression tests
+        run: bash .claude/hooks/block-git-writes.test.sh

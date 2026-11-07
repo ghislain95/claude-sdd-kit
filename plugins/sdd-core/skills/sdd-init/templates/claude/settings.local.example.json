@@ -1,0 +1,8 @@
+{
+  "env": {
+    "GH_TOKEN": "<your own fine-grained token, repo scope only — never commit settings.local.json>"
+  },
+  "permissions": {
+    "allow": []
+  }
+}
