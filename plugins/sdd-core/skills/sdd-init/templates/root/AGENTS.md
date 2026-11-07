@@ -1,144 +1,144 @@
-# AGENTS.md — équipe virtuelle Claude pour {{PROJECT_NAME}}
+# AGENTS.md — the Claude virtual team for {{PROJECT_NAME}}
 
-<!-- sdd:note: option lean → ne pas utiliser ce fichier : générer AGENTS.md depuis AGENTS.lean.md -->
+<!-- sdd:note: lean option → do not use this file: generate AGENTS.md from AGENTS.lean.md -->
 
-Ce document décrit comment monter une **équipe produit** entièrement portée par Claude Code, avec des rôles spécialisés. Chaque rôle est défini par un fichier dans [`.claude/agents/`](.claude/agents/) et est invocable via la commande `/agents` (ou `claude --agent <nom>`).
-
----
-
-## 1. Pourquoi des sous-agents ?
-
-- **Spécialisation** : chaque agent a un prompt système ciblé (PO, dev, reviewer…). Il ne fait pas le travail d'un autre.
-- **Contexte propre** : un sous-agent travaille dans son propre contexte. Le contexte principal reste léger.
-- **Rigueur** : un agent reviewer ne se laisse pas attendrir par l'auteur du code (lui-même un autre agent).
-- **Reproductibilité** : la même tâche prompte le même rôle de la même façon.
+This document describes how to run a **product team** carried entirely by Claude Code, with specialised roles. Each role is defined by a file in [`.claude/agents/`](.claude/agents/) and can be invoked through the `/agents` command (or `claude --agent <name>`).
 
 ---
 
-## 2. Rôles
+## 1. Why sub-agents?
 
-| Agent | Quand l'invoquer | Outils typiques |
+- **Specialisation**: each agent has a targeted system prompt (PO, dev, reviewer…). It does not do another agent's job.
+- **Clean context**: a sub-agent works in its own context. The main context stays light.
+- **Rigour**: a reviewer agent is not softened by the author of the code (itself another agent).
+- **Reproducibility**: the same task prompts the same role the same way.
+
+---
+
+## 2. Roles
+
+| Agent | When to invoke it | Typical tools |
 |---|---|---|
-| **product-owner** | Cadrer un nouveau besoin métier, écrire une user story, prioriser, identifier les impacts produit | Read, Grep, Glob, WebFetch, Edit, Write (`proposal.md`), Bash (lecture) |
-| **architect** | Designer une fonctionnalité transverse : spec deltas + `design.md`, passe adversariale, ADR si structurant | Read, Grep, Glob, Edit, Write (artefacts du change, ADR), Bash (lecture) |
+| **product-owner** | Frame a new business need, write a user story, prioritise, identify product impacts | Read, Grep, Glob, WebFetch, Edit, Write (`proposal.md`), Bash (read-only) |
+| **architect** | Design a cross-cutting feature: spec deltas + `design.md`, adversarial pass, ADR if structural | Read, Grep, Glob, Edit, Write (change artifacts, ADR), Bash (read-only) |
 <!-- sdd:each module -->
-| **{{MODULE_NAME}}-dev** | Implémenter dans `{{MODULE_PATH}}` ({{MODULE_STACK}}) en respectant ses `CODING_RULES.md` | Read, Edit, Write, Bash, Grep, Glob |
+| **{{MODULE_NAME}}-dev** | Implement in `{{MODULE_PATH}}` ({{MODULE_STACK}}) following its `CODING_RULES.md` | Read, Edit, Write, Bash, Grep, Glob |
 <!-- sdd:endeach -->
 <!-- sdd:if multi-module -->
-| **full-stack-dev** | Petite feature qui touche deux modules en un lot cohérent | Tous |
+| **full-stack-dev** | Small feature touching two modules as one coherent batch | All |
 <!-- sdd:endif -->
-| **code-reviewer** | Revue d'une PR / d'un diff : sévère, par ligne, aucun éloge | Read, Grep, Bash (git diff, contrôles) |
-| **tester** | Écrire / compléter les tests (outils de chaque module : `<module>/docs/TESTING_STRATEGY.md`) | Read, Edit, Write, Bash |
-| **doc-writer** | Mettre à jour la doc après une feature (READMEs, `docs/`) | Read, Edit, Write |
+| **code-reviewer** | Review of a PR / a diff: strict, line by line, no praise | Read, Grep, Bash (git diff, checks) |
+| **tester** | Write / complete tests (each module's tools: `<module>/docs/TESTING_STRATEGY.md`) | Read, Edit, Write, Bash |
+| **doc-writer** | Update the docs after a feature (READMEs, `docs/`) | Read, Edit, Write |
 <!-- sdd:if devops -->
-| **devops** | CI, conteneurs, scripts de build/déploiement, secrets | Read, Edit, Write, Bash |
+| **devops** | CI, containers, build/deployment scripts, secrets | Read, Edit, Write, Bash |
 <!-- sdd:endif -->
 
-**Tous les agents tournent en `model: {{AGENT_MODEL}}`**, écrit explicitement dans chaque fichier plutôt qu'hérité de la session : une session lancée sur un modèle moins cher ne dégrade pas silencieusement un agent. Les outils et skills disponibles en renfort sont catalogués dans [`docs/AGENT_TOOLBOX.md`](docs/AGENT_TOOLBOX.md).
+**All agents run on `model: {{AGENT_MODEL}}`**, written explicitly in each file rather than inherited from the session: a session started on a cheaper model does not silently degrade an agent. The tools and skills available as backup are catalogued in [`docs/AGENT_TOOLBOX.md`](docs/AGENT_TOOLBOX.md).
 
 ---
 
-## 3. Workflow type pour une feature
+## 3. Typical workflow for a feature
 
-Le workflow s'appuie sur **OpenSpec** : les artefacts du change
-(`openspec/changes/<id>/` — proposal, spec deltas, design, tasks) sont le
-contrat passé d'un agent à l'autre.
+The workflow relies on **OpenSpec**: the change artifacts
+(`openspec/changes/<id>/` — proposal, spec deltas, design, tasks) are the
+contract handed from one agent to the next.
 
 ```
-1. product-owner     ← /opsx:new : proposal.md (intent, scope, non-goals)
-1b. architect        ← passe adversariale sur la proposition, si le change est structurant
-2. architect         ← /opsx:ff : spec deltas + design.md + tasks
-3. <module>-dev      ← /opsx:apply : tasks du module<!-- sdd:if multi-module --> (modules en parallèle si le contrat est stabilisé)<!-- sdd:endif -->
+1. product-owner     ← /opsx:new: proposal.md (intent, scope, non-goals)
+1b. architect        ← adversarial pass on the proposal, if the change is structural
+2. architect         ← /opsx:ff: spec deltas + design.md + tasks
+3. <module>-dev      ← /opsx:apply: the module's tasks<!-- sdd:if multi-module --> (modules in parallel once the contract is stable)<!-- sdd:endif -->
 <!-- sdd:if devops -->
-3b. devops           ← /opsx:apply : si CI/infra/secrets impactés
+3b. devops           ← /opsx:apply: if CI/infra/secrets are affected
 <!-- sdd:endif -->
-4. tester            ← 1 scénario de delta = 1 test
-5. code-reviewer     ← revue du diff non commité (obligatoire, avant verify)
-6. /opsx:verify      ← implémentation vs specs, tasks cochées
-7. commit            ← l'agent, sur la branche du change (docs/CONTRIBUTING.md §2)
-8. /opsx:archive     ← fusion des deltas dans openspec/specs/
-9. post-archive      ← roadmap, doc-writer (docs/ ne contredit pas les specs fusionnées ;
-                       glossaire) ou « aucun impact doc », `## Purpose` des specs touchées
-                       (corrigé par la session qui archive)<!-- sdd:if graphify -->, rafraîchissement du graph<!-- sdd:endif --> ;
+4. tester            ← 1 delta scenario = 1 test
+5. code-reviewer     ← review of the uncommitted diff (mandatory, before verify)
+6. /opsx:verify      ← implementation vs specs, tasks ticked
+7. commit            ← by the agent, on the change branch (docs/CONTRIBUTING.md §2)
+8. /opsx:archive     ← deltas merged into openspec/specs/
+9. post-archive      ← roadmap, doc-writer (docs/ does not contradict the merged specs;
+                       glossary) or "no doc impact", `## Purpose` of the touched specs
+                       (fixed by the session that archives)<!-- sdd:if graphify -->, graph refresh<!-- sdd:endif -->;
                        commit chore(<id>)
 <!-- sdd:if autonomy-merge -->
-10. PR + fusion      ← l'agent : CI verte + review sans BLOQUANT/MAJEUR, sinon il demande
+10. PR + merge       ← the agent: green CI + review with no BLOCKER/MAJOR, otherwise it asks
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
-10. PR               ← l'agent ouvre la PR ; un humain fusionne
+10. PR               ← the agent opens the PR; a human merges
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-commit -->
-10. push + PR        ← un humain (l'agent ne pousse jamais)
+10. push + PR        ← a human (the agent never pushes)
 <!-- sdd:endif -->
 ```
 
-Le cycle de référence est dans [`CLAUDE.md` §3](CLAUDE.md) ; `/opsx:archive` n'intervient qu'**après**
-le commit d'implémentation, et la fusion qu'après l'archive.
+The reference cycle is in [`CLAUDE.md` §3](CLAUDE.md); `/opsx:archive` only happens **after**
+the implementation commit, and the merge only after the archive.
 
-À chaque étape, le contexte est passé via le résultat de l'agent précédent (résumé court + chemins de fichiers).
-
----
-
-## 4. Workflow type pour un bug
-
-```
-1. <module>-dev   ← reproduire en local + identifier la cause racine
-2. tester         ← écrire un test qui échoue
-3. <module>-dev   ← fixer ; faire passer le test
-4. code-reviewer  ← revue minimale (focus sur la régression)
-```
-
-Bug qui contredit une spec → change OpenSpec `fix-<bug>`. Hotfix trivial (< 30 min, comportement spécifié intact) → branche `fix/<scope>-<desc>` sans change.
+At each step, the context is handed over through the previous agent's result (short summary + file paths).
 
 ---
 
-## 5. Conventions communes à tous les agents
+## 4. Typical workflow for a bug
 
-Chaque agent hérite implicitement de `CLAUDE.md` et des `CODING_RULES.md` du module dans lequel il opère. En plus :
+```
+1. <module>-dev   ← reproduce locally + identify the root cause
+2. tester         ← write a failing test
+3. <module>-dev   ← fix; make the test pass
+4. code-reviewer  ← minimal review (focus on the regression)
+```
 
-- **Aucun agent** n'invente un module ou un package racine.
-- **Aucun agent** ne commit de secret.
-- **Git** : les agents travaillent sur une branche selon [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2 ; **aucun agent** ne committe ni ne pousse sur
-  `{{DEFAULT_BRANCH}}`, ne force-push ni ne réécrit l'historique. Le hook
-  [`.claude/hooks/block-git-writes.sh`](.claude/hooks/block-git-writes.sh) l'impose, sous-agents
-  compris. Un sous-agent dispatché pour une tranche ne committe que si son brief le lui demande ;
-  sinon c'est l'agent principal qui committe après la review.
-- Tout agent qui modifie du code finit par lancer les contrôles du module, **les mêmes que la CI** :
+Bug that contradicts a spec → OpenSpec change `fix-<bug>`. Trivial hotfix (< 30 min, specified behaviour intact) → branch `fix/<scope>-<desc>` without a change.
+
+---
+
+## 5. Conventions shared by all agents
+
+Each agent implicitly inherits `CLAUDE.md` and the `CODING_RULES.md` of the module it works in. In addition:
+
+- **No agent** invents a root module or package.
+- **No agent** commits a secret.
+- **Git**: agents work on a branch following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2; **no agent** commits or pushes on
+  `{{DEFAULT_BRANCH}}`, force-pushes or rewrites history. The hook
+  [`.claude/hooks/block-git-writes.sh`](.claude/hooks/block-git-writes.sh) enforces it, sub-agents
+  included. A sub-agent dispatched for a slice only commits if its brief asks it to;
+  otherwise the main agent commits after the review.
+- Every agent that modifies code ends by running the module's checks, **the same as CI**:
 <!-- sdd:each module -->
-  - `{{MODULE_PATH}}` : `{{MODULE_CHECK}}`
+  - `{{MODULE_PATH}}`: `{{MODULE_CHECK}}`
 <!-- sdd:endeach -->
-- Tout agent qui modifie un contrat externe le fait naître dans les spec deltas, puis `doc-writer` le documente au post-archive.
+- Every agent that changes an external contract makes it born in the spec deltas, then `doc-writer` documents it at post-archive.
 <!-- sdd:if graphify -->
-- Tout agent qui lit du code interroge d'abord le graph (`graphify explain|affected|path|query`), après `graphify check-update .`.
+- Every agent that reads code queries the graph first (`graphify explain|affected|path|query`), after `graphify check-update .`.
 <!-- sdd:endif -->
 
 ---
 
-## 6. Comment ajouter un nouveau rôle
+## 6. How to add a new role
 
-1. Créer `.claude/agents/<nom>.md` avec le frontmatter suivant :
+1. Create `.claude/agents/<name>.md` with the following frontmatter:
    ```yaml
    ---
-   name: <nom>
-   description: UTILISER QUAND <déclencheurs concrets>. NE PAS UTILISER <contre-indications>.
-   tools: [Read, Edit, Write, Bash, Grep, Glob]   # ou un sous-ensemble
+   name: <name>
+   description: USE WHEN <concrete triggers>. DO NOT USE <counter-indications>.
+   tools: [Read, Edit, Write, Bash, Grep, Glob]   # or a subset
    model: {{AGENT_MODEL}}
    ---
    ```
-   Un agent qui doit lancer des commandes de lecture (graphify, git diff, tests) a besoin de `Bash`.
-2. Décrire la **mission**, les **lectures obligatoires**, les **règles dures**, le **workflow**, les **livrables attendus** et les **anti-patterns**.
-3. Mettre à jour la table de la section 2 ci-dessus et [`.claude/agents/README.md`](.claude/agents/README.md).
-4. Tester en l'invoquant sur une petite tâche.
+   An agent that must run read commands (graphify, git diff, tests) needs `Bash`.
+2. Describe the **mission**, the **mandatory reading**, the **hard rules**, the **workflow**, the **expected deliverables** and the **anti-patterns**.
+3. Update the table in section 2 above and [`.claude/agents/README.md`](.claude/agents/README.md).
+4. Test it by invoking it on a small task.
 
-La `description` est ce que lit Claude principal pour router : déclencheurs concrets (« UTILISER QUAND… ») et contre-indications (« NE PAS UTILISER… ») valent mieux qu'une phrase générale.
+The `description` is what the main Claude reads to route: concrete triggers ("USE WHEN…") and counter-indications ("DO NOT USE…") work better than a general sentence.
 
 ---
 
 ## 7. Invocation
 
-Dans Claude Code :
+In Claude Code:
 ```
-/agents                              # liste les agents disponibles
+/agents                              # lists the available agents
 ```
 
-Ou laisser Claude principal **déléguer automatiquement** : il lit la description de chaque agent et choisit le bon selon la table de routage de [`CLAUDE.md` §8](CLAUDE.md).
+Or let the main Claude **delegate automatically**: it reads each agent's description and picks the right one according to the routing table in [`CLAUDE.md` §8](CLAUDE.md).

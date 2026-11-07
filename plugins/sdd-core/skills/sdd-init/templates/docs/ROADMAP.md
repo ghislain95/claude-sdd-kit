@@ -1,66 +1,66 @@
 # Roadmap
 
-> **Statut** : <!-- sdd:fill: état en une ligne + date de la dernière resynchronisation avec le code ({{INSTALL_DATE}} à l'installation) -->
-> **Public** : ingénieurs (agents Claude compris), product owner, reviewers.
-> **Objectif** : <!-- sdd:fill: objectif de la prochaine version, tiré du README / des docs / issues existantes ; sans source : « À confirmer par le product owner. » — ne pas poser de question pour ça -->
+> **Status**: <!-- sdd:fill: state in one line + date of the last resync with the code ({{INSTALL_DATE}} at install time) -->
+> **Audience**: engineers (Claude agents included), product owner, reviewers.
+> **Goal**: <!-- sdd:fill: goal of the next version, taken from the README / docs / existing issues; with no source: "To be confirmed by the product owner." — do not ask a question for this -->
 
-Pour le contexte produit, lire d'abord [`ARCHITECTURE.md`](ARCHITECTURE.md) et [`GLOSSARY.md`](GLOSSARY.md).
+For product context, read [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`GLOSSARY.md`](GLOSSARY.md) first.
 
-La roadmap est le **vivier** du workflow : un epic/ticket = un futur change OpenSpec
-(`/opsx:new`) ; une idée différée = une ligne « Backlog — chantiers flaggés », pas un souvenir de
-session.
+The roadmap is the workflow's **pool**: an epic/ticket = a future OpenSpec change
+(`/opsx:new`); a deferred idea = a line in "Backlog — flagged work", not a session
+memory.
 
 ---
 
 ## Vision
 
-<!-- sdd:fill: 3-5 lignes tirées du README et des docs existantes : ce que le produit permet, pour qui ; sans source : « À confirmer par le product owner. » (ne rien inventer, ne pas poser de question) -->
+<!-- sdd:fill: 3-5 lines taken from the README and existing docs: what the product enables, for whom; with no source: "To be confirmed by the product owner." (invent nothing, ask no question) -->
 
-## Hors-scope
+## Out of scope
 
-<!-- sdd:fill: ce qui n'est explicitement pas visé par cette version — ou « À définir avec le product owner. » -->
+<!-- sdd:fill: what this version explicitly does not aim for — or "To be defined with the product owner." -->
 
-## Phasage
+## Phasing
 
-### Ordre retenu le {{INSTALL_DATE}}
+### Order agreed on {{INSTALL_DATE}}
 
-<!-- sdd:fill: ordre des epics s'il existe déjà (docs, issues) ; sinon « À définir avec le product owner. » — toute décision qui le modifie sera datée ici -->
+<!-- sdd:fill: order of the epics if it already exists (docs, issues); otherwise "To be defined with the product owner." — any decision that changes it will be dated here -->
 
-## État d'avancement ({{INSTALL_DATE}})
+## Progress ({{INSTALL_DATE}})
 
-Décompte des tickets cochés `✅` sur le nombre de tickets du tableau de chaque epic. Légende : ✅ livré · 🟡 partiel (ticket ouvert) · ⬜ non commencé.
+Count of tickets ticked `✅` over the number of tickets in each epic's table. Legend: ✅ delivered · 🟡 partial (ticket open) · ⬜ not started.
 
-| EPIC | Titre | État | Tickets livrés | Reste notable |
+| EPIC | Title | State | Tickets delivered | Notable remainder |
 |---|---|---|---|---|
-<!-- sdd:fill: une ligne par epic réel (issues, backlog existant) ; aucun → supprimer le tableau et écrire « Aucun epic pour l'instant : le premier cadrage (`/opsx:new`) en créera un. » -->
+<!-- sdd:fill: one line per real epic (issues, existing backlog); none → remove the table and write "No epic yet: the first framing (`/opsx:new`) will create one." -->
 
 ---
 
-<!-- sdd:fill: epics réels s'il en existe (issues, backlog existant), chacun au format : `## EPIC n — titre`, **User story** « En tant que … je peux … afin de … », tableau **Tickets** (# | Description | Taille S/M/L), **Dépendances**. Aucun → rien ici. Les fonctionnalités DÉJÀ présentes dans le code ne deviennent pas des tickets : elles sont décrites dans ARCHITECTURE.md -->
+<!-- sdd:fill: real epics if any exist (issues, existing backlog), each in the format: `## EPIC n — title`, **User story** "As a … I can … so that …", **Tickets** table (# | Description | Size S/M/L), **Dependencies**. None → nothing here. Features ALREADY present in the code do not become tickets: they are described in ARCHITECTURE.md -->
 
 ---
 
-## Backlog — chantiers flaggés (hors epics)
+## Backlog — flagged work (outside epics)
 
-Chantiers identifiés en cours de route, pas encore rattachés à un epic. Chacun
-devient un change OpenSpec à cadrer (`/opsx:new`) quand il est priorisé.
+Work identified along the way, not yet attached to an epic. Each item
+becomes an OpenSpec change to frame (`/opsx:new`) when it is prioritised.
 
-| Chantier | Description | Taille | Origine |
+| Item | Description | Size | Origin |
 |---|---|---|---|
-<!-- sdd:fill: dette ou trous repérés pendant la rétro-doc (TODO/FIXME significatifs, tests absents sur un module critique, contrôle d'architecture manquant…), une ligne chacun, Origine = « sdd-init (AAAA-MM-JJ) » — ou une ligne « — | Aucun chantier relevé | — | — » -->
+<!-- sdd:fill: debt or gaps found during the reverse documentation (significant TODO/FIXME, missing tests on a critical module, missing architecture check…), one line each, Origin = "sdd-init ({{INSTALL_DATE}})" — or one line "— | Nothing flagged | — | —" -->
 
 ---
 
-## Process de mise à jour de cette roadmap
+## Update process for this roadmap
 
-- Chaque ticket complété est coché ou retiré. Cocher = préfixer la description par `✅` et citer le change qui l'a livré (« — livré par `<change-id>` (date) »), au post-archive (`CLAUDE.md` §3). Une ligne « Backlog — chantiers flaggés » close est retirée.
-- Légende des préfixes :
-  - `✅` livré : `` | 1.1 | ✅ <description> — livré par `<change-id>` (AAAA-MM-JJ) | M | ``. La date est le **préfixe du dossier** `openspec/changes/archive/` (convention uniforme, vérifiable). Sans change archivé (hotfix, outillage) : `` livré par `<hash court>` (date du commit) ``. Une réserve éventuelle (test ignoré hors CI, double de test…) se met en fin de ligne : ` — réserve : …` ; on ne coche que si le comportement promis existe.
-  - `🟡` partiel : `` | 3.2 | 🟡 <description> — partiel : livré par `<id>` (date) ; reste : <ce qui manque> | M | ``. Un `🟡` n'est jamais « presque coché » : c'est un ticket encore ouvert, dont la ligne dit exactement ce qui reste.
-  - Aucun préfixe = non fait ; si utile, suffixe ` — ⚠️ <constat>` (sans coche).
-  - Un écart entre le texte d'un ticket et le code livré se corrige dans la ligne, de façon compacte : `(réel : …)`.
-- À chaque coche, recompter le tableau « État d'avancement » (tickets `✅` sur le nombre de tickets de l'epic) et mettre à jour sa date.
-- Tenir à jour l'« Ordre retenu » de la section Phasage : toute décision qui le modifie y est datée.
-- Chaque nouveau ticket suit le format `EPIC X — # — Description — Taille (S/M/L)`.
-- Toute évolution majeure d'epic = ADR dans `docs/adr/` puis mise à jour ici.
-- L'agent `product-owner` est le gardien de la cohérence métier de ce document.
+- Each completed ticket is ticked or removed. Ticking = prefixing the description with `✅` and citing the change that delivered it ("— delivered by `<change-id>` (date)"), at post-archive (`CLAUDE.md` §3). A closed "Backlog — flagged work" line is removed.
+- Prefix legend:
+  - `✅` delivered: `` | 1.1 | ✅ <description> — delivered by `<change-id>` (YYYY-MM-DD) | M | ``. The date is the **folder prefix** in `openspec/changes/archive/` (uniform, verifiable convention). Without an archived change (hotfix, tooling): `` delivered by `<short hash>` (commit date) ``. Any caveat (test skipped outside CI, test double…) goes at the end of the line: ` — caveat: …`; only tick if the promised behaviour exists.
+  - `🟡` partial: `` | 3.2 | 🟡 <description> — partial: delivered by `<id>` (date); remaining: <what is missing> | M | ``. A `🟡` is never "almost ticked": it is a ticket still open, whose line says exactly what remains.
+  - No prefix = not done; if useful, a ` — ⚠️ <finding>` suffix (no tick).
+  - A gap between a ticket's text and the delivered code is fixed in the line, compactly: `(actual: …)`.
+- At each tick, recount the "Progress" table (`✅` tickets over the epic's number of tickets) and update its date.
+- Keep the "Order agreed" of the Phasing section up to date: any decision that changes it is dated there.
+- Each new ticket follows the format `EPIC X — # — Description — Size (S/M/L)`.
+- Any major epic evolution = an ADR in `docs/adr/`, then an update here.
+- The `product-owner` agent is the guardian of this document's business consistency.

@@ -1,114 +1,114 @@
-<!-- sdd:note: ne pas générer avec l'option lean (module unique, petit projet) ; supprimer ce commentaire -->
-# {{PROJECT_NAME}} — Boîte à outils des agents
+<!-- sdd:note: do not generate with the lean option (single module, small project); remove this comment -->
+# {{PROJECT_NAME}} — Agent toolbox
 
-Catalogue des skills, hooks et contrôles retenus pour le développement assisté de {{PROJECT_NAME}},
-**et de ceux écartés, avec la raison**, pour ne pas refaire l'évaluation. Base : le kit
-`claude-sdd-kit` (plugins `sdd-core`<!-- sdd:if ui --> et `sdd-ui`<!-- sdd:endif -->), installé par `/sdd-core:sdd-init`.
+Catalogue of the skills, hooks and checks adopted for AI-assisted development of {{PROJECT_NAME}},
+**and of those rejected, with the reason**, so the evaluation is not redone. Base: the
+`claude-sdd-kit` kit (plugins `sdd-core`<!-- sdd:if ui --> and `sdd-ui`<!-- sdd:endif -->), installed by `/sdd-core:sdd-init`.
 
-La table « demande → outil » à utiliser au quotidien est dans [`CLAUDE.md` §11](../CLAUDE.md).
-Ce document en est le catalogue complet. Toute addition ou retrait d'outil s'y note, datée.
+The everyday "request → tool" table is in [`CLAUDE.md` §11](../CLAUDE.md).
+This document is the full catalogue. Every tool added or removed is recorded here, with its date.
 
-## 1. Principes
+## 1. Principles
 
-- **OpenSpec est le process.** Les packs « cycle complet » (spec → plan → build → test → review →
-  ship) recouvrent ce qu'OpenSpec fait déjà ; on en prend des idées, pas les plugins.
-- **Jamais de plugin entier qui doublonne superpowers.** Des skills `tdd` / `debugging` /
-  `code-review` concurrents se déclenchent au hasard. On *vendorise* le skill utile, seul.
-- **Lire avant d'installer.** Un `SKILL.md` devient des instructions pour l'agent : on le lit en
-  entier, on vérifie l'absence de scripts ou d'effets de bord, puis on le copie dans
-  `.claude/skills/<nom>/` avec `LICENSE` et `SOURCE.md` (dépôt, commit, date, modifié ou non).
-- **Peu de skills.** Chaque description de skill entre dans le contexte de chaque session et
-  peut se déclencher hors de propos. Un skill qui ne sert pas est retiré.
-- **Une règle mécanique devient un contrôle, pas une consigne** (hook, test d'architecture, lint,
-  CI). Les consignes écrites sont réservées aux jugements.
+- **OpenSpec is the process.** "Full cycle" packs (spec → plan → build → test → review →
+  ship) overlap with what OpenSpec already does; we take ideas from them, not the plugins.
+- **Never a whole plugin that duplicates superpowers.** Competing `tdd` / `debugging` /
+  `code-review` skills trigger at random. We *vendor* the useful skill, alone.
+- **Read before installing.** A `SKILL.md` becomes instructions for the agent: read it in
+  full, check there are no scripts or side effects, then copy it into
+  `.claude/skills/<name>/` with `LICENSE` and `SOURCE.md` (repository, commit, date, modified or not).
+- **Few skills.** Every skill description enters the context of every session and
+  may trigger out of place. A skill that is not used is removed.
+- **A mechanical rule becomes a check, not an instruction** (hook, architecture test, lint,
+  CI). Written instructions are reserved for judgement calls.
 
-## 2. Retenus
+## 2. Adopted
 
-| Outil | Source | Ce que c'est | Quand |
+| Tool | Source | What it is | When |
 |---|---|---|---|
-| OpenSpec (`/opsx:*`) | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) (CLI npm `@fission-ai/openspec`) | Specs source de vérité + changes (proposal, deltas, design, tasks), archive qui fusionne les deltas | Toute feature non triviale ([`OPENSPEC_GUIDE.md`](OPENSPEC_GUIDE.md)) |
-| superpowers | plugin officiel `claude-plugins-official` | `brainstorming`, `systematic-debugging`, `test-driven-development`, `verification-before-completion`… | Partout, sauf pour remplacer `/opsx:new` / `/opsx:ff` |
-| `/sdd-core:passation` | `sdd-core` (idées : mattpocock `handoff`) | Document de reprise : objectif, état, décisions, tenté et raté, faits vérifiés vs supposés, fichiers clés, prochaine étape, mode de travail. Écrit dans `.claude/passation/` (gitignoré) + presse-papier | Avant `/clear` ou une nouvelle session, dès que le contexte s'alourdit ou que le sujet change |
-| `sdd-core:domain-modeling` | `sdd-core` (mattpocock, adapté) | Challenge les termes contre [`GLOSSARY.md`](GLOSSARY.md), propose le terme canonique, met à jour le glossaire quand l'utilisateur tranche | Cadrage, design ; aussi lu par `product-owner`, `architect`, `code-reviewer` |
-| `/sdd-core:improve-codebase-architecture` | `sdd-core` (mattpocock, adapté) | Audit des points chauds (git<!-- sdd:if graphify --> + graphify<!-- sdd:endif -->) → rapport des modules « creux » → cadrage du candidat choisi → ligne dans [`ROADMAP.md`](ROADMAP.md), section « Backlog — chantiers flaggés » | À la main, tous les ~5 changes, jamais en cours de change |
-| `/sdd-core:retro` | `sdd-core` (mattpocock, adapté) | Rétro sur l'**environnement** de l'agent : navigation, contrôles automatiques, règles du reviewer, fichiers de pilotage, économie d'outils | Après un archive douloureux ou une session ratée |
+| OpenSpec (`/opsx:*`) | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) (npm CLI `@fission-ai/openspec`) | Specs as source of truth + changes (proposal, deltas, design, tasks), archive that merges the deltas | Every non-trivial feature ([`OPENSPEC_GUIDE.md`](OPENSPEC_GUIDE.md)) |
+| superpowers | official plugin `claude-plugins-official` | `brainstorming`, `systematic-debugging`, `test-driven-development`, `verification-before-completion`… | Everywhere, except as a replacement for `/opsx:new` / `/opsx:ff` |
+| `/sdd-core:passation` | `sdd-core` (ideas: mattpocock `handoff`) | Handoff document: goal, state, decisions, tried and failed, verified vs assumed facts, key files, next step, working style. Written to `.claude/passation/` (gitignored) + clipboard | Before `/clear` or a new session, as soon as the context gets heavy or the topic changes |
+| `sdd-core:domain-modeling` | `sdd-core` (mattpocock, adapted) | Challenges terms against [`GLOSSARY.md`](GLOSSARY.md), proposes the canonical term, updates the glossary when the user decides | Framing, design; also read by `product-owner`, `architect`, `code-reviewer` |
+| `/sdd-core:improve-codebase-architecture` | `sdd-core` (mattpocock, adapted) | Hotspot audit (git<!-- sdd:if graphify --> + graphify<!-- sdd:endif -->) → report of "shallow" modules → framing of the chosen candidate → line in [`ROADMAP.md`](ROADMAP.md), section "Backlog — flagged work" | By hand, every ~5 changes, never in the middle of one |
+| `/sdd-core:retro` | `sdd-core` (mattpocock, adapted) | Retro on the agent's **environment**: navigation, automated checks, reviewer rules, steering files, tool economy | After a painful archive or a failed session |
 <!-- sdd:if ui -->
-| `/sdd-ui:web-design-guidelines` | `sdd-ui` (vercel-labs/agent-skills) | Lint accessibilité / UX (`aria`, focus, formulaires, reduced motion…) en `fichier:ligne`, règles récupérées en ligne à chaque exécution | Review de tout change UI |
-| `sdd-ui:break-ui` | `sdd-ui` (emilkowalski/skills) | Données pire cas (libellés longs, compteurs énormes, zéro, champs manquants) derrière un toggle DEV-only ; l'utilisateur bascule et juge | Avant de livrer un écran de données |
-| `sdd-ui:emil-design-eng`, `sdd-ui:animate`, `/sdd-ui:review-animations`, `sdd-ui:improve-animations` | `sdd-ui` (emilkowalski/skills) | Finition UI, construction d'une animation dans le bon ordre de décision, revue du code de mouvement, audit motion. ⚠️ Les plans d'`improve-animations` sont des **entrées** pour `/opsx:new` ou la roadmap, pas un process parallèle | Polish d'un composant, nouvelle transition, review d'un diff qui touche du mouvement |
+| `/sdd-ui:web-design-guidelines` | `sdd-ui` (vercel-labs/agent-skills) | Accessibility / UX lint (`aria`, focus, forms, reduced motion…) as `file:line`, rules fetched online at each run | Review of every UI change |
+| `sdd-ui:break-ui` | `sdd-ui` (emilkowalski/skills) | Worst-case data (long labels, huge counters, zero, missing fields) behind a DEV-only toggle; the user flips it and judges | Before shipping a data screen |
+| `sdd-ui:emil-design-eng`, `sdd-ui:animate`, `/sdd-ui:review-animations`, `sdd-ui:improve-animations` | `sdd-ui` (emilkowalski/skills) | UI polish, building an animation in the right decision order, review of motion code, motion audit. ⚠️ `improve-animations` plans are **inputs** for `/opsx:new` or the roadmap, not a parallel process | Polishing a component, new transition, review of a diff that touches motion |
 <!-- sdd:endif -->
-| Hook [`block-git-writes.sh`](../.claude/hooks/block-git-writes.sh) | `sdd-core` (mattpocock `git-guardrails`, adapté) | `PreToolUse` sur Bash : impose la partie mécanique des règles git ([`CONTRIBUTING.md`](CONTRIBUTING.md) §2). Lit la commande comme le shell (heredocs, guillemets, substitutions), suit le dossier réel (`cd`, `git -C`, `switch`). Réglages dans `block-git-writes.conf`. Coût mesuré : ~70-110 ms par appel | Toujours actif ([`.claude/settings.json`](../.claude/settings.json)) ; agit aussi sur les sous-agents. Sans `jq`, il bloque toute commande `git`/`gh`. Faux positifs assumés : un `$(…)` non échappé qui exécuterait vraiment une commande git interdite, même dans un message → citer le délimiteur du heredoc (`<<'EOF'`) ou passer par `git commit -F <fichier>` ; un dossier créé dans la même commande avant le `cd` compte comme inexistant → deux appels ; un `git switch <branche>; git commit` sans `&&` est jugé sur la branche de départ. `git <op> --abort/--quit` reste permis |
+| Hook [`block-git-writes.sh`](../.claude/hooks/block-git-writes.sh) | `sdd-core` (mattpocock `git-guardrails`, adapted) | `PreToolUse` on Bash: enforces the mechanical part of the git rules ([`CONTRIBUTING.md`](CONTRIBUTING.md) §2). Reads the command the way the shell does (heredocs, quotes, substitutions), follows the real directory (`cd`, `git -C`, `switch`). Settings in `block-git-writes.conf`. Measured cost: ~70-110 ms per call | Always on ([`.claude/settings.json`](../.claude/settings.json)); also applies to sub-agents. Without `jq`, it blocks every `git`/`gh` command. Accepted false positives: an unescaped `$(…)` that would really run a forbidden git command, even inside a message → quote the heredoc delimiter (`<<'EOF'`) or use `git commit -F <file>`; a directory created in the same command before the `cd` counts as nonexistent → two calls; a `git switch <branch>; git commit` without `&&` is judged on the starting branch. `git <op> --abort/--quit` stays allowed |
 <!-- sdd:if ci -->
-| CI GitHub Actions | `sdd-core` | [`openspec.yml`](../.github/workflows/openspec.yml) : `openspec validate --all` (CLI épinglé) + garde « specs modifiées sans change ». `checks-<module>.yml` (un par module, dans [`.github/workflows/`](../.github/workflows/)) ou la CI existante du projet : les contrôles de chaque module. [`tooling.yml`](../.github/workflows/tooling.yml) : suite de régression du hook git | À chaque PR et push sur `{{DEFAULT_BRANCH}}`, filtrés par chemin |
+| GitHub Actions CI | `sdd-core` | [`openspec.yml`](../.github/workflows/openspec.yml): `openspec validate --all` (pinned CLI) + "specs modified without a change" guard. `checks-<module>.yml` (one per module, in [`.github/workflows/`](../.github/workflows/)) or the project's existing CI: each module's checks. [`tooling.yml`](../.github/workflows/tooling.yml): regression suite of the git hook | On every PR and push to `{{DEFAULT_BRANCH}}`, path-filtered |
 <!-- sdd:endif -->
 <!-- sdd:if graphify -->
-| Graph graphify déterministe | graphify (`uv tool install "graphifyy[sql]"`, skill via `graphify install --platform claude`) | Carte du code interrogeable ; [`.graphifyignore`](../.graphifyignore) exclut `.claude/` et `**/*.md` : le graph ne contient que du code (voir [`GRAPHIFY.md`](GRAPHIFY.md)) | Toujours ; pour chercher dans la doc : grep / lecture directe |
+| Deterministic graphify graph | graphify (`uv tool install "graphifyy[sql]"`, skill via `graphify install --platform claude`) | Queryable code map; [`.graphifyignore`](../.graphifyignore) excludes `.claude/` and `**/*.md`: the graph only contains code (see [`GRAPHIFY.md`](GRAPHIFY.md)) | Always; to search the docs: grep / direct reading |
 <!-- sdd:endif -->
 <!-- sdd:if caveman -->
-| caveman | [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Réponses compressées (~-75 % de tokens), status line | Par choix du développeur, au niveau utilisateur |
+| caveman | [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Compressed replies (~-75% tokens), status line | Developer's choice, at user level |
 <!-- sdd:endif -->
 <!-- sdd:if cockpit -->
-| claude-mods | [ghislain95/claude-mods](https://github.com/ghislain95/claude-mods) | Mods de l'app desktop : cockpit OpenSpec, messages en cartes, bandeau de session, tâches de fond | App desktop uniquement, au niveau utilisateur |
+| claude-mods | [ghislain95/claude-mods](https://github.com/ghislain95/claude-mods) | Desktop app mods: OpenSpec cockpit, messages as cards, session band, background tasks | Desktop app only, at user level |
 <!-- sdd:endif -->
-<!-- sdd:fill: contrôles automatiques propres au projet déjà en place (test d'architecture, lint d'import, garde de migrations…) — ou rien si aucun -->
+<!-- sdd:fill: project-specific automated checks already in place (architecture test, import lint, migration guard…) — or nothing if none -->
 
-### Idées intégrées dans les agents (sans nouveau skill)
+### Ideas built into the agents (no new skill)
 
-- **Baisse de qualité masquée** (idée : addyosmani `constraint-driven-development`) → `code-reviewer` :
-  nouveau test désactivé ou sauté, suppression d'avertissement (`@SuppressWarnings`, `# type: ignore`,
-  `@ts-ignore`, `eslint-disable`), assertion affaiblie, seuil ou timeout relevé, `catch` silencieux,
-  `continue-on-error` en CI = BLOQUANT sauf justification écrite.
-- **Décisions sourcées** (idée : addyosmani `source-driven-development`) → `architect` et règle
-  `design` de `openspec/config.yaml` : une décision qui dépend d'une librairie cite sa source **à la
-  version épinglée du repo**, sinon elle est marquée « non vérifiée ».
-- **Ajouter → migrer → retirer** (idée : mattpocock `to-tickets`) → `architect` et règle `tasks` de
-  `openspec/config.yaml` : un changement à large rayon se découpe en trois temps, chacun avec un
-  build vert.
-- **Les faits sont le travail de l'agent** (idée : mattpocock `grilling`) → `product-owner` : au
-  cadrage, on ne demande jamais à l'utilisateur ce que le code, les specs ou le graph peuvent dire.
-- **Passe adversariale** → `architect` et [`CLAUDE.md` §3](../CLAUDE.md) : avant `/opsx:ff` d'un
-  change structurant, on tente de casser la proposition (hypothèses fragiles, alternatives
-  ignorées, coûts cachés, conflits avec un ADR).
-- **Ordre testé selon le contrat** → `tester` : une assertion d'ordre seulement si la spec impose
-  un ordre ; sinon comparaison sans ordre, ou fixture dans le désordre pour un test de tri.
+- **Hidden quality drop** (idea: addyosmani `constraint-driven-development`) → `code-reviewer`:
+  new disabled or skipped test, warning suppression (`@SuppressWarnings`, `# type: ignore`,
+  `@ts-ignore`, `eslint-disable`), weakened assertion, raised threshold or timeout, silent `catch`,
+  `continue-on-error` in CI = BLOCKER unless justified in writing.
+- **Sourced decisions** (idea: addyosmani `source-driven-development`) → `architect` and the
+  `design` rule of `openspec/config.yaml`: a decision that depends on a library cites its source **at the
+  version pinned in the repo**, otherwise it is marked "unverified".
+- **Add → migrate → remove** (idea: mattpocock `to-tickets`) → `architect` and the `tasks` rule of
+  `openspec/config.yaml`: a wide-radius change is split into three steps, each with a
+  green build.
+- **Facts are the agent's job** (idea: mattpocock `grilling`) → `product-owner`: during
+  framing, never ask the user what the code, the specs or the graph can tell.
+- **Adversarial pass** → `architect` and [`CLAUDE.md` §3](../CLAUDE.md): before `/opsx:ff` on a
+  structural change, try to break the proposal (fragile assumptions, ignored
+  alternatives, hidden costs, conflicts with an ADR).
+- **Order tested according to the contract** → `tester`: an order assertion only if the spec imposes
+  an order; otherwise an order-insensitive comparison, or a shuffled fixture for a sorting test.
 
-## 3. Différés : à reconsidérer quand le besoin apparaît
+## 3. Deferred: reconsider when the need appears
 
-| Outil | Pourquoi pas maintenant | Déclencheur |
+| Tool | Why not now | Trigger |
 |---|---|---|
 <!-- sdd:if ui -->
-| impeccable (pbakaus) | Bon pack design général, mais il télécharge un binaire natif, installe des hooks par projet et fait doublon avec d'autres skills UI | Refonte visuelle : à tester **à la place** d'un autre pack UI, pas en plus |
-| addyosmani `/webperf` | Audit Lighthouse / Core Web Vitals | Mise en production publique d'un front web |
+| impeccable (pbakaus) | Good general design pack, but it downloads a native binary, installs per-project hooks and duplicates other UI skills | Visual redesign: try it **instead of** another UI pack, not on top |
+| addyosmani `/webperf` | Lighthouse / Core Web Vitals audit | Public production launch of a web front end |
 <!-- sdd:endif -->
 <!-- sdd:if graphify -->
-| Passe sémantique graphify sur la doc | Aucun backend exploitable sans clé API (voir [`GRAPHIFY.md`](GRAPHIFY.md)) | Clé API d'un modèle bon marché disponible |
+| graphify semantic pass on the docs | No usable backend without an API key (see [`GRAPHIFY.md`](GRAPHIFY.md)) | API key for a cheap model available |
 <!-- sdd:endif -->
-<!-- sdd:fill: outils repérés pendant sdd-init mais pas installés, avec leur déclencheur — ou supprimer la ligne -->
+<!-- sdd:fill: tools spotted during sdd-init but not installed, with their trigger — or remove the line -->
 
-## 4. Écartés
+## 4. Rejected
 
-| Outil | Raison |
+| Tool | Reason |
 |---|---|
-| Plugins mattpocock / addyosmani entiers | Collisions avec superpowers ; `implement` de mattpocock **committe tout seul** ; le cycle d'Addy duplique OpenSpec |
-| `grill-me` / `grilling` | Doublon de `brainstorming` et du cadrage `product-owner` |
+| Whole mattpocock / addyosmani plugins | Collisions with superpowers; mattpocock's `implement` **commits on its own**; Addy's cycle duplicates OpenSpec |
+| `grill-me` / `grilling` | Duplicates `brainstorming` and the `product-owner` framing |
 <!-- sdd:if ui -->
-| taste-skill | Son `SKILL.md` exclut explicitement « dashboards, data tables, multi-step product UI » |
-| `minimalist-ui` | Ses interdits (pas d'Inter, pas d'ombres, pas d'icônes Lucide) se battent avec la plupart des design systems existants |
-| anti-ai-slop (hallmark & co) | Pas de source de référence ; générateurs de pages marketing |
+| taste-skill | Its `SKILL.md` explicitly excludes "dashboards, data tables, multi-step product UI" |
+| `minimalist-ui` | Its bans (no Inter, no shadows, no Lucide icons) clash with most existing design systems |
+| anti-ai-slop (hallmark & co) | No reference source; marketing page generators |
 <!-- sdd:endif -->
-| Playwright MCP, agent-browser | Doublons du navigateur intégré de l'app et de Claude in Chrome. À revoir seulement pour de l'E2E scripté (Playwright test, pas MCP) |
-| `find-skills` | `npx skills find <requête>` fait la même chose |
-| Garde d'architecture CI par `grep` | Un vrai test d'architecture (ArchUnit, import-linter, dependency-cruiser…) fait mieux et tourne avec les tests |
-| Proxy « économiseur de tokens » qui réécrit les sorties shell (`git`, `grep`…) | Étude JetBrains : +7,6 % de coût en effort bas (p=0,004), aucun gain en effort haut ; économies auto-déclarées gonflées car Claude Code tronque déjà les sorties. Sorties corrompues constatées : `git log` sans les 2 derniers commits, `grep` à 0 résultat sur un diff non vide |
-| Routage automatique requête par requête vers un modèle moins cher | Comportement en plein tour non documenté ; on garde le routage explicite par agent |
+| Playwright MCP, agent-browser | Duplicate the app's built-in browser and Claude in Chrome. Revisit only for scripted E2E (Playwright test, not MCP) |
+| `find-skills` | `npx skills find <query>` does the same |
+| CI architecture guard based on `grep` | A real architecture test (ArchUnit, import-linter, dependency-cruiser…) does better and runs with the tests |
+| "Token-saving" proxy that rewrites shell outputs (`git`, `grep`…) | JetBrains study: +7.6% cost at low effort (p=0.004), no gain at high effort; self-reported savings inflated because Claude Code already truncates outputs. Corrupted outputs observed: `git log` missing the last 2 commits, `grep` returning 0 results on a non-empty diff |
+| Automatic per-request routing to a cheaper model | Mid-turn behaviour undocumented; explicit per-agent routing is kept |
 
-## 5. Modèles et sessions
+## 5. Models and sessions
 
-- **Tous les agents tournent en `model: {{AGENT_MODEL}}`**, écrit explicitement dans chaque
-  `.claude/agents/*.md` plutôt qu'hérité : une session lancée sur un modèle moins cher ne dégrade
-  pas silencieusement un agent.
-- **`/compact` ou `/sdd-core:passation` ?** `/compact` garde la forme de la conversation, impasses
-  comprises. Préférer la passation + session neuve dès qu'on change de sujet ou après un debug
-  laborieux.
-- **Messagerie entre sessions** (`SendMessage` / `ListAgents`, natif) : possible, mais la passation
-  couvre le besoin plus simplement.
+- **All agents run on `model: {{AGENT_MODEL}}`**, written explicitly in each
+  `.claude/agents/*.md` rather than inherited: a session started on a cheaper model does not
+  silently degrade an agent.
+- **`/compact` or `/sdd-core:passation`?** `/compact` keeps the shape of the conversation, dead ends
+  included. Prefer the handoff + a fresh session as soon as the topic changes or after a
+  laborious debug.
+- **Messaging between sessions** (`SendMessage` / `ListAgents`, native): possible, but the handoff
+  covers the need more simply.

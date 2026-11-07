@@ -1,55 +1,55 @@
-<!-- sdd:note: instancié une fois par module dans {{MODULE_PATH}}/docs/TESTING_STRATEGY.md. Décrire la façon de tester OBSERVÉE (frameworks, dossiers, fixtures, helpers existants) ; si le module n'a pas ou peu de tests, le dire et proposer la stratégie minimale en la marquant « cible, à valider » + une ligne au Backlog de docs/ROADMAP.md. -->
-# Stratégie de test — `{{MODULE_NAME}}`
+<!-- sdd:note: instantiated once per module in {{MODULE_PATH}}/docs/TESTING_STRATEGY.md. Describe the OBSERVED way of testing (frameworks, folders, fixtures, existing helpers); if the module has few or no tests, say so and propose the minimal strategy, marking it "target, to be validated" + a line in the Backlog of docs/ROADMAP.md. -->
+# Testing strategy — `{{MODULE_NAME}}`
 
-> Référence de la façon de tester `{{MODULE_PATH}}` ({{MODULE_STACK}}). Toute déviation est justifiée en PR.
+> Reference for how to test `{{MODULE_PATH}}` ({{MODULE_STACK}}). Any deviation is justified in the PR.
 
 ---
 
-## 1. Pyramide de tests
+## 1. Test pyramid
 
-| Couche | Outils | Périmètre | Quand l'utiliser |
+| Layer | Tools | Scope | When to use it |
 |---|---|---|---|
-<!-- sdd:fill: une ligne par couche observée (intégration, unitaire, e2e, non testé directement), avec outils, périmètre et règle de choix. Indiquer la couche PRIMAIRE (celle où vivent les règles métier) -->
+<!-- sdd:fill: one line per observed layer (integration, unit, e2e, not tested directly), with tools, scope and selection rule. Mark the PRIMARY layer (the one where the business rules live) -->
 
-<!-- sdd:fill: règle(s) non négociable(s) observée(s), ex. « jamais de base embarquée : conteneurs avec le moteur de prod » — ou supprimer la ligne -->
+<!-- sdd:fill: observed non-negotiable rule(s), e.g. "never an embedded database: containers with the production engine" — or remove the line -->
 
-## 2. Lancer les tests
+## 2. Running the tests
 
 ```bash
-{{MODULE_CHECK}}             # tout, identique à la CI
+{{MODULE_CHECK}}             # everything, identical to CI
 ```
 
-<!-- sdd:fill: commandes pour lancer un seul fichier / un seul test / un tag, et prérequis (Docker, base locale, variables d'env) -->
+<!-- sdd:fill: commands to run a single file / a single test / a tag, and prerequisites (Docker, local database, environment variables) -->
 
-## 3. Arborescence
+## 3. Layout
 
-<!-- sdd:fill: où vivent les tests, fixtures et helpers (bloc d'arborescence), et convention de nommage des fichiers de test -->
+<!-- sdd:fill: where the tests, fixtures and helpers live (tree block), and the naming convention of test files -->
 
-## 4. Du scénario de spec au test
+## 4. From spec scenario to test
 
-Chaque scénario `#### Scenario:` d'une spec OpenSpec donne **un** test, nommé d'après le scénario, qui suit son GIVEN/WHEN/THEN.
+Each `#### Scenario:` of an OpenSpec spec yields **one** test, named after the scenario, following its GIVEN/WHEN/THEN.
 
-<!-- sdd:fill: comment traduire concrètement un GIVEN/WHEN/THEN dans ce module (Gherkin/Cucumber si présent, sinon test paramétré ou fonction nommée `test_<scenario>`), avec un court exemple dans la stack réelle -->
+<!-- sdd:fill: how to translate a GIVEN/WHEN/THEN concretely in this module (Gherkin/Cucumber if present, otherwise a parameterised test or a function named `test_<scenario>`), with a short example in the real stack -->
 
-## 5. Isolation et données
+## 5. Isolation and data
 
-<!-- sdd:fill: comment les tests s'isolent (transaction annulée, nettoyage explicite, base par test, mocks), données aléatoires uniques vs fixes, attente asynchrone (jamais de sleep : outil d'attente utilisé) -->
+<!-- sdd:fill: how tests isolate themselves (rolled-back transaction, explicit cleanup, database per test, mocks), unique random vs fixed data, async waiting (never a sleep: waiting tool used) -->
 
 ## 6. Assertions
 
-- Asserter selon le **contrat** : une assertion d'ordre seulement si la spec impose un ordre ; sinon comparaison sans ordre, ou fixture dans le désordre pour tester un tri.
-- Une assertion affaiblie, un seuil relevé ou un test désactivé « pour faire passer » est un BLOQUANT en review.
-<!-- sdd:fill: niveaux d'assertion utilisés dans le module (statut seul, champs clés, corps complet, invariants en base) et quand choisir lequel -->
+- Assert according to the **contract**: an order assertion only if the spec imposes an order; otherwise an order-insensitive comparison, or a shuffled fixture to test a sort.
+- A weakened assertion, a raised threshold or a disabled test "to make it pass" is a BLOCKER in review.
+<!-- sdd:fill: assertion levels used in the module (status only, key fields, full body, database invariants) and when to pick which -->
 
-## 7. Checklist quand on ajoute une feature
+## 7. Checklist when adding a feature
 
-<!-- sdd:fill: 4-7 étapes concrètes dans ce module (créer le fichier de test ici, fixture là, nettoyage, lancement) -->
+<!-- sdd:fill: 4-7 concrete steps in this module (create the test file here, fixture there, cleanup, run) -->
 
-## 8. Anti-patterns à signaler en review
+## 8. Anti-patterns to flag in review
 
-| ❌ Anti-pattern | ✅ À faire |
+| ❌ Anti-pattern | ✅ Do instead |
 |---|---|
-| Test désactivé, sauté ou neutralisé sans justification | Corriger la cause, ou justifier par écrit |
-| Attente par `sleep` fixe | Outil d'attente avec condition et délai max |
-| Assertion d'ordre sans contrat d'ordre | Comparaison sans ordre |
-<!-- sdd:fill: anti-patterns propres à la stack et aux helpers du module -->
+| Test disabled, skipped or neutralised without justification | Fix the cause, or justify in writing |
+| Waiting with a fixed `sleep` | Waiting tool with a condition and a max delay |
+| Order assertion without an order contract | Order-insensitive comparison |
+<!-- sdd:fill: anti-patterns specific to the module's stack and helpers -->

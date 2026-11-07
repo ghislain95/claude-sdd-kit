@@ -1,2 +1,2 @@
-Adapted from https://github.com/mattpocock/skills (commit 49dd158, MIT) on 2026-10-10, then rewritten on 2026-10-12 for an OpenSpec-based project (agent-toolbox evaluation): paths, OpenSpec workflow, framing style.
-Généricisé pour claude-sdd-kit le 2026-11-07 (depuis l'adaptation projet source) : ancrage projet retiré (chemins standard `sdd-init`, exemples neutres « ex. », graphify optionnel, références `sdd-core:*`).
+Adapted from https://github.com/mattpocock/skills (commit 49dd158, MIT) on 2026-10-10, then rewritten on 2026-10-12 for an OpenSpec-based project: paths, OpenSpec workflow, framing style.
+Made project-agnostic for claude-sdd-kit on 2026-11-07: standard `sdd-init` paths, neutral examples, graphify optional, `sdd-core:*` cross-references.

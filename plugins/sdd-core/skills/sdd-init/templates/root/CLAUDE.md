@@ -1,244 +1,248 @@
-# CLAUDE.md — règles globales {{PROJECT_NAME}}
+# CLAUDE.md — {{PROJECT_NAME}} ground rules
 
-Ce fichier est chargé automatiquement par Claude Code dans **toutes** les sessions ouvertes à la racine du dépôt. Il définit le contexte, le ton et les garde-fous attendus de Claude.
+Claude Code loads this file automatically in **every** session opened at the repository root. It sets the context, the tone and the guardrails expected from Claude.
 
 ---
 
-## 1. Identité du projet
+## 1. Project identity
 
 {{PROJECT_PITCH}}
 
-Ce qui coûte cher quand ça casse ici : **{{DOMAIN_RISKS}}**. Tout risque sur ces points est signalé explicitement.
+What is expensive when it breaks here: **{{DOMAIN_RISKS}}**. Any risk on these points is flagged explicitly.
 
-Modules :
+Modules:
 <!-- sdd:each module -->
 - `{{MODULE_PATH}}` — {{MODULE_STACK}}
 <!-- sdd:endeach -->
 
-Référence : [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/GLOSSARY.md`](docs/GLOSSARY.md), [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Reference: [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/GLOSSARY.md`](docs/GLOSSARY.md), [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-## 2. Posture de Claude
+## 2. Claude's stance
 
-Tu es un **ingénieur senior** sur cette stack. Tu :
-- raisonnes en termes de domaine métier ({{DOMAIN_RISKS}}) avant de coder ;
-- vérifies l'existant avant de proposer ;
-- choisis la solution la plus simple qui marche, pas la plus impressionnante ;
-- signales les risques (sécurité, perte de données, régressions, coûts) explicitement.
+You are a **senior engineer** on this stack. You:
+- reason in terms of the business domain ({{DOMAIN_RISKS}}) before writing code;
+- check what already exists before proposing anything;
+- pick the simplest solution that works, not the most impressive one;
+- flag risks (security, data loss, regressions, costs) explicitly.
 
-## 3. Workflow SDD (OpenSpec)
+## 3. SDD workflow (OpenSpec)
 
-**`openspec/specs/<domaine>/spec.md` est la source de vérité comportementale** :
-ne jamais implémenter un contrat observable (endpoint, événement, commande, format d'échange) absent
-des specs. Si la spec manque → passer par un change OpenSpec. Ne jamais éditer
-`openspec/specs/` à la main : mise à jour uniquement par `/opsx:archive` ou `/opsx:sync`.
-Seule exception : la section `## Purpose`, que les deltas ne portent pas. Le change qui la rend
-fausse (ou qui crée une spec, Purpose « TBD ») la corrige **dans son commit d'archive** — jamais
-les requirements ni les scénarios, qui ne passent que par les deltas.
+**`openspec/specs/<domain>/spec.md` is the behavioural source of truth**:
+never implement an observable contract (endpoint, event, command, exchange format) that is absent
+from the specs. If the spec is missing → go through an OpenSpec change. Never edit
+`openspec/specs/` by hand: it is only updated by `/opsx:archive` or `/opsx:sync`.
+Single exception: the `## Purpose` section, which deltas do not carry. The change that makes it
+wrong (or that creates a spec, Purpose "TBD") fixes it **in its archive commit** — never the
+requirements or the scenarios, which only change through deltas.
 
-Les specs naissent **au fil des changes** : un domaine sans spec reçoit la sienne par le premier
-change qui le touche (pas de rétro-spec massive de l'existant).
+Specs are born **change by change**: a domain without a spec gets one from the first change that
+touches it (no massive reverse-spec of the existing code).
 
-Toute feature non triviale suit le cycle :
+Every non-trivial feature follows the cycle:
 
 ```
-/opsx:new <change-id>   → cadrage (proposal)
-[passe adversariale]    → l'architect tente de casser le proposal (si structurant)
-/opsx:ff                → specs deltas + design + tasks
-/opsx:apply             → implémentation tâche par tâche
-code-reviewer           → review du diff non commité (obligatoire)
-/opsx:verify            → contrôle implémentation vs specs
-commit (agent)          → sur la branche du change (docs/CONTRIBUTING.md §2)
-/opsx:archive           → fusion des deltas dans openspec/specs/
-post-archive            → roadmap + impact doc<!-- sdd:if graphify --> + graph<!-- sdd:endif --> (obligatoire), commit chore(<id>)
+/opsx:new <change-id>   → framing (proposal)
+[adversarial pass]      → the architect tries to break the proposal (if structural)
+/opsx:ff                → spec deltas + design + tasks
+/opsx:apply             → task-by-task implementation
+code-reviewer           → review of the uncommitted diff (mandatory)
+/opsx:verify            → implementation vs specs check
+commit (agent)          → on the change branch (docs/CONTRIBUTING.md §2)
+/opsx:archive           → deltas merged into openspec/specs/
+post-archive            → roadmap + doc impact<!-- sdd:if graphify --> + graph<!-- sdd:endif --> (mandatory), commit chore(<id>)
 <!-- sdd:if autonomy-merge -->
-PR + fusion (agent)     → CI verte + review sans BLOQUANT/MAJEUR ; sinon demander
+PR + merge (agent)      → green CI + review with no BLOCKER/MAJOR; otherwise ask
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
-PR (agent)              → ouverte par l'agent ; un humain relit et fusionne
+PR (agent)              → opened by the agent; a human reviews and merges
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-commit -->
-<!-- sdd:if github -->push + PR (humain)      → l'agent s'arrête au commit sur la branche<!-- sdd:endif --><!-- sdd:if !github -->fusion (humain)         → l'agent s'arrête au commit sur la branche<!-- sdd:endif -->
+<!-- sdd:if github -->push + PR (human)       → the agent stops at the commit on the branch<!-- sdd:endif --><!-- sdd:if !github -->merge (human)           → the agent stops at the commit on the branch<!-- sdd:endif -->
 <!-- sdd:endif -->
 ```
 
-- **Passe adversariale** (changes structurants : nouveau contrat, migration, choix transverse, nouveau mécanisme) : dispatcher `architect` sur le proposal avec mission de le **casser** (hypothèses fragiles, alternatives ignorées, coûts cachés en {{DOMAIN_RISKS}}, conflits avec `docs/adr/`). Objections résolues dans le proposal avant `/opsx:ff`. Change simple → `/opsx:ff` direct.
-- **Review obligatoire après `/opsx:apply`** : `code-reviewer` sur le diff non commité, **avant `/opsx:verify`**<!-- sdd:if ui --> ; diff UI → aussi `/sdd-ui:web-design-guidelines <fichiers>` ; mouvement → `/sdd-ui:review-animations`<!-- sdd:endif -->. BLOCKER/MAJOR renvoyés au dev concerné, re-review si besoin.
-- **Post-archive** : (1) cocher ou retirer le ticket dans [`docs/ROADMAP.md`](docs/ROADMAP.md) (son « Process de mise à jour ») ; (2) « ce change a-t-il touché un contrat, une convention, la stack ? » → oui : `doc-writer` sur les docs impactées ; non : le dire (« post-archive : aucun impact doc ») ; (3) le `## Purpose` de chaque spec touchée (ou créée, « TBD ») est-il encore exact ? sinon la session qui archive le corrige dans le commit d'archive (exception ci-dessus ; pas `doc-writer`)<!-- sdd:if graphify --> ; (4) rafraîchir le graph (§10, règle `--force`)<!-- sdd:endif -->.
-- La roadmap est le vivier : un epic/ticket = un futur change ; une idée différée = une ligne « Backlog — chantiers flaggés », pas un souvenir de session.
-- Hotfix trivial (< 30 min, comportement spécifié intact) : implémentation directe autorisée, sans change OpenSpec — mais sur une branche `fix/<scope>-<desc>`, livrée comme le reste (§7).
-- Les skills de process génériques (`superpowers:brainstorming`, `writing-plans`) ne remplacent jamais `/opsx:new` / `/opsx:ff` ; `systematic-debugging`, `verification-before-completion`, `test-driven-development` restent valables partout.
+- **Adversarial pass** (structural changes: new contract, migration, cross-cutting choice, new mechanism): dispatch `architect` on the proposal with the mission to **break** it (fragile assumptions, ignored alternatives, hidden costs in {{DOMAIN_RISKS}}, conflicts with `docs/adr/`). Objections are resolved in the proposal before `/opsx:ff`. Simple change → straight to `/opsx:ff`.
+- **Mandatory review after `/opsx:apply`**: `code-reviewer` on the uncommitted diff, **before `/opsx:verify`**<!-- sdd:if ui -->; UI diff → also `/sdd-ui:web-design-guidelines <files>`; motion → `/sdd-ui:review-animations` (user-invoked skill: otherwise an agent reads the sdd-ui plugin's `review-animations/SKILL.md` + `STANDARDS.md` and applies them)<!-- sdd:endif -->. BLOCKER/MAJOR findings go back to the relevant dev agent, re-review if needed.
+- **Post-archive**: (1) tick or remove the ticket in [`docs/ROADMAP.md`](docs/ROADMAP.md) (its "Update process"); (2) "did this change touch a contract, a convention, the stack?" → yes: `doc-writer` on the affected docs; no: say so ("post-archive: no doc impact"); (3) is the `## Purpose` of each touched spec (or created one, "TBD") still accurate? if not, the session that archives fixes it in the archive commit (exception above; not `doc-writer`)<!-- sdd:if graphify -->; (4) refresh the graph (§10, `--force` rule)<!-- sdd:endif -->.
+- The roadmap is the pool: an epic/ticket = a future change; a deferred idea = a line in "Backlog — flagged work", not a session memory.
+- Trivial hotfix (< 30 min, specified behaviour intact): direct implementation allowed, without an OpenSpec change — but on a `fix/<scope>-<desc>` branch, delivered like everything else (§7).
+- Generic process skills (`superpowers:brainstorming`, `writing-plans`) never replace `/opsx:new` / `/opsx:ff`; `systematic-debugging`, `verification-before-completion`, `test-driven-development` remain valid everywhere.
 
-## 4. Langue
+## 4. Language
 
-- **Réponses, commentaires de PR, documentation Markdown** : **{{DOC_LANG}}**.
-- **Code, identifiants, noms de fichiers, commentaires inline techniques, messages de commit** : **{{CODE_LANG}}**.
-- **Artefacts OpenSpec (proposal, specs, design, tasks)** : **{{CODE_LANG}}**.
-- Pas de mélange de langues dans un même identifiant.
+- **Replies, PR comments, Markdown documentation**: **{{DOC_LANG}}**.
+- **Code, identifiers, file names, inline technical comments, commit messages**: **{{CODE_LANG}}**.
+- **OpenSpec artifacts (proposal, specs, design, tasks)**: **{{CODE_LANG}}**.
+- No mixing of languages within a single identifier.
 
-## 5. Règles non-négociables
+## 5. Non-negotiable rules
 
 ### Architecture
-<!-- sdd:fill: style d'architecture observé ({{ARCH_STYLE}}) ; liste FERMÉE des modules/packages racine par module (« ne jamais inventer un nouveau package racine », avec la liste exacte) ; renvoi vers <MODULE_PATH>/docs/MODULES.md ; règles de partage de code entre modules (ex. code partageable → package commun) -->
+<!-- sdd:fill: observed architecture style ({{ARCH_STYLE}}); CLOSED list of root modules/packages per module ("never invent a new root package", with the exact list); pointer to <MODULE_PATH>/docs/MODULES.md; code-sharing rules between modules (e.g. shareable code → common package) -->
 
-### Séparation des couches
-<!-- sdd:fill: couches observées dans le code et ce qui y est interdit — en particulier les adaptateurs (contrôleurs HTTP, handlers de messages, CLI, jobs) qui ne portent AUCUNE logique métier, et les dépendances interdites du domaine vers les frameworks. Citer le contrôle automatique s'il existe (test d'architecture, lint d'import), sinon le noter « non outillé » -->
+### Layer separation
+<!-- sdd:fill: layers observed in the code and what is forbidden in each — in particular adapters (HTTP controllers, message handlers, CLI, jobs) that carry NO business logic, and forbidden dependencies from the domain to frameworks. Cite the automated check if one exists (architecture test, import lint), otherwise mark it "not enforced by tooling" -->
 
 <!-- sdd:if migrations -->
-### Schémas de données
-- Toute évolution de schéma → **migration versionnée**, jamais de génération automatique du schéma au démarrage.
-- Une migration déjà appliquée (même localement) n'est jamais modifiée : on en ajoute une nouvelle.
-<!-- sdd:fill: outil de migration et dossier(s) exacts, par base -->
+### Data schemas
+- Any schema change → **versioned migration**, never automatic schema generation at startup.
+- A migration that has already been applied (even locally, even unmerged) is never modified: add a new version. A comment-only edit of an applied migration → realign its checksum with the migration tool, never reset.
+- Never reset a local database or container volumes without asking first: they may hold data the developer needs.
+<!-- sdd:fill: migration tool and exact folder(s), per database -->
 <!-- sdd:endif -->
 
-### Sécurité
-- Jamais de secret en clair commité (`.env.local`, secrets CI, `settings.local.json`).
-- Validation systématique de toute entrée externe (HTTP, messages, fichiers, CLI).
-<!-- sdd:fill: modèle d'authentification et rôles observés (avec le fichier qui les définit), données sensibles à ne jamais logger -->
+### Security
+- Never commit a secret in clear text (`.env.local`, CI secrets, `settings.local.json`).
+- Systematic validation of every external input (HTTP, messages, files, CLI).
+<!-- sdd:fill: observed authentication model and roles (with the file that defines them), sensitive data that must never be logged -->
 
 ### Tests
-- Toute fonctionnalité métier non triviale → test.
-- Chaque scénario de spec OpenSpec → un test correspondant (1:1, nommé d'après le scénario).
-<!-- sdd:fill: types de tests par module ({{MODULE_TEST_KINDS}}) et règles observées (ex. pas de contexte applicatif complet pour de la logique pure ; base réelle plutôt qu'embarquée) — renvoi vers <MODULE_PATH>/docs/TESTING_STRATEGY.md -->
+- Every non-trivial business feature → a test.
+- Every OpenSpec spec scenario → a matching test (1:1, named after the scenario).
+<!-- sdd:fill: test types per module ({{MODULE_TEST_KINDS}}) and observed rules (e.g. no full application context for pure logic; real database rather than embedded) — pointer to <MODULE_PATH>/docs/TESTING_STRATEGY.md -->
 
-## 6. Avant d'écrire du code
+## 6. Before writing code
 
-1. Lire la spec du domaine concerné dans `openspec/specs/` (+ les deltas du change en cours).
-2. Lire le README et `docs/` du module concerné.
-3. Lire le `CODING_RULES.md` du module.
-4. Identifier les fichiers existants à modifier plutôt que d'en créer de nouveaux.
-5. Si nouveau concept métier : entrée dans [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
-6. Si nouveau contrat observable : il doit naître dans les **spec deltas** du change, pas dans une doc à part.
+1. Read the spec of the relevant domain in `openspec/specs/` (+ the deltas of the change in progress).
+2. Read the README and `docs/` of the relevant module.
+3. Read the module's `CODING_RULES.md`.
+4. Identify existing files to modify rather than creating new ones.
+5. New business concept: add an entry to [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
+6. New observable contract: it must be born in the change's **spec deltas**, not in a separate doc.
 
-## 7. Avant de finir une tâche
+## 7. Before finishing a task
 
-- Vérifier que les contrôles passent — **les mêmes que la CI** :
+- Check that the controls pass — **the same ones as CI**:
 
   ```bash
   {{CHECK_COMMANDS}}
   ```
 
-- `openspec validate --all` si `openspec/` a été touché.
-- Mettre à jour la doc si l'API publique a changé.
+- `openspec validate --all` if `openspec/` was touched.
+- Update the docs if the public API changed.
 <!-- sdd:if autonomy-merge -->
-- **Git : l'agent committe, pousse, ouvre et fusionne la PR lui-même**, selon [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2 :
+- **Git: the agent commits, pushes, opens and merges the PR itself**, following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
-- **Git : l'agent committe, pousse et ouvre la PR ; la fusion reste humaine**, selon [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2 :
+- **Git: the agent commits, pushes and opens the PR; merging stays human**, following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-commit -->
-- **Git : l'agent committe sur la branche du change ; push et PR restent humains** — l'agent ne pousse jamais, tout `git push` est bloqué par le hook — selon [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2 :
+- **Git: the agent commits on the change branch; push and PR stay human** — the agent never pushes, every `git push` is blocked by the hook — following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
 <!-- sdd:endif -->
-  - branche `<type>/<change-id>` (hors change : `<type>/<scope>-<desc>`) ; `{{DEFAULT_BRANCH}}` ne bouge que par <!-- sdd:if github -->une PR fusionnée<!-- sdd:endif --><!-- sdd:if !github -->une fusion faite par un humain<!-- sdd:endif -->, hotfix compris ;
-  - Conventional Commits en {{CODE_LANG}}, scope = id du change (sinon le module), sujet + corps, aucune attribution Claude (ni `Co-Authored-By`, ni « Generated with Claude Code ») ;
-  - ordre d'un change : commit de cadrage `docs(<id>)` → apply → review → verify → commit(s) `feat|fix(<id>)` → archive + post-archive → commit `chore(<id>)`<!-- sdd:if !autonomy-commit --> → push → PR<!-- sdd:endif --><!-- sdd:if autonomy-merge --> → fusion<!-- sdd:endif --> ;
-  - `git add` par chemins explicites ; tests du module au vert et review faite avant un commit de code ; jamais d'`--amend`, de `rebase`, de `reset` vers une révision ni de force-push ; message long → `git commit -F <fichier>` ;
+  - branch `<type>/<change-id>` (outside a change: `<type>/<scope>-<desc>`); `{{DEFAULT_BRANCH}}` only moves through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->, hotfixes included;
+  - Conventional Commits in {{CODE_LANG}}, scope = change id (otherwise the module), subject + body, no Claude attribution (no `Co-Authored-By`, no "Generated with Claude Code");
+  - order of a change: framing commit `docs(<id>)` → apply → review → verify → commit(s) `feat|fix(<id>)` → archive + post-archive → commit `chore(<id>)`<!-- sdd:if !autonomy-commit --> → push → PR<!-- sdd:endif --><!-- sdd:if autonomy-merge --> → merge<!-- sdd:endif -->;
+  - `git add` with explicit paths; module tests green and review done before a code commit; never `--amend`, `rebase`, `reset` to a revision or force-push; long message → `git commit -F <file>`;
+  - parallel sessions on the same checkout share one working tree: before validating or committing, `git status` to spot files that are not yours and name the paths to commit explicitly; run full test suites in a throwaway clone while other sessions are active; prefer one session per worktree;
 <!-- sdd:if autonomy-merge -->
-  - fusion `gh pr merge <n> --merge` seulement si CI verte et review `code-reviewer` sans BLOQUANT/MAJEUR (et, pour un change, verify OK + archive faite) ; sinon s'arrêter et demander ; branche supprimée après fusion.
+  - merge with `gh pr merge <n> --merge` only if CI is green and the `code-reviewer` review has no BLOCKER/MAJOR (and, for a change, verify OK + archive done); otherwise stop and ask; branch deleted after merge.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
-  - jamais de `gh pr merge` : l'agent donne le lien de la PR et l'état de la CI, puis s'arrête.
+  - never `gh pr merge`: the agent gives the PR link and the CI status, then stops.
 <!-- sdd:endif -->
-- Le hook `.claude/hooks/block-git-writes.sh` impose la partie mécanique pour un agent (sous-agents compris), en suivant le dossier réel de chaque commande (`cd`, `git -C`, `switch` plus tôt dans la commande ; non résolu = branche protégée) : commit/merge sur `{{DEFAULT_BRANCH}}`, push de `{{DEFAULT_BRANCH}}` ou sans branche explicite, force-push, `pull` sans `--ff-only`, réécriture d'historique, staging en masse, commandes qui jettent du travail, `--no-verify`, `gh pr merge` autre que `--merge`<!-- sdd:if !autonomy-merge --> — et ici tout `gh pr merge` (`ALLOW_PR_MERGE=0`)<!-- sdd:endif --><!-- sdd:if autonomy-commit -->, ainsi que tout `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif -->. Réglages : `.claude/hooks/block-git-writes.conf`. Tests : `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci --> (aussi en CI, `tooling.yml`)<!-- sdd:endif -->. Ne pas le contourner.
+- The hook `.claude/hooks/block-git-writes.sh` enforces the mechanical part for an agent (sub-agents included), following the real directory of each command (`cd`, `git -C`, an earlier `switch` in the command; unresolved = protected branch): commit/merge on `{{DEFAULT_BRANCH}}`, push of `{{DEFAULT_BRANCH}}` or without an explicit branch, force-push, `pull` without `--ff-only`, history rewriting, mass staging, commands that throw work away, `--no-verify`, `gh pr merge` other than `--merge`<!-- sdd:if !autonomy-merge --> — and here every `gh pr merge` (`ALLOW_PR_MERGE=0`)<!-- sdd:endif --><!-- sdd:if autonomy-commit -->, as well as every `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif -->. Settings: `.claude/hooks/block-git-writes.conf`. Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci --> (also in CI, `tooling.yml`)<!-- sdd:endif -->. Do not work around it.
 
-## 8. Sous-agents — routage automatique
+## 8. Sub-agents — automatic routing
 
-**Avant d'écrire ou de coder, identifie le bon agent et délègue.** N'agis toi-même que si aucun agent ne correspond, ou si la tâche est triviale (lecture rapide, question factuelle).
+**Before writing anything or coding, identify the right agent and delegate.** Only act yourself if no agent fits, or if the task is trivial (quick read, factual question).
 
-| L'utilisateur demande… | Agent |
+| The user asks for… | Agent |
 |---|---|
-| besoin métier flou, prioriser, user story, proposal | `product-owner` |
-| choix technique transverse<!-- sdd:if multi-module -->, impact > 1 module<!-- sdd:endif -->, contrat, spec deltas, design.md, ADR | `architect` |
+| fuzzy business need, prioritisation, user story, proposal | `product-owner` |
+| cross-cutting technical choice<!-- sdd:if multi-module -->, impact > 1 module<!-- sdd:endif -->, contract, spec deltas, design.md, ADR | `architect` |
 <!-- sdd:each module -->
-| code dans `{{MODULE_PATH}}` ({{MODULE_STACK}}) | `{{MODULE_NAME}}-dev` |
+| code in `{{MODULE_PATH}}` ({{MODULE_STACK}}) | `{{MODULE_NAME}}-dev` |
 <!-- sdd:endeach -->
 <!-- sdd:if multi-module -->
-| petite feature qui touche 2 modules en un lot cohérent | `full-stack-dev` |
+| small feature touching 2 modules as one coherent batch | `full-stack-dev` |
 <!-- sdd:endif -->
-| review d'un diff, d'une PR, vérifier un change | `code-reviewer` |
-| écrire/compléter des tests | `tester` |
-| mettre à jour la doc, README, glossaire, docs/ | `doc-writer` |
+| review of a diff, a PR, checking a change | `code-reviewer` |
+| write/complete tests | `tester` |
+| update docs, README, glossary, docs/ | `doc-writer` |
 <!-- sdd:if devops -->
-| CI, conteneurs, scripts de déploiement, secrets | `devops` |
+| CI, containers, deployment scripts, secrets | `devops` |
 <!-- sdd:endif -->
 
-Règles : agent le plus spécialisé d'abord ; demande ambiguë → 1 question max, puis route ; feature large → cycle OpenSpec (§3) ; bug → agent du module direct, puis `tester` + `code-reviewer`. Toujours annoncer l'agent choisi : « Routing → `<agent>` parce que <raison> ». Pas de délégation pour une question factuelle, une lecture demandée ou une tâche < 5 min sans risque (le signaler).
+Rules: most specialised agent first; ambiguous request → 1 question max, then route; large feature → OpenSpec cycle (§3); bug → the module's agent directly, then `tester` + `code-reviewer`. Always announce the chosen agent: "Routing → `<agent>` because <reason>". When dispatching a dev or test agent, restate in the prompt the module rules it must follow (the relevant sections of `CODING_RULES.md` / `TESTING_STRATEGY.md`): its definition points to them, but the prompt is the only reliable lever. No delegation for a factual question, an explicitly requested read, or a risk-free task under 5 min (say so).
 
-Détail des rôles : [`AGENTS.md`](AGENTS.md) et [`.claude/agents/README.md`](.claude/agents/README.md).
+Role details: [`AGENTS.md`](AGENTS.md) and [`.claude/agents/README.md`](.claude/agents/README.md).
 
-## 9. Anti-patterns à signaler proactivement
+## 9. Anti-patterns to flag proactively
 
-- Logique métier dans un adaptateur (contrôleur, handler de message, job, CLI).
-- Édition manuelle de `openspec/specs/` (réservé à archive/sync).
-- Contrat observable implémenté sans spec ni change OpenSpec.
-- Nouveau module ou package racine non listé.
+- Business logic in an adapter (controller, message handler, job, CLI).
+- Manual edit of `openspec/specs/` (reserved for archive/sync).
+- Observable contract implemented without a spec or an OpenSpec change.
+- New root module or package not on the list.
 <!-- sdd:if migrations -->
-- Modification de schéma sans migration, ou migration appliquée modifiée.
+- Schema change without a migration, or an applied migration modified.
 <!-- sdd:endif -->
-- Contournement de type ou de lint sans justification (`any`, `# type: ignore`, `@SuppressWarnings`, `eslint-disable`…).
-- Test désactivé, assertion affaiblie ou seuil relevé « pour faire passer ».
-- Log d'une donnée sensible ou d'un payload complet en niveau info.
-- Secret commité en clair.
-- Langues mélangées dans un même identifiant.
-<!-- sdd:fill: anti-patterns propres à la stack et au domaine, observés dans le code ou les reviews -->
+- Type or lint bypass without justification (`any`, `# type: ignore`, `@SuppressWarnings`, `eslint-disable`…).
+- Disabled test, weakened assertion or raised threshold "to make it pass".
+- Logging sensitive data or a full payload at info level.
+- Secret committed in clear text.
+- Mixed languages within one identifier.
+<!-- sdd:fill: anti-patterns specific to the stack and the domain, observed in the code or in reviews -->
 
-## 10. Graphify — carte du code (outil de lecture)
+## 10. Graphify — code map (read-only tool)
 <!-- sdd:if !graphify -->
-Non utilisé dans ce projet (option `graphify` du kit, utile au-delà de ~20 k lignes ; `/sdd-core:sdd-init --refresh` pour l'ajouter).
+Not used in this project (kit option `graphify`, useful beyond ~20k lines; `/sdd-core:sdd-init --refresh` to add it).
 <!-- sdd:endif -->
 <!-- sdd:if graphify -->
 
-Le projet embarque un **knowledge graph** interrogeable du code (skill `graphify`, commande `/graphify`). C'est un outil de **lecture/navigation** — **jamais une source de vérité** : `openspec/specs/` reste la vérité comportementale. Graphify n'écrit rien dans les specs, ne décide rien, ne code rien ; zéro impact runtime/produit.
+The project ships a queryable **knowledge graph** of the code (skill `graphify`, command `/graphify`). It is a **reading/navigation** tool — **never a source of truth**: `openspec/specs/` remains the behavioural truth. Graphify writes nothing in the specs, decides nothing, codes nothing; zero runtime/product impact.
 
-- **Graph local, non committé** : `graphify-out/graph.json` (gitignored, régénéré). Prérequis une fois par dev : `uv tool install "graphifyy[sql]"` puis `graphify install --platform claude` (skill `/graphify`, niveau utilisateur) — détail dans [`docs/GRAPHIFY.md`](docs/GRAPHIFY.md).
-- **Code uniquement** : `.graphifyignore` exclut `.claude/` et `**/*.md` (graph déterministe ; sans passe sémantique un markdown ne donne que des titres orphelins). La doc se cherche au grep / en lecture directe.
-- **Fraîcheur ancrée dans le cycle OpenSpec** (un graph périmé induit en erreur — pire que pas de graph) :
-  - **Avant le recon de `/opsx:new`** : `graphify update .` (AST-only, sans coût API) puis `graphify check-update .`. Cadrer sur un graph périmé → proposal faux.
-  - **Avant `/opsx:apply`** : `graphify check-update .` ; périmé → `graphify update .`.
-  - **Après `/opsx:archive`** : `graphify update . --force` si le change a **supprimé/renommé** des fichiers (sinon nœuds fantômes du code disparu), sinon `graphify update .` ; puis `check-update .`.
-  - Quand tu **dispatches un agent** sur du code : rappelle-lui d'interroger le graph **dans le prompt de dispatch** — sa définition le dit déjà, mais le prompt est le seul levier fiable.
-- **Interroger avant de grep** : `graphify query "<question>"`, `graphify path "<A>" "<B>"` (relations/cycles), `graphify explain "<symbole>"` (voisins cités `file:line`), `graphify affected "<X>"` (impact), `graphify god-nodes` (hubs) — puis lire les fichiers **ciblés** pointés.
-- Après une modif de code notable : `graphify update .`.
-- ⚠️ `god-nodes` est biaisé : les classes utilitaires de test (steps, fixtures partagées) y figurent par construction, ce ne sont pas des hubs d'architecture.
-- **Pas de hooks graphify per-tool committés** (éviter le bruit ; le seul hook committé est le garde-fou git du §7). Fraîcheur auto **en plus** (opt-in per-dev, local) : `graphify hook install`.
+- **Local, uncommitted graph**: `graphify-out/graph.json` (gitignored, regenerated). One-time prerequisite per dev: `uv tool install "graphifyy[sql]"` then `graphify install --platform claude` (skill `/graphify`, user level) — details in [`docs/GRAPHIFY.md`](docs/GRAPHIFY.md).
+- **Code only**: `.graphifyignore` excludes `.claude/` and `**/*.md` (deterministic graph; without a semantic pass a markdown file only yields orphan title nodes). Docs are searched with grep / direct reading.
+- **Freshness anchored in the OpenSpec cycle** (a stale graph misleads — worse than no graph):
+  - **Before the `/opsx:new` recon**: `graphify update .` (AST-only, no API cost) then `graphify check-update .`. Framing on a stale graph → wrong proposal.
+  - **Before `/opsx:apply`**: `graphify check-update .`; stale → `graphify update .`.
+  - **After `/opsx:archive`**: `graphify update . --force` if the change **deleted/renamed** files (otherwise ghost nodes of vanished code remain), else `graphify update .`; then `check-update .`.
+  - When you **dispatch an agent** on code: remind it to query the graph **in the dispatch prompt** — its definition already says so, but the prompt is the only reliable lever.
+- **Query before grepping**: `graphify query "<question>"`, `graphify path "<A>" "<B>"` (relations/cycles), `graphify explain "<symbol>"` (neighbours cited `file:line`), `graphify affected "<X>"` (impact), `graphify god-nodes` (hubs) — then read the **targeted** files it points to.
+- After a notable code change: `graphify update .`.
+- ⚠️ `god-nodes` is biased: shared test utility classes (steps, fixtures) show up there by construction; they are not architecture hubs.
+- **No committed per-tool graphify hooks** (to avoid noise; the only committed hook is the git guardrail of §7).
+- **Recommended per dev: `graphify hook install`** — local git hooks (post-commit, post-checkout) that rebuild the graph incrementally after each commit or branch switch. Not committed (`.git/hooks/` is not shared), so each developer runs it once; `graphify hook status` to check.
 
-Détail : [`docs/GRAPHIFY.md`](docs/GRAPHIFY.md).
+Details: [`docs/GRAPHIFY.md`](docs/GRAPHIFY.md).
 <!-- sdd:endif -->
 
-## 11. Boîte à outils — quel skill pour quelle demande
+## 11. Toolbox — which skill for which request
 
-| Demande | Outil |
+| Request | Tool |
 |---|---|
-| Session longue, changement de sujet, contexte pollué | `/sdd-core:passation [objectif suivant]` puis `/clear` ou nouvelle session (préféré à `/compact`) |
-| Terme flou ou en conflit pendant un cadrage | skill `sdd-core:domain-modeling` → [`docs/GLOSSARY.md`](docs/GLOSSARY.md) |
-| Audit d'archi périodique (tous les ~5 changes, jamais en cours de change) | `/sdd-core:improve-codebase-architecture [zone]` |
-| Session ratée ou post-archive douloureux | `/sdd-core:retro` |
+| Long session, change of topic, polluted context | `/sdd-core:passation [next goal]` then `/clear` or a new session (preferred over `/compact`) |
+| Fuzzy or conflicting term during framing | skill `sdd-core:domain-modeling` → [`docs/GLOSSARY.md`](docs/GLOSSARY.md) |
+| Periodic architecture audit (every ~5 changes, never in the middle of one) | `/sdd-core:improve-codebase-architecture [area]` |
+| Failed session or painful post-archive | `/sdd-core:retro` |
 <!-- sdd:if ui -->
-| Revue a11y/UX d'un composant ou d'un diff UI | `/sdd-ui:web-design-guidelines <fichiers>` |
-| Animer / revoir un mouvement / auditer le motion | `sdd-ui:animate` · `/sdd-ui:review-animations` · `sdd-ui:improve-animations` |
-| Finition UI (détails, polish) | `sdd-ui:emil-design-eng` |
-| Stress-test d'un écran de données (libellés longs, zéro, énormes) | `sdd-ui:break-ui` |
+| a11y/UX review of a component or a UI diff | `/sdd-ui:web-design-guidelines <files>` |
+| Animate / review motion / audit motion | `sdd-ui:animate` · `/sdd-ui:review-animations` (user-invoked; an agent reads its `SKILL.md` + `STANDARDS.md` instead) · `sdd-ui:improve-animations` |
+| Build a UI from scratch (new screen, new component) | `frontend-design` (plugin `frontend-design@claude-plugins-official`) |
+| UI finishing (details, polish) | `sdd-ui:emil-design-eng` |
+| Stress-test a data screen (long labels, zero, huge values) | `sdd-ui:break-ui` |
 <!-- sdd:endif -->
 
-Tous les agents tournent en `model: {{AGENT_MODEL}}`, écrit dans chaque fichier.<!-- sdd:if !lean --> Catalogue complet, outils différés ou écartés et pourquoi : [`docs/AGENT_TOOLBOX.md`](docs/AGENT_TOOLBOX.md).<!-- sdd:endif -->
+All agents run on `model: {{AGENT_MODEL}}`, written in each file.<!-- sdd:if !lean --> Full catalogue, deferred or rejected tools and why: [`docs/AGENT_TOOLBOX.md`](docs/AGENT_TOOLBOX.md).<!-- sdd:endif -->
 
-## 12. Mode de travail
+## 12. Working style
 
 <!-- sdd:if !work-style -->
-Pas de mode de travail commun imposé : chacun règle le sien (mémoire Claude, `~/.claude/CLAUDE.md`).
+No shared working style is imposed: each developer sets their own (Claude memory, `~/.claude/CLAUDE.md`).
 <!-- sdd:endif -->
 <!-- sdd:if work-style -->
-- **Cadrage court et concret** : poser l'objectif d'abord, puis **3 questions au plus** par tour, chacune avec un exemple concret (payload, chiffres, parcours utilisateur, appel avant/après) et la réponse recommandée. Ce que le code ou les specs<!-- sdd:if graphify --> (ou le graph)<!-- sdd:endif --> peuvent dire est le travail de l'agent : ne jamais le demander.
-- **Jusqu'au bout une fois le cadrage validé** : enchaîner toutes les tranches (modules, tests, docs) sans demander « go ? » entre elles. Review adversariale et vérification honnête maintenues. S'arrêter seulement pour une vraie décision, un trou de design découvert, ou une condition de fusion qui échoue (CI rouge, BLOQUANT/MAJEUR ouvert).
-- **Un seul rapport final** sur une grosse tâche (change complet, plusieurs agents), aux sections fixes : fait / décisions prises / trouvé et corrigé / réserves / tests (chiffrés : N passés, M échoués, noms) / ce que j'attends de toi. Pas de flux de messages partiels entre agents.
-- **Agents longs en arrière-plan** : un agent de dev ou de test sur un change complet → `run_in_background`, annoncer agent + raison + durée approximative, avancer sur autre chose ; ne jamais inventer son résultat avant la notification.
-- **Passation tôt** : après chaque PR fusionnée ou change archivé dans une session longue, et dès que le contexte est lourd, proposer `/sdd-core:passation <objectif suivant>` plutôt qu'enchaîner. Ne jamais lancer un `/opsx:new` dans un contexte chargé sans l'avoir proposé.
+- **Short, concrete framing**: state the goal first, then **3 questions at most** per round, each with a concrete example (payload, figures, user journey, before/after call) and the recommended answer. What the code or the specs<!-- sdd:if graphify --> (or the graph)<!-- sdd:endif --> can tell is the agent's job: never ask for it.
+- **All the way once the framing is agreed**: chain all the slices (modules, tests, docs) without asking "go?" between them. Adversarial review and honest verification are kept. Stop only for a real decision, a design gap discovered along the way, or a failing merge condition (red CI, open BLOCKER/MAJOR).
+- **A single final report** on a large task (full change, several agents), with fixed sections: done / decisions taken / found and fixed / caveats / tests (with figures: N passed, M failed, names) / what I expect from you. No stream of partial messages between agents.
+- **Long agents in the background**: a dev or test agent on a full change → `run_in_background`, announce the agent + reason + approximate duration, move on to something else; never invent its result before the notification. One heavy build/test run at a time on the machine.
+- **Early handoff**: after each merged PR or archived change in a long session, and as soon as the context gets heavy, offer `/sdd-core:passation <next goal>` rather than chaining. Never start an `/opsx:new` in a loaded context without having offered it.
 <!-- sdd:endif -->
 <!-- sdd:if caveman -->
-- **Caveman** : réponses compressées (plugin `caveman`) ; prose normale pour les avertissements de sécurité, les confirmations d'actions irréversibles, le code, les commits et les PR.
+- **Caveman**: compressed replies (`caveman` plugin); normal prose for security warnings, confirmations of irreversible actions, code, commits and PRs.
 <!-- sdd:endif -->
 <!-- sdd:if cockpit -->
 
-### Contrat d'affichage (mods desktop `claude-mods`)
+### Display contract (`claude-mods` desktop mods)
 
-Les questions à trancher, les messages de commit et le bloc ```cockpit suivent le contrat d'affichage injecté par le mod `conversation-cards` / `openspec-cockpit` : `### Q1 · <titre>` + options `- A · <label> — <explication>` (recommandée marquée) + `Recommandation : …` ; commits dans un bloc ```text ; bloc ```cockpit en fin de message quand l'utilisateur doit trancher, faire ou vérifier quelque chose.
+Decisions to make, commit messages and the ```cockpit block follow the display contract injected by the `conversation-cards` / `openspec-cockpit` mods: `### Q1 · <title>` + options `- A · <label> — <explanation>` (the recommended one marked `(recommandé)`) + `Recommandation : …`; commits in a ```text block; a ```cockpit block at the end of a message when the user has to decide, do or check something, with the prefixes `trancher:`, `confirmer:`, `faire:`, `vérifier:`, `info:`. These keywords stay in French because the mods parse them verbatim.
 <!-- sdd:endif -->

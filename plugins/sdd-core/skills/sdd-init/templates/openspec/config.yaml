@@ -1,9 +1,9 @@
-# sdd:note: fusionné dans openspec/config.yaml APRÈS `openspec init` (garder la clé `schema`
-# écrite par le CLI si elle diffère). Les marqueurs à l'intérieur du bloc `context: |` sont du
-# texte YAML, pas des commentaires : les remplacer comme ailleurs. Le `context` fait 25 lignes AU
-# PLUS : il est injecté dans chaque artefact OpenSpec, donc il RÉSUME et RENVOIE aux docs
-# (docs/ARCHITECTURE.md, docs/CODING_RULES.md de chaque module) au lieu de les recopier.
-# Tout ce fichier est en anglais : {{PROJECT_PITCH}} et {{DOMAIN_RISKS}} y sont TRADUITS.
+# sdd:note: merged into openspec/config.yaml AFTER `openspec init` (keep the `schema` key
+# written by the CLI if it differs). The markers inside the `context: |` block are YAML
+# text, not comments: replace them like everywhere else. The `context` is 25 lines AT
+# MOST: it is injected into every OpenSpec artifact, so it SUMMARISES and POINTS to the docs
+# (docs/ARCHITECTURE.md, each module's docs/CODING_RULES.md) instead of copying them.
+# This whole file is in English: {{PROJECT_PITCH}} and {{DOMAIN_RISKS}} are TRANSLATED here.
 schema: spec-driven
 
 context: |
@@ -43,11 +43,16 @@ rules:
   tasks:
     - "Every implementation group MUST end with test tasks (# sdd:fill: test kinds per module, e.g. pytest integration for business rules, unit tests for pure logic)"
     - Keep tasks small enough to complete in one session
+    # sdd:if graphify
+    - A rename or contract/type change whose `graphify affected` crosses more than one module is split into add → migrate callers → remove, each step leaving build and tests green
+    # sdd:endif
+    # sdd:if !graphify
     - A rename or contract/type change that crosses more than one module is split into add → migrate callers → remove, each step leaving build and tests green
+    # sdd:endif
     # sdd:if !ui
     - After the implementation groups, a task runs the code-reviewer pass on the uncommitted diff
     # sdd:endif
     # sdd:if ui
-    - After the implementation groups, a task runs the code-reviewer pass on the uncommitted diff (plus /sdd-ui:web-design-guidelines when UI files change; /sdd-ui:review-animations when motion changes)
+    - After the implementation groups, a task runs the code-reviewer pass on the uncommitted diff (plus /sdd-ui:web-design-guidelines when UI files change; /sdd-ui:review-animations when motion changes — a user-invoked skill, so otherwise an agent reads the sdd-ui plugin's review-animations/SKILL.md + STANDARDS.md and applies them)
     # sdd:endif
     - "Final task: run {{CHECK_COMMANDS}}, the same checks as CI, and report results"

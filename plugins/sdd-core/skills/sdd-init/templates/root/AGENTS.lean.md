@@ -1,8 +1,8 @@
-<!-- sdd:note: version de AGENTS.md pour l'option lean (module unique, petit projet) -->
-# AGENTS.md — équipe virtuelle Claude pour {{PROJECT_NAME}}
+<!-- sdd:note: AGENTS.md version for the lean option (single module, small project) -->
+# AGENTS.md — the Claude virtual team for {{PROJECT_NAME}}
 
-Les agents de ce projet sont définis dans [`.claude/agents/`](.claude/agents/) ; leur table de
-routage est dans [`.claude/agents/README.md`](.claude/agents/README.md), et le cycle qu'ils suivent
-dans [`CLAUDE.md`](CLAUDE.md) §3 (feature) et §8 (routage). Pour ajouter un rôle : un fichier
-`.claude/agents/<nom>.md` avec `name`, une `description` « UTILISER QUAND … NE PAS UTILISER … »,
-`tools` et `model: {{AGENT_MODEL}}`, puis une ligne dans le README des agents.
+This project's agents are defined in [`.claude/agents/`](.claude/agents/); their routing table
+is in [`.claude/agents/README.md`](.claude/agents/README.md), and the cycle they follow
+in [`CLAUDE.md`](CLAUDE.md) §3 (feature) and §8 (routing). To add a role: a file
+`.claude/agents/<name>.md` with `name`, a `description` "USE WHEN … DO NOT USE …",
+`tools` and `model: {{AGENT_MODEL}}`, then a line in the agents README.

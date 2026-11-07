@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "<ui-module-name>",
+      "runtimeExecutable": "<executable from the module's dev-server script, e.g. npm, pnpm, bash>",
+      "runtimeArgs": ["<arguments, e.g. run, dev — or -c, cd apps/web && npx vite --port ${PORT:-3000} --strictPort>"],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}

@@ -1,39 +1,39 @@
-# Glossaire
+# Glossary
 
-Le vocabulaire partagé du domaine, pour l'équipe et pour les agents : un terme qui le contredit
-pendant un cadrage est challengé. Règle : **un concept = un mot**. Les synonymes vont sous
-_Éviter_, et la spec OpenSpec (`openspec/specs/`) l'emporte en cas de conflit. Le glossaire est
-tenu via le skill `sdd-core:domain-modeling` : un
-terme nouveau ou contesté se tranche avec l'utilisateur, puis s'écrit ici.
+The shared vocabulary of the domain, for the team and for the agents: a term that contradicts it
+during framing gets challenged. Rule: **one concept = one word**. Synonyms go under
+_Avoid_, and the OpenSpec spec (`openspec/specs/`) wins in case of conflict. The glossary is
+maintained through the `sdd-core:domain-modeling` skill: a
+new or disputed term is settled with the user, then written here.
 
 ## Format
 
 ```
-**Commande** (`Order`, `order_id`) :
-Demande d'achat passée par un client, identifiée par son `order_id`. À l'écran : « commande ».
-_Éviter_ : achat (le paiement, pas la demande), panier (avant validation)
-_Source_ : `openspec/specs/ordering/spec.md`
+**Order** (`Order`, `order_id`):
+A purchase request placed by a customer, identified by its `order_id`. On screen: "order".
+_Avoid_: purchase (the payment, not the request), cart (before checkout)
+_Source_: `openspec/specs/ordering/spec.md`
 ```
 
-Règles :
+Rules:
 
-- **Terme canonique en {{DOC_LANG}}** en gras, suivi de son ou ses **identifiants de code** entre
-  parenthèses et en backticks. Pas d'identifiant : `(pas d'identifiant)`.
-- **Définition = ce que c'EST**, en une ou deux phrases. **Aucun détail d'implémentation** : pas de
-  seuil, de table, de migration ni de classe au-delà de l'identifiant. Ces détails vivent dans la
-  spec, `MODULES.md` ou le code.
-- **Seulement les termes propres au domaine.** Les concepts généraux de programmation (timeout,
-  cache, endpoint) n'ont rien à faire ici.
-- `_Éviter_` liste les synonymes écartés ; `_Source_` pointe la spec (ou le document, ou le fichier
-  de code) qui fait foi.
-- Termes **groupés par thème** (un `###` par thème, sous `## Termes`).
-- Un conflit non résolu n'est pas tranché en silence : il est marqué `⚠️ À arbitrer` dans l'entrée
-  et listé sous [À arbitrer](#à-arbitrer).
+- **Canonical term in {{DOC_LANG}}** in bold, followed by its **code identifier(s)** in
+  parentheses and backticks. No identifier: `(no identifier)`.
+- **Definition = what it IS**, in one or two sentences. **No implementation details**: no
+  threshold, table, migration or class beyond the identifier. Those details live in the
+  spec, `MODULES.md` or the code.
+- **Only domain-specific terms.** General programming concepts (timeout,
+  cache, endpoint) do not belong here.
+- `_Avoid_` lists the rejected synonyms; `_Source_` points to the spec (or document, or code
+  file) that is authoritative.
+- Terms **grouped by theme** (one `###` per theme, under `## Terms`).
+- An unresolved conflict is not settled silently: it is marked `⚠️ To settle` in the entry
+  and listed under [To settle](#to-settle).
 
-## Termes
+## Terms
 
-<!-- sdd:fill: amorce tirée du code — les entités/agrégats/value objects métier, enums de statut et noms d'écrans récurrents. Un `###` par thème. Chaque entrée au format ci-dessus, `_Source_` = le fichier de code qui la définit (pas encore de spec). Deux noms pour un même concept trouvés dans le code → entrée marquée `⚠️ À arbitrer`. Pas plus de ~20 termes : les plus centraux. -->
+<!-- sdd:fill: seed taken from the code — business entities/aggregates/value objects, status enums and recurring screen names. One `###` per theme. Each entry in the format above, `_Source_` = the code file that defines it (no spec yet). Two names for the same concept found in the code → entry marked `⚠️ To settle`. No more than ~20 terms: the most central ones. -->
 
-## À arbitrer
+## To settle
 
-<!-- sdd:fill: liste des conflits de vocabulaire trouvés pendant la rétro-doc (terme, variantes observées avec fichiers, recommandation) — ou « Aucun conflit relevé. » -->
+<!-- sdd:fill: list of the vocabulary conflicts found during the reverse documentation (term, observed variants with files, recommendation) — or "No conflict found." -->

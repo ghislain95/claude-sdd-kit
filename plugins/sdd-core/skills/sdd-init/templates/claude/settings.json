@@ -1,4 +1,38 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git diff)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch -vv)",
+      "Bash(git branch --list *)",
+      "Bash(git rev-parse *)",
+      "Bash(openspec *)",
+      "Bash(gh run list *)",
+      "Bash(gh run view *)",
+      "Bash(gh run watch *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr create *)",
+      "Bash(gh auth status)",
+      "Bash(graphify update *)",
+      "Bash(graphify check-update *)",
+      "Bash(graphify query *)",
+      "Bash(graphify path *)",
+      "Bash(graphify explain *)",
+      "Bash(graphify affected *)",
+      "Bash(graphify god-nodes *)",
+      "Bash(graphify hook status)",
+      "Bash(jq *)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(bash .claude/hooks/block-git-writes.test.sh)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

@@ -1,7 +1,9 @@
 {
   "name": "sdd-ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Optional UI review and polish skills for projects with a web interface: accessibility/UX lint, worst-case data stress test, motion build/review/audit, UI polish.",
-  "author": { "name": "ghislain95" },
+  "author": {
+    "name": "ghislain95"
+  },
   "license": "MIT"
 }

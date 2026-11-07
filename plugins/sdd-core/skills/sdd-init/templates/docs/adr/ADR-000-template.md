@@ -1,38 +1,38 @@
-<!-- sdd:note: ce fichier est copié comme modèle (docs/adr/ADR-000-template.md), {{DOMAIN_RISKS}} remplacé et les placeholders <…> gardés ; les ADR de rétro-doc créés par sdd-init s'appellent ADR-001-<sujet>.md, ADR-002-…, statut « Acceptée (rétro-documentée) », Décideur « existant — à confirmer », sections remplies depuis le code. Retirer cette note dans les deux cas. -->
-# ADR-NNN — <Titre court de la décision>
+<!-- sdd:note: this file is copied as a template (docs/adr/ADR-000-template.md), {{DOMAIN_RISKS}} replaced and the <…> placeholders kept; the reverse-documentation ADRs created by sdd-init are named ADR-001-<topic>.md, ADR-002-…, status "Accepted (reverse-documented)", Decider "existing — to be confirmed", sections filled from the code. Remove this note in both cases. -->
+# ADR-NNN — <Short title of the decision>
 
-- **Statut** : Proposée | Acceptée | Acceptée (rétro-documentée) | Remplacée par ADR-MMM | Abandonnée
-- **Date** : AAAA-MM-JJ
-- **Auteur** : <architect (Claude) | nom>
-- **Contexte** : <epic, ticket ou change OpenSpec concerné>
-- **Décideur** : <qui tranche>
+- **Status**: Proposed | Accepted | Accepted (reverse-documented) | Superseded by ADR-MMM | Abandoned
+- **Date**: YYYY-MM-DD
+- **Author**: <architect (Claude) | name>
+- **Context**: <epic, ticket or OpenSpec change concerned>
+- **Decider**: <who decides>
 
-## Contexte
+## Context
 
-<Quel problème force une décision maintenant ? Quelles contraintes (techniques, produit, coûts,
-{{DOMAIN_RISKS}}) ? Ce qui se passe si on ne décide pas. Lier le `design.md` du change si la
-décision en vient.>
+<What problem forces a decision now? What constraints (technical, product, costs,
+{{DOMAIN_RISKS}})? What happens if we do not decide. Link the change's `design.md` if the
+decision comes from it.>
 
-## Décisions
+## Decisions
 
-### 1. <Décision>
+### 1. <Decision>
 
-<Ce qui est décidé, en une ou deux phrases affirmatives. Puis le détail utile.>
+<What is decided, in one or two affirmative sentences. Then the useful details.>
 
-- **Alternative rejetée — <nom>** : <pourquoi pas>.
-- **Source** : <doc officielle à la version épinglée dans le fichier de dépendances, ou fichier:ligne
-  du code installé ; sans source : « non vérifiée »>.
+- **Rejected alternative — <name>**: <why not>.
+- **Source**: <official doc at the version pinned in the dependency file, or file:line
+  of the installed code; with no source: "unverified">.
 
-## Impact (sections à garder seulement si elles s'appliquent)
+## Impact (keep these sections only if they apply)
 
-- **Modules impactés** : <module> : <quoi>.
-- **Contrats modifiés** : <API / événement / message / format> : <détails>.
-- **Migration / compatibilité** : <schéma, breaking change, rollback>.
-- **Risques et mitigations** : <…>.
+- **Impacted modules**: <module>: <what>.
+- **Modified contracts**: <API / event / message / format>: <details>.
+- **Migration / compatibility**: <schema, breaking change, rollback>.
+- **Risks and mitigations**: <…>.
 
-## Conséquences
+## Consequences
 
-- **Positives** : <ce que la décision rend facile>.
-- **Négatives / coûts** : <ce qu'elle rend difficile, dette assumée, coûts en latence, perte de
-  données, exploitation>.
-- **Suivi** : <ce qui devra être revu, et quand (déclencheur)>.
+- **Positive**: <what the decision makes easy>.
+- **Negative / costs**: <what it makes hard, accepted debt, costs in latency, data
+  loss, operations>.
+- **Follow-up**: <what will need to be reviewed, and when (trigger)>.

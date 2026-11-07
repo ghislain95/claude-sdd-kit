@@ -13,7 +13,7 @@ is not this skill — every framing and design already does that.
 
 ## Files
 
-- Glossary: **`docs/GLOSSARY.md`** — canonical term in the docs language (`CLAUDE.md` §Langue)
+- Glossary: **`docs/GLOSSARY.md`** — canonical term in the docs language (`CLAUDE.md` §Language)
   + code identifier(s), definition, `_Éviter_` synonyms, `_Source_`. Format in
   [GLOSSARY-FORMAT.md](GLOSSARY-FORMAT.md). Entries in an older format (ex. a legacy table)
   migrate to this format when a change touches them.

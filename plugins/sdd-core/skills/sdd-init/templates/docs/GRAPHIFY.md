@@ -1,130 +1,130 @@
-<!-- sdd:note: fichier généré SEULEMENT si l'option graphify est active ; sinon ne pas le créer (et ne pas le lier depuis CLAUDE.md ni AGENT_TOOLBOX.md) -->
-# Graphify — carte du code interrogeable
+<!-- sdd:note: file generated ONLY if the graphify option is on; otherwise do not create it (and do not link it from CLAUDE.md or AGENT_TOOLBOX.md) -->
+# Graphify — queryable code map
 
-> Outil de **lecture/navigation** du code pour les assistants IA (Claude Code). Transforme le repo en **knowledge graph** local et interrogeable. **Pas une source de vérité** : `openspec/specs/` reste la vérité comportementale ; graphify n'écrit rien dans les specs, ne décide rien, ne code rien.
+> A **reading/navigation** tool for AI assistants (Claude Code). Turns the repo into a local, queryable **knowledge graph**. **Not a source of truth**: `openspec/specs/` remains the behavioural truth; graphify writes nothing in the specs, decides nothing, codes nothing.
 
-## Pourquoi
+## Why
 
-Sur un codebase de taille réelle, répondre à « qui appelle X », « qu'est-ce qui relie le module A au module B », « qu'est-ce qui casse si je touche ce type » coûte beaucoup de grep et de lecture. Graphify répond via un graphe (nœuds = symboles, arêtes = calls/imports/inherits, citées `file:line`), avec nettement moins de tokens que le grep aveugle — à mesurer sur ce repo avec `graphify benchmark` (ordre de grandeur constaté sur d'autres projets : ~5×).
+On a real-size codebase, answering "who calls X", "what links module A to module B", "what breaks if I touch this type" costs a lot of grepping and reading. Graphify answers through a graph (nodes = symbols, edges = calls/imports/inherits, cited `file:line`), with far fewer tokens than blind grepping — measure it on this repo with `graphify benchmark` (order of magnitude seen on other projects: ~5×).
 
-Parsing **tree-sitter AST**, local et déterministe, **zéro appel réseau** pour le code. Les docs/PDF/images ne passeraient que par une passe sémantique (LLM), **qui ne tourne pas ici** : voir [Pourquoi la passe sémantique ne tourne pas](#pourquoi-la-passe-sémantique-ne-tourne-pas).
+**tree-sitter AST** parsing, local and deterministic, **zero network calls** for code. Docs/PDFs/images would only go through a semantic pass (LLM), **which does not run here**: see [Why the semantic pass does not run](#why-the-semantic-pass-does-not-run).
 
-## Prérequis (une fois par dev / CI)
+## Prerequisites (once per dev / CI)
 
 ```bash
-uv tool install "graphifyy[sql]"   # l'extra [sql] capte aussi les fichiers SQL (migrations, schémas)
-graphify --version                  # doit afficher une version
-graphify install --platform claude  # installe le skill /graphify au niveau utilisateur (pas dans le repo)
+uv tool install "graphifyy[sql]"   # the [sql] extra also captures SQL files (migrations, schemas)
+graphify --version                  # must print a version
+graphify install --platform claude  # installs the /graphify skill at user level (not in the repo)
 ```
 
-Désinstaller : voir [Retrait complet](#retrait-complet).
+Uninstall: see [Full removal](#full-removal).
 
-## Construire / rafraîchir le graph
+## Build / refresh the graph
 
-Le graph vit dans `graphify-out/` (**gitignored**, jamais committé — volumineux et volatil).
+The graph lives in `graphify-out/` (**gitignored**, never committed — large and volatile).
 
 ```bash
-# build initial, code-only (AST local, aucun coût API)
+# initial build, code-only (local AST, no API cost)
 graphify extract . --code-only
 
-# refresh incrémental (ré-extrait seulement les fichiers changés, AST-only)
+# incremental refresh (re-extracts only changed files, AST-only)
 graphify update .
 
-# le graph est-il périmé vs les fichiers ?
+# is the graph stale compared with the files?
 graphify check-update .
 
-# après un GROS refactor / des suppressions : forcer le re-scan
-# (sinon des nœuds « fantômes » du code supprimé subsistent)
+# after a BIG refactor / deletions: force a re-scan
+# (otherwise "ghost" nodes of deleted code remain)
 graphify update . --force
 ```
 
-**Exclusions** : un `.graphifyignore` (committé, syntaxe `.gitignore`) retire le bruit et rend le graph **déterministe**.
+**Exclusions**: a `.graphifyignore` (committed, `.gitignore` syntax) removes the noise and makes the graph **deterministic**.
 
-| Exclu | Raison |
+| Excluded | Reason |
 |---|---|
-| Lockfiles | Énormes, faible valeur |
-| `.claude/` | Outillage agent : la doc des skills n'a rien à faire dans le graph du code |
-| `**/*.md` | Sans passe sémantique, un markdown ne produit que des nœuds de **titres**, sans arête vers le code ; ajoutés au gré des commits, ils forment un index partiel arbitraire, plus trompeur qu'une absence. Pour chercher dans la doc : grep / lecture directe (`openspec/specs/` reste la vérité) |
-| `graphify-out/` | Le graph lui-même |
-<!-- sdd:fill: exclusions propres à la stack (stories, code généré, fixtures volumineuses…) avec leur raison — ou rien -->
+| Lockfiles | Huge, low value |
+| `.claude/` | Agent tooling: skill docs have no place in the code graph |
+| `**/*.md` | Without a semantic pass, a markdown file only produces **title** nodes, with no edge to the code; added commit after commit, they form an arbitrary partial index, more misleading than nothing. To search the docs: grep / direct reading (`openspec/specs/` remains the truth) |
+| `graphify-out/` | The graph itself |
+<!-- sdd:fill: stack-specific exclusions (stories, generated code, large fixtures…) with their reason — or nothing -->
 
-Les **tests sont gardés** (contexte usage/impact utile). Les dossiers de build déjà dans `.gitignore` sont exclus d'office (respecté par graphify).
+**Tests are kept** (useful usage/impact context). Build folders already in `.gitignore` are excluded automatically (graphify respects it).
 
-> **Après toute modification de `.graphifyignore`, relancer `graphify update . --force`.** Un
-> `update` incrémental seul laisse subsister des nœuds fantômes.
+> **After any change to `.graphifyignore`, run `graphify update . --force`.** An
+> incremental `update` alone leaves ghost nodes behind.
 
-## Interroger
+## Query
 
 ```bash
-graphify query "<question>"          # traversée BFS pour une question libre (régler avec --budget / --context)
-graphify path "<A>" "<B>"            # plus court chemin (relations, cycles) — «no directed path» = découplage réel
-graphify explain "<symbole>"         # un nœud + ses voisins, cités file:line + type d'arête (EXTRACTED/INFERRED)
-graphify affected "<X>"              # traversée inverse : qui est impacté par X
-graphify god-nodes                   # hubs architecturaux (nœuds les plus connectés)
-graphify benchmark graphify-out/graph.json   # réduction de tokens mesurée
+graphify query "<question>"          # BFS traversal for a free-form question (tune with --budget / --context)
+graphify path "<A>" "<B>"            # shortest path (relations, cycles) — "no directed path" = real decoupling
+graphify explain "<symbol>"          # a node + its neighbours, cited file:line + edge type (EXTRACTED/INFERRED)
+graphify affected "<X>"              # reverse traversal: what is impacted by X
+graphify god-nodes                   # architecture hubs (most connected nodes)
+graphify benchmark graphify-out/graph.json   # measured token reduction
 ```
 
-Visualisation : `graphify-out/graph.html` (`--no-viz` au build si > 5000 nœuds). Rapport : `graphify cluster-only . --no-label` génère `GRAPH_REPORT.md` sans coût LLM.
+Visualisation: `graphify-out/graph.html` (`--no-viz` at build time if > 5000 nodes). Report: `graphify cluster-only . --no-label` generates `GRAPH_REPORT.md` with no LLM cost.
 
-## Place dans le workflow OpenSpec
+## Place in the OpenSpec workflow
 
-Le cycle OpenSpec (voir [`CLAUDE.md` §3](../CLAUDE.md)) **ne change pas**. Graphify s'insère en **lecture** à trois moments :
+The OpenSpec cycle (see [`CLAUDE.md` §3](../CLAUDE.md)) **does not change**. Graphify fits in as **reading** at three moments:
 
-1. **Recon (pré-change)** — interroger le graph (`explain`/`path`/`affected`/`query`) **avant** de lancer des agents d'exploration ou de grep. Lire ensuite les fichiers **ciblés** pointés.
-2. **Cadrage / architecture** — `path "<A>" "<B>"` pour vérifier cycles et impact **avant** de proposer un design ; `god-nodes` pour les hubs concernés.
-3. **Implémentation** — retrouver un précédent/pattern via `explain`/`query`.
+1. **Recon (pre-change)** — query the graph (`explain`/`path`/`affected`/`query`) **before** launching exploration agents or grepping. Then read the **targeted** files it points to.
+2. **Framing / architecture** — `path "<A>" "<B>"` to check cycles and impact **before** proposing a design; `god-nodes` for the hubs concerned.
+3. **Implementation** — find a precedent/pattern through `explain`/`query`.
 
-**Fraîcheur = priorité**, portée par la session principale ([`CLAUDE.md` §10](../CLAUDE.md)), pas par les agents :
+**Freshness = priority**, owned by the main session ([`CLAUDE.md` §10](../CLAUDE.md)), not by the agents:
 
-| Moment | Commande |
+| Moment | Command |
 |---|---|
-| Avant le recon de `/opsx:new` | `graphify update .` puis `graphify check-update .` — cadrer sur un graph périmé produit un proposal faux |
-| Avant `/opsx:apply` | `graphify check-update .` ; périmé → `graphify update .` |
-| Après `/opsx:archive` | `graphify update . --force` si le change a **supprimé ou renommé** des fichiers, sinon `graphify update .` ; puis `check-update .` |
+| Before the `/opsx:new` recon | `graphify update .` then `graphify check-update .` — framing on a stale graph produces a wrong proposal |
+| Before `/opsx:apply` | `graphify check-update .`; stale → `graphify update .` |
+| After `/opsx:archive` | `graphify update . --force` if the change **deleted or renamed** files, else `graphify update .`; then `check-update .` |
 
-Après une modif de code notable en cours de tâche : `graphify update .`. Quand on **dispatche un
-agent** sur du code, lui rappeler d'interroger le graph **dans le prompt de dispatch** : sa
-définition le dit déjà, mais le prompt est le seul levier fiable. Un agent qui doit lancer ces
-commandes a besoin de l'outil `Bash`.
+After a notable code change in the middle of a task: `graphify update .`. When **dispatching an
+agent** on code, remind it to query the graph **in the dispatch prompt**: its
+definition already says so, but the prompt is the only reliable lever. An agent that must run these
+commands needs the `Bash` tool.
 
-**Filet opt-in per-dev** : `graphify hook install` (local, non committé — `.git/hooks/` ne se
-partage pas) reconstruit le graph en incrémental après chaque commit ou checkout, en AST seul donc
-sans coût API. Il s'ajoute aux trois points ci-dessus sans les remplacer : il ne couvre pas le
-`--force` après suppressions.
+**Recommended per-dev safety net**: `graphify hook install` (local, uncommitted — `.git/hooks/` is
+not shared, so each developer runs it once; `graphify hook status` to check) rebuilds the graph
+incrementally after each commit or checkout, AST only so no API cost. It comes on top of the three points above without replacing them: it does not cover the
+`--force` after deletions.
 
-## Choix d'intégration (assumés)
+## Integration choices (deliberate)
 
-- **Skill installé au niveau utilisateur** (`graphify install --platform claude`, une fois par dev), **pas committé** dans `.claude/skills/` : il suit la version du CLI de chacun. **Config partagée, pas le graph** : `.graphifyignore` est committé, `graphify-out/` est gitignored et régénéré.
-- **Pas de hook graphify committé.** L'auto-nudge (`graphify hook-guard` sur chaque Read/Grep/Bash) est non-bloquant mais **fréquent** et pointe un chemin absolu **non portable**. Un dev qui le veut : `graphify claude install --project` en local — ⚠️ il modifie `.claude/settings.json`, qui est committé (il porte le hook du garde-fou git) : ne pas ajouter cette modification au commit. Retrait : `graphify claude uninstall`.
-- **Pas de `watch`** par défaut (éviter les rebuilds incessants).
+- **Skill installed at user level** (`graphify install --platform claude`, once per dev), **not committed** in `.claude/skills/`: it follows each developer's CLI version. **Shared config, not the graph**: `.graphifyignore` is committed, `graphify-out/` is gitignored and regenerated.
+- **No committed graphify hook.** The auto-nudge (`graphify hook-guard` on every Read/Grep/Bash) is non-blocking but **frequent** and points to a **non-portable** absolute path. A dev who wants it: `graphify claude install --project` locally — ⚠️ it modifies `.claude/settings.json`, which is committed (it carries the git guardrail hook): do not add that change to the commit. Removal: `graphify claude uninstall`.
+- **No `watch`** by default (avoid endless rebuilds).
 
-## Limites
+## Limits
 
-- Un graph **périmé** induit en erreur → toujours refresh + `check-update` avant de s'y fier.
-- **La doc n'est pas dans le graph**, garanti par `.graphifyignore` (`**/*.md`), pas par le flag `--code-only` → pas de lien code↔spec.
-- La recherche texte libre (`query`) s'évase parfois ; les commandes structurelles (`explain`/`path`/`affected`/`god-nodes`) sont plus tranchantes.
-- `god-nodes` remonte par construction les classes utilitaires de test : ce ne sont pas des hubs d'architecture.
+- A **stale** graph misleads → always refresh + `check-update` before relying on it.
+- **Docs are not in the graph**, guaranteed by `.graphifyignore` (`**/*.md`), not by the `--code-only` flag → no code↔spec link.
+- Free-text search (`query`) sometimes spreads out; the structural commands (`explain`/`path`/`affected`/`god-nodes`) are sharper.
+- `god-nodes` surfaces shared test utility classes by construction: they are not architecture hubs.
 
-### Pourquoi la passe sémantique ne tourne pas
+### Why the semantic pass does not run
 
-Constats faits sur d'autres projets (graphify 0.9.x), à re-vérifier si la version change :
+Findings from other projects (graphify 0.9.x), to re-check if the version changes:
 
-- `--backend claude` exige `ANTHROPIC_API_KEY`. **Ce n'est pas la CLI** : le nom induit en erreur.
-- `--backend claude-cli` passe par la CLI, mais `claude -p` refuse le jeton OAuth de l'abonnement
-  (`401 OAuth access token has expired`, même juste après une connexion) ; il veut une clé API.
-- `--backend ollama` fonctionne mais est inexploitable en local sur un modèle moyen (quelques
-  fichiers en plusieurs dizaines de minutes).
+- `--backend claude` requires `ANTHROPIC_API_KEY`. **It is not the CLI**: the name is misleading.
+- `--backend claude-cli` goes through the CLI, but `claude -p` rejects the subscription's OAuth token
+  (`401 OAuth access token has expired`, even right after logging in); it wants an API key.
+- `--backend ollama` works but is unusable locally on a mid-size model (a few
+  files in several tens of minutes).
 
-⚠️ Les extras se cumulent explicitement : `uv tool install "graphifyy[sql,ollama]"`. Installer
-`[ollama]` seul **désinstalle `[sql]`** et casse silencieusement l'extraction des migrations SQL.
+⚠️ Extras add up explicitly: `uv tool install "graphifyy[sql,ollama]"`. Installing
+`[ollama]` alone **uninstalls `[sql]`** and silently breaks the extraction of SQL migrations.
 
-**Preuve que la passe ne tourne pas** : tous les nœuds et arêtes de `graph.json` portent
+**Proof that the pass does not run**: every node and edge in `graph.json` carries
 `_origin: "ast"`.
 
-## Retrait complet
+## Full removal
 
 ```bash
-graphify uninstall                 # retire le skill de toutes les plateformes détectées
-rm -rf graphify-out                # supprime le graph local
-uv tool uninstall graphifyy        # retire l'outil
+graphify uninstall                 # removes the skill from every detected platform
+rm -rf graphify-out                # deletes the local graph
+uv tool uninstall graphifyy        # removes the tool
 ```

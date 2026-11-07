@@ -1,65 +1,64 @@
-# Agents Claude Code — {{PROJECT_NAME}}
+# Claude Code agents — {{PROJECT_NAME}}
 
-Chaque fichier `*.md` de ce dossier définit un **sous-agent** spécialisé. Claude principal les
-choisit seul d'après leur `description` (« UTILISER QUAND / NE PAS UTILISER ») ; on peut aussi les
-lister avec `/agents`. Workflow et conventions : [`/AGENTS.md`](../../AGENTS.md).
+Each `*.md` file in this folder defines a specialised **subagent**. The main Claude picks them on
+its own from their `description` ("USE WHEN / DO NOT USE"); you can also list them with `/agents`.
+Workflow and conventions: [`/AGENTS.md`](../../AGENTS.md).
 
-## Table de routage
+## Routing table
 
-**Avant d'écrire ou de coder, identifier le bon agent et déléguer.** N'agir soi-même que si aucun
-agent ne correspond ou si la tâche est triviale (lecture rapide, question factuelle).
+**Before writing or coding, identify the right agent and delegate.** Act yourself only when no
+agent fits or the task is trivial (quick read, factual question).
 
-| L'utilisateur demande… | Agent |
+| The user asks… | Agent |
 |---|---|
-| « je veux une feature X », « on devrait pouvoir Y », besoin métier flou, prioriser, user story, proposal | `product-owner` |
-| « comment on devrait faire X », choix transverse<!-- sdd:if multi-module -->, impact > 1 module<!-- sdd:endif -->, nouveau contrat externe, spec deltas, design.md, ADR, passe adversariale | `architect` |
+| "I want feature X", "we should be able to Y", fuzzy business need, prioritisation, user story, proposal | `product-owner` |
+| "how should we do X", cross-cutting choice<!-- sdd:if multi-module -->, impact on > 1 module<!-- sdd:endif -->, new external contract, spec deltas, design.md, ADR, adversarial pass | `architect` |
 <!-- sdd:each module -->
-| implémentation dans `{{MODULE_PATH}}` ({{MODULE_STACK}}) | `{{MODULE_NAME}}-dev` |
+| implementation in `{{MODULE_PATH}}` ({{MODULE_STACK}}) | `{{MODULE_NAME}}-dev` |
 <!-- sdd:endeach -->
 <!-- sdd:if multi-module -->
-| petite feature cohérente touchant plusieurs modules | `full-stack-dev` |
+| small coherent feature spanning several modules | `full-stack-dev` |
 <!-- sdd:endif -->
-| « review ce diff », « valide ma PR », « regarde ce que j'ai fait » ; systématique après une implémentation | `code-reviewer` |
-| écrire / compléter des tests, test de régression | `tester` |
-| mettre à jour la doc, README, glossaire, `docs/` ; post-archive | `doc-writer` |
+| "review this diff", "validate my PR", "look at what I did"; always after an implementation | `code-reviewer` |
+| write / complete tests, regression test | `tester` |
+| update docs, README, glossary, `docs/`; post-archive | `doc-writer` |
 <!-- sdd:if devops -->
-| infra, conteneurs, CI, secrets, configs de prod | `devops` |
+| infra, containers, CI, secrets, production configs | `devops` |
 <!-- sdd:endif -->
 
-### Règles de routage
-- Plusieurs agents possibles → celui qui **maximise la spécialisation**<!-- sdd:if multi-module --> (l'agent du module plutôt que `full-stack-dev` si la tâche ne touche qu'un module)<!-- sdd:endif -->.
-- Demande ambiguë → **1 question max** à l'utilisateur, puis router.
-- Feature large → cycle OpenSpec : `product-owner` (proposal) → [`architect` passe adversariale]
-  → `architect` (deltas + design + tasks) → agents de dev (tasks) → `tester` → `code-reviewer` →
-  `/opsx:verify` → commit → `/opsx:archive` → post-archive (`doc-writer` si impact doc).
-- Bug → agent de dev du module (reproduire, cause racine), `tester` (test qui échoue), fix,
+### Routing rules
+- Several agents fit → the one that **maximises specialisation**<!-- sdd:if multi-module --> (the module's agent rather than `full-stack-dev` when the task touches a single module)<!-- sdd:endif -->.
+- Ambiguous request → **at most 1 question** to the user, then route.
+- Large feature → OpenSpec cycle: `product-owner` (proposal) → [`architect` adversarial pass]
+  → `architect` (deltas + design + tasks) → dev agents (tasks) → `tester` → `code-reviewer` →
+  `/opsx:verify` → commit → `/opsx:archive` → post-archive (`doc-writer` if docs are impacted).
+- Bug → the module's dev agent (reproduce, root cause), `tester` (failing test), fix,
   `code-reviewer`.
-- Toujours annoncer l'agent choisi avant délégation : « Routing → `<agent>` parce que <raison> ».
+- Always announce the chosen agent before delegating: "Routing → `<agent>` because <reason>".
 
-### Quand ne pas déléguer
-- Question factuelle (« où est défini X ? ») → réponse directe.
-- Lecture de fichier demandée explicitement → exécuter.
-- Tâche < 5 min, single-shot, sans risque → exécuter, et signaler qu'elle eût pu être déléguée.
+### When not to delegate
+- Factual question ("where is X defined?") → answer directly.
+- File read explicitly requested → do it.
+- Task < 5 min, single-shot, risk-free → do it, and say it could have been delegated.
 
-## Modèle et outils
-- **Tous les agents tournent en `model: {{AGENT_MODEL}}`**, écrit explicitement dans chaque
-  fichier plutôt qu'hérité : une session lancée sur un modèle moins cher ne dégrade pas un agent
-  en silence.
-- Les outils sont ceux du frontmatter de chaque agent (source de vérité). `architect` et
-  `product-owner` ont `Write`/`Edit`, limités par consigne à leurs livrables
-  (`openspec/changes/<id>/`, `docs/adr/` ; `proposal.md`) ; leur `Bash` sert à la lecture.
-- `code-reviewer` n'a pas `Edit` : il signale, ne corrige pas.
+## Model and tools
+- **Every agent runs on `model: {{AGENT_MODEL}}`**, written explicitly in each file rather than
+  inherited: a session started on a cheaper model does not silently degrade an agent.
+- Tools are those of each agent's frontmatter (source of truth). `architect` and
+  `product-owner` have `Write`/`Edit`, restricted by instruction to their deliverables
+  (`openspec/changes/<id>/`, `docs/adr/`; `proposal.md`); their `Bash` is for reading.
+- `code-reviewer` has no `Edit`: it reports, it does not fix.
 
-## Ajouter un agent
-1. Créer `<nom>.md` :
+## Adding an agent
+1. Create `<name>.md`:
    ```yaml
    ---
-   name: <nom>
-   description: UTILISER QUAND <déclencheurs concrets>. NE PAS UTILISER <cas voisins → autre agent>.
+   name: <name>
+   description: USE WHEN <concrete triggers>. DO NOT USE <neighbouring cases → other agent>.
    tools: [Read, Edit, Write, Bash, Grep, Glob]
    model: {{AGENT_MODEL}}
    ---
    ```
-2. Décrire mission, lectures obligatoires, règles dures, workflow, anti-patterns, livrable.
-3. Mettre à jour la table de routage ci-dessus, [`/AGENTS.md`](../../AGENTS.md) et le `CLAUDE.md`.
-4. Tester en l'invoquant sur une petite tâche.
+2. Describe mission, mandatory reading, hard rules, workflow, anti-patterns, deliverable.
+3. Update the routing table above, [`/AGENTS.md`](../../AGENTS.md) and `CLAUDE.md`.
+4. Test it by invoking it on a small task.
