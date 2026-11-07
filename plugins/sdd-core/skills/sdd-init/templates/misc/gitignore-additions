@@ -1,0 +1,21 @@
+# sdd:note: appended to the project's .gitignore (skip lines already present). Keep the section header.
+
+# --- Claude Code / SDD tooling ---
+# Handoff documents between sessions (/sdd-core:passation), per developer
+/.claude/passation/
+# Local permissions and tokens (absolute paths, GH_TOKEN) — settings.json, by contrast, is shared
+/.claude/settings.local.json
+# Worktrees created by the app for parallel sessions
+/.claude/worktrees/
+# Per-machine Claude state
+.claude/memory/
+.claude/sessions/
+.claude/cache/
+# sdd:if graphify
+# graphify knowledge graph — regenerated locally, never committed
+graphify-out/
+# sdd:endif
+# Local env / secrets — never commit
+.env
+.env.local
+.env.*.local

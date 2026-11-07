@@ -1,0 +1,30 @@
+# sdd:note: copied to .graphifyignore only with the `graphify` option.
+# graphify exclusions — cut "code understanding" noise (.gitignore syntax).
+# Build/dependency folders already in .gitignore are excluded automatically.
+
+# Lockfiles — huge, low value
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+uv.lock
+poetry.lock
+Cargo.lock
+Gemfile.lock
+composer.lock
+go.sum
+
+# Agent tooling — skill docs have nothing to do in the code graph
+.claude/
+
+# Markdown — excluded to keep the graph DETERMINISTIC. Without a semantic pass, a markdown file
+# only yields orphan heading nodes with no edge to code; added commit after commit, they form an
+# arbitrary partial index, more misleading than none. Docs: grep / direct read; openspec/specs/
+# stays the behavioural source of truth.
+**/*.md
+
+# The graph itself
+graphify-out/
+
+# sdd:fill: stack-specific noise (stories, generated code, vendored deps, large fixtures), one line each with a comment — or nothing
+
+# NB: tests are KEPT on purpose (usage/impact context useful to the LLM).

@@ -1,0 +1,93 @@
+# sdd:note: generated only with the `ci` option. Replace OPENSPEC_VERSION with the output of `openspec --version` on the developer machine (pin, never @latest).
+# OpenSpec guard.
+#
+# validate         - every spec and change must parse. The CLI is pinned to the version
+#                    used locally: an unpinned @latest once broke a run after an upstream
+#                    CLI change. Bump the version here and locally together, on purpose.
+# hand-edit-guard  - openspec/specs/ is the behavioural source of truth. It is only
+#                    rewritten by /opsx:archive or /opsx:sync, and those always go with a
+#                    change folder (archive moves it, sync runs inside a change). A diff that
+#                    touches specs/ without touching changes/ is therefore a hand edit.
+name: OpenSpec
+
+on:
+  pull_request:
+    paths: [ 'openspec/**', '.github/workflows/openspec.yml' ]
+  push:
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+    paths: [ 'openspec/**', '.github/workflows/openspec.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Keep in sync with `openspec --version` on developer machines.
+      - name: Install OpenSpec CLI (pinned)
+        run: npm install -g @fission-ai/openspec@{{OPENSPEC_VERSION}}
+
+      - name: Validate all specs and changes
+        run: openspec validate --all
+
+  hand-edit-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history: the guard diffs against the base branch / previous push tip.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Specs must only change together with a change folder
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          case "$EVENT_NAME" in
+            pull_request)
+              RANGE="origin/${BASE_REF}...HEAD"
+              ;;
+            push)
+              if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+                echo "No base commit to compare - skipping."
+                exit 0
+              fi
+              if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+                echo "::warning::Base commit ${BEFORE} is not in the history (force push?) - skipping."
+                exit 0
+              fi
+              RANGE="${BEFORE}..HEAD"
+              ;;
+            *)
+              echo "Manual run - nothing to diff, skipping."
+              exit 0
+              ;;
+          esac
+
+          # --no-renames: list both sides of a move, so an archive (changes/x -> changes/archive/x)
+          # is seen as touching changes/ whatever the similarity score.
+          CHANGED=$(git diff --name-only --no-renames "$RANGE")
+          echo "Range: $RANGE"
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          if grep -q '^openspec/specs/' <<< "$CHANGED" && ! grep -q '^openspec/changes/' <<< "$CHANGED"; then
+            echo "::error::openspec/specs/ was modified without any openspec/changes/ update."
+            echo "::error::Specs only change through /opsx:archive or /opsx:sync (delta merge). Hand edits are forbidden."
+            exit 1
+          fi
+
+          echo "OK - specs changes (if any) come with a change folder."

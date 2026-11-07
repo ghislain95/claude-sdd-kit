@@ -1,0 +1,53 @@
+# sdd:note: fusionné dans openspec/config.yaml APRÈS `openspec init` (garder la clé `schema`
+# écrite par le CLI si elle diffère). Les marqueurs à l'intérieur du bloc `context: |` sont du
+# texte YAML, pas des commentaires : les remplacer comme ailleurs. Le `context` fait 25 lignes AU
+# PLUS : il est injecté dans chaque artefact OpenSpec, donc il RÉSUME et RENVOIE aux docs
+# (docs/ARCHITECTURE.md, docs/CODING_RULES.md de chaque module) au lieu de les recopier.
+# Tout ce fichier est en anglais : {{PROJECT_PITCH}} et {{DOMAIN_RISKS}} y sont TRADUITS.
+schema: spec-driven
+
+context: |
+  {{PROJECT_PITCH}}
+  What breaks expensively here: {{DOMAIN_RISKS}} — always flag impacts on these explicitly.
+
+  Stack (versions pinned in each module's dependency file):
+  # sdd:fill: one line per module — "- <module> (<path>): <language + version>, <framework>, <db/infra>"
+
+  Critical architecture rules (detail: docs/ARCHITECTURE.md and each module's docs/CODING_RULES.md):
+  # sdd:fill: 5 to 8 bullets, ONLY rules proven in the code or confirmed by the user — e.g. closed list of root packages/modules ({{ARCH_STYLE}}), adapters hold no business logic, domain free of framework imports, auth/roles source file, data never logged
+  # sdd:if migrations
+  - Schema changes only through new versioned migrations; an applied migration is never edited.
+  # sdd:endif
+
+  Language: OpenSpec artifacts, code and commits in {{CODE_LANG}}; docs/ and user-facing replies in {{DOC_LANG}}.
+  Git: Conventional Commits on the change branch, never on {{DEFAULT_BRANCH}} (docs/CONTRIBUTING.md §2).
+
+rules:
+  proposal:
+    - Always include a "Non-goals" section
+    - If the change comes from the roadmap (docs/ROADMAP.md), reference the epic (e.g. EPIC 3)
+    - "Flag any impact on {{DOMAIN_RISKS}} explicitly"
+  specs:
+    - Use Given/When/Then scenarios, written so they can be translated 1:1 into automated tests (one scenario = one test)
+    - Start every requirement with SHALL or MUST on its first line
+    - Describe observable behavior only — endpoints, events, commands, exchanged formats, error codes; no class names
+    - Cover error and edge cases (invalid input, duplicate, unauthorized role, unknown resource, limit reached), not just the happy path
+  design:
+    - State which existing module and root package(s) the change belongs to — never create a new root package
+    # sdd:if migrations
+    - State explicitly whether a schema migration is required, and in which migration folder
+    # sdd:endif
+    - Keep business logic out of adapters (HTTP controllers, message handlers, jobs, CLI) — name the domain service that owns it
+    # sdd:fill: one rule per multi-module concern if relevant (e.g. "For frontend work, state what goes into the shared package vs each app") — or remove this line
+    - Any decision relying on a library's behaviour cites its source at the version pinned in the module's dependency file (official doc URL for that version, or the installed type/source file:line); without a source, mark it "unverified"
+  tasks:
+    - "Every implementation group MUST end with test tasks (# sdd:fill: test kinds per module, e.g. pytest integration for business rules, unit tests for pure logic)"
+    - Keep tasks small enough to complete in one session
+    - A rename or contract/type change that crosses more than one module is split into add → migrate callers → remove, each step leaving build and tests green
+    # sdd:if !ui
+    - After the implementation groups, a task runs the code-reviewer pass on the uncommitted diff
+    # sdd:endif
+    # sdd:if ui
+    - After the implementation groups, a task runs the code-reviewer pass on the uncommitted diff (plus /sdd-ui:web-design-guidelines when UI files change; /sdd-ui:review-animations when motion changes)
+    # sdd:endif
+    - "Final task: run {{CHECK_COMMANDS}}, the same checks as CI, and report results"

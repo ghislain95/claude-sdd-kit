@@ -1,0 +1,74 @@
+# sdd:note: generated only with the `ci` AND `migrations` options. Replace the path list with the real migration folders/globs (one per database), and adapt the "new migration" hint to the tool (Flyway V<n+1>__, Alembic revision, Prisma migrate dev…). Skip it for tools whose applied migrations are not files (pure schema-push).
+# Migration immutability guard.
+#
+# Migration tools record what was applied (checksum, revision id). Editing, deleting or renaming
+# a migration that already exists on the base branch breaks every database that applied it, or
+# silently diverges from the ones that did not. Schema changes always go through a NEW migration.
+# Added files (A) are fine and are not checked.
+name: Migrations
+
+on:
+  pull_request:
+    paths: [ '{{MIGRATION_PATHS}}', '.github/workflows/migrations.yml' ]
+  push:
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+    paths: [ '{{MIGRATION_PATHS}}', '.github/workflows/migrations.yml' ]
+
+permissions:
+  contents: read
+
+jobs:
+  immutable-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history: the guard diffs against the base branch / previous push tip.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No applied migration may be modified, deleted or renamed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          case "$EVENT_NAME" in
+            pull_request)
+              RANGE="origin/${BASE_REF}...HEAD"
+              ;;
+            push)
+              if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+                echo "No base commit to compare - skipping."
+                exit 0
+              fi
+              if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+                echo "::warning::Base commit ${BEFORE} is not in the history (force push?) - skipping."
+                exit 0
+              fi
+              RANGE="${BEFORE}..HEAD"
+              ;;
+            *)
+              echo "Unsupported event ${EVENT_NAME} - skipping."
+              exit 0
+              ;;
+          esac
+
+          echo "Range: $RANGE"
+
+          # M = modified, D = deleted, R = renamed (-M makes renames explicit).
+          VIOLATIONS=$(git diff --name-status -M --diff-filter=MDR "$RANGE" -- \
+            '{{MIGRATION_PATHS}}')
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::Already-applied migrations were modified, deleted or renamed:"
+            while IFS= read -r line; do
+              echo "::error::  $line"
+            done <<< "$VIOLATIONS"
+            echo "::error::Never edit an applied migration - create a new migration instead."
+            exit 1
+          fi
+
+          echo "OK - no existing migration was modified, deleted or renamed."
