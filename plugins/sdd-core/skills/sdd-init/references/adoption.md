@@ -1,50 +1,51 @@
-# Adoption d'un projet déjà outillé, et `--refresh`
+# Adopting a project that already has tooling, and `--refresh`
 
-## 1. Le projet a déjà des fichiers cibles
+## 1. The project already has target files
 
-Règle : **ce qui existe a été écrit pour une raison.** On fusionne, on n'écrase pas.
+Rule: **what exists was written for a reason.** Merge, don't overwrite.
 
-| Fichier présent | Conduite |
+| File present | What to do |
 |---|---|
-| `CLAUDE.md` | Lis-le en entier. Garde tout ce qui est propre au projet (règles, contexte, pièges). Ajoute les sections du template qui manquent ; si une section existante contredit le workflow (ex. « commit directement sur main »), signale-la et demande en porte 1 — ne tranche pas seul. |
-| `AGENTS.md` (format multi-outils) | Ne le remplace pas : ajoute une section « Équipe d'agents Claude » qui renvoie à `.claude/agents/README.md`. |
-| `.claude/agents/<x>.md` | Même nom qu'un template → compare : garde les règles spécifiques de l'existant, ajoute les blocs du template (description UTILISER QUAND, format de sortie, graphify…). Nom différent → garde-le et ajoute-le à la table de routage. |
-| `.claude/settings.json` | Fusion JSON : ajoute le hook `PreToolUse` du garde-fou git, ne retire ni ne modifie rien d'autre. |
-| `.claude/hooks/*` d'un autre garde-fou git | Montre les deux à l'utilisateur, recommande de n'en garder qu'un (deux hooks contradictoires = blocages incompréhensibles). |
-| `openspec/` déjà initialisé | Pas de `openspec init`. `openspec update` pour rafraîchir les commandes. `config.yaml` : fusionne `context` et `rules` (ajoute les règles du template absentes). Les specs existantes ne sont **pas** touchées. |
-| `docs/*.md` homonymes | Fusion par section ; ce qui contredit le code observé est signalé dans le rapport (pas corrigé en silence). |
-| CI existante | N'ajoute que `openspec.yml` et `tooling.yml` ; ne touche pas aux workflows existants. |
+| `CLAUDE.md` | Read it in full. Keep everything specific to the project (rules, context, pitfalls). Add the template sections that are missing; if an existing section contradicts the workflow (e.g. "commit straight to main"), flag it and ask at gate 1 — don't decide alone. |
+| `AGENTS.md` (multi-tool format) | Don't replace it: add a "Claude agent team" section pointing to `.claude/agents/README.md`. |
+| `.claude/agents/<x>.md` | Same name as a template → compare: keep the existing file's specific rules, add the template's blocks (USE WHEN / DO NOT USE description, output format, graphify…). Different name → keep it and add it to the routing table. |
+| `.claude/settings.json` | JSON merge: add the git guardrail's `PreToolUse` hook, remove or change nothing else. |
+| `.claude/hooks/*` from another git guardrail | Show both to the user, recommend keeping only one (two contradictory hooks = baffling blocks). |
+| `openspec/` already initialised | No `openspec init`. `openspec update` to refresh the commands. `config.yaml`: merge `context` and `rules` (add the template rules that are missing). Existing specs are **not** touched. |
+| `docs/*.md` with the same name | Merge section by section; whatever contradicts the observed code is flagged in the report (not silently fixed). |
+| Existing CI | Only add `openspec.yml` and `tooling.yml`; don't touch the existing workflows. |
 
-Montre le diff de chaque fichier fusionné dans la porte de validation 1 (résumé : sections
-ajoutées / conservées / en conflit).
+Show the diff of every merged file at validation gate 1 (summary: sections added / kept / in
+conflict).
 
-## 2. Marqueur d'installation
+## 2. Install marker
 
-Dernière ligne de `CLAUDE.md` généré :
+Last line of the generated `CLAUDE.md`:
 
 ```markdown
-<!-- sdd-kit: installed <version du plugin sdd-core> on <AAAA-MM-JJ> — options: <liste> — autonomy: <niveau> -->
+<!-- sdd-kit: installed <sdd-core plugin version> on <YYYY-MM-DD> — options: <list> — autonomy: <level> -->
 ```
 
-Il sert au `--refresh`. Lis la version dans `.claude-plugin/plugin.json` du plugin (deux niveaux
-au-dessus de ce skill).
+It is what `--refresh` relies on. Read the version in the plugin's `.claude-plugin/plugin.json` (two
+levels above this skill).
 
-## 3. `/sdd-init --refresh` — resynchroniser avec une nouvelle version du kit
+## 3. `/sdd-init --refresh` — resync with a newer version of the kit
 
-1. Lis le marqueur : version installée, options, autonomie. Absent → ce n'est pas un projet
-   installé par le kit : propose une installation complète en mode adoption (§1).
-2. Branche `chore/sdd-kit-refresh-<version>`.
-3. Pour chaque fichier généré à partir d'un template (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/*`,
+1. Read the marker: installed version, options, autonomy. Missing → this project was not set up by
+   the kit: offer a full install in adoption mode (§1).
+2. Branch `chore/sdd-kit-refresh-<version>`.
+3. For every file generated from a template (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/*`,
    `docs/{CONTRIBUTING,OPENSPEC_GUIDE,AGENT_TOOLBOX,GRAPHIFY}.md`, `openspec/config.yaml`,
-   `.claude/hooks/*`, workflows CI du kit) :
-   - remplis le **nouveau** template avec les valeurs du projet (relues dans les fichiers actuels,
-     pas re-déduites) ;
-   - compare au fichier actuel : ce qui diffère vient soit du kit (à appliquer), soit d'une
-     modification locale (à garder). En cas de doute sur l'origine d'un écart, garde le local et
-     liste-le.
-4. Fichiers copiés à l'identique (hook `.sh`/`.pl`/`.test.sh`) : remplacés, puis
-   `bash .claude/hooks/block-git-writes.test.sh` ; la `.conf` locale est conservée.
-5. Ne touche jamais : `openspec/specs/`, `openspec/changes/`, la rétro-doc (`ARCHITECTURE.md`,
-   docs de module, glossaire, ADR, roadmap) — elle appartient au projet.
-6. Phase 5 de `SKILL.md` (contrôles), puis un commit `chore(sdd-kit): refresh workflow to <version>`
-   avec, dans le corps, ce qui vient du kit et les écarts locaux conservés. Marqueur mis à jour.
+   `.claude/hooks/*`, `.claude/settings.json` (union of the `allow` lists and hooks, nothing removed),
+   `.claude/settings.local.example.json`, `.claude/launch.json` (option `ui`), the kit's CI workflows):
+   - fill the **new** template with the project's values (read back from the current files, not
+     deduced again);
+   - compare with the current file: what differs comes either from the kit (to apply) or from a local
+     change (to keep). When in doubt about where a difference comes from, keep the local version and
+     list it.
+4. Files copied verbatim (hook `.sh`/`.pl`/`.test.sh`): replaced, then
+   `bash .claude/hooks/block-git-writes.test.sh`; the local `.conf` is kept.
+5. Never touch: `openspec/specs/`, `openspec/changes/`, the reverse-documentation (`ARCHITECTURE.md`,
+   module docs, glossary, ADRs, roadmap) — it belongs to the project.
+6. Phase 5 of `SKILL.md` (checks), then one commit `chore(sdd-kit): refresh workflow to <version>`
+   listing in its body what comes from the kit and the local differences kept. Marker updated.

@@ -1,54 +1,54 @@
-# Architecture système — {{PROJECT_NAME}}
+# System architecture — {{PROJECT_NAME}}
 
-> Rétro-documentation : ce document décrit l'architecture **observée dans le code** au
-> <!-- sdd:fill: date AAAA-MM-JJ et commit court de la rétro-doc -->, pas une cible. Ce qui n'a pas
-> pu être vérifié est marqué « à confirmer ». Le comportement fait foi dans `openspec/specs/` ;
-> ce document décrit la **structure**.
+> Reverse documentation: this document describes the architecture **observed in the code** as of
+> <!-- sdd:fill: date YYYY-MM-DD and short commit of the reverse documentation -->, not a target. Whatever
+> could not be verified is marked "to be confirmed". Behaviour is defined by `openspec/specs/`;
+> this document describes the **structure**.
 
 ---
 
-## 1. Vue d'ensemble
+## 1. Overview
 
 {{PROJECT_PITCH}}
 
-<!-- sdd:fill: schéma ASCII ou Mermaid des composants (modules, bases, files de messages, services externes) et de leurs flux principaux, tiré du code et des fichiers de config/déploiement -->
+<!-- sdd:fill: ASCII or Mermaid diagram of the components (modules, databases, message queues, external services) and their main flows, taken from the code and the config/deployment files -->
 
 ## 2. Modules
 
-| Module | Chemin | Stack | Rôle | Docs |
+| Module | Path | Stack | Role | Docs |
 |---|---|---|---|---|
 <!-- sdd:each module -->
-| `{{MODULE_NAME}}` | `{{MODULE_PATH}}` | {{MODULE_STACK}} | <!-- sdd:fill: rôle en une phrase --> | [`CODING_RULES`](../{{MODULE_PATH}}/docs/CODING_RULES.md) · [`MODULES`](../{{MODULE_PATH}}/docs/MODULES.md) |
+| `{{MODULE_NAME}}` | `{{MODULE_PATH}}` | {{MODULE_STACK}} | <!-- sdd:fill: role in one sentence --> | [`CODING_RULES`](../{{MODULE_PATH}}/docs/CODING_RULES.md) · [`MODULES`](../{{MODULE_PATH}}/docs/MODULES.md) |
 <!-- sdd:endeach -->
 
-Style d'architecture observé : **{{ARCH_STYLE}}**.
+Observed architecture style: **{{ARCH_STYLE}}**.
 
-## 3. Contrats externes
+## 3. External contracts
 
-<!-- sdd:fill: les interfaces observables du système, par type — API HTTP (préfixes, versionnage, format d'erreur, auth), messages/événements (topics, files, schémas), CLI, fichiers importés/exportés, webhooks. Pour chacun : où il est défini dans le code (fichier:ligne). Pas l'inventaire complet des endpoints : les familles et les conventions. Les contrats détaillés naîtront dans openspec/specs/ au fil des changes. -->
+<!-- sdd:fill: the system's observable interfaces, by type — HTTP API (prefixes, versioning, error format, auth), messages/events (topics, queues, schemas), CLI, imported/exported files, webhooks. For each: where it is defined in the code (file:line). Not the full inventory of endpoints: the families and the conventions. Detailed contracts will be born in openspec/specs/ change by change. -->
 
-## 4. Modèle de données
+## 4. Data model
 
-<!-- sdd:fill: entités métier principales et leurs relations (schéma court), bases utilisées, outil de migration et dossier des migrations, règles transverses observées (ex. multi-tenant : toute requête filtre par tenant ; suppression logique) -->
+<!-- sdd:fill: main business entities and their relations (short diagram), databases used, migration tool and migrations folder, observed cross-cutting rules (e.g. multi-tenant: every query filters by tenant; soft delete) -->
 
-## 5. Flux critiques
+## 5. Critical flows
 
-<!-- sdd:fill: 2 à 4 parcours de bout en bout qui portent {{DOMAIN_RISKS}} (ex. une commande de l'API au paiement), en étapes numérotées avec le fichier de chaque étape -->
+<!-- sdd:fill: 2 to 4 end-to-end journeys that carry {{DOMAIN_RISKS}} (e.g. an order from the API to the payment), as numbered steps with the file of each step -->
 
-## 6. Sécurité
+## 6. Security
 
-<!-- sdd:fill: authentification (mécanisme, durée de vie, stockage), autorisation (rôles et où ils sont définis), validation des entrées, gestion des secrets (variables d'env, fichiers ignorés) — tel qu'observé -->
+<!-- sdd:fill: authentication (mechanism, lifetime, storage), authorisation (roles and where they are defined), input validation, secret management (environment variables, ignored files) — as observed -->
 
-## 7. Environnements et exécution
+## 7. Environments and runtime
 
-<!-- sdd:fill: comment on lance le projet en local (commandes exactes), dépendances d'infra (conteneurs, compose), variables d'environnement requises (noms seulement, jamais de valeurs), environnements de déploiement connus -->
+<!-- sdd:fill: how to run the project locally (exact commands), infrastructure dependencies (containers, compose), required environment variables (names only, never values), known deployment environments -->
 
-## 8. Décisions structurantes
+## 8. Structural decisions
 
-Les décisions qui ont façonné cette architecture sont dans [`adr/`](adr/).
+The decisions that shaped this architecture are in [`adr/`](adr/).
 
-<!-- sdd:fill: liste des ADR créés par sdd-init pour les décisions implicites observées (ex. choix du framework, du style de persistance, du monorepo), une ligne chacun avec lien -->
+<!-- sdd:fill: list of the ADRs created by sdd-init for the implicit decisions observed (e.g. choice of framework, persistence style, monorepo), one line each with a link -->
 
-## 9. Zones à confirmer
+## 9. Areas to confirm
 
-<!-- sdd:fill: ce que la rétro-doc n'a pas pu établir avec certitude (code mort apparent, intention d'un module, config contradictoire), une ligne chacun — ou « Rien à confirmer. » -->
+<!-- sdd:fill: what the reverse documentation could not establish with certainty (apparently dead code, intent of a module, contradictory config), one line each — or "Nothing to confirm." -->

@@ -1,148 +1,149 @@
 # Contributing
 
-Conventions transverses pour contribuer à {{PROJECT_NAME}}.
+Cross-cutting conventions for contributing to {{PROJECT_NAME}}.
 
 ---
 
-## 1. Langue
+## 1. Language
 
-- **Prose** (issues, PRs, docs, commentaires de review) : **{{DOC_LANG}}**.
-- **Code** (identifiants, noms de fichiers, commentaires inline techniques), **messages de commit** et **artefacts OpenSpec** : **{{CODE_LANG}}**.
-- Pas de mélange de langues dans un même identifiant.
+- **Prose** (issues, PRs, docs, review comments): **{{DOC_LANG}}**.
+- **Code** (identifiers, file names, inline technical comments), **commit messages** and **OpenSpec artifacts**: **{{CODE_LANG}}**.
+- No mixing of languages within a single identifier.
 
 ## 2. Git
 
-Règles communes aux humains et aux agents.
+Rules shared by humans and agents.
 <!-- sdd:if autonomy-merge -->
-Les agents (sous-agents compris) committent, poussent, ouvrent et fusionnent les PR **eux-mêmes**, en suivant cette section ; le hook décrit plus bas en impose la partie mécanique.
+Agents (sub-agents included) commit, push, open and merge PRs **themselves**, following this section; the hook described below enforces the mechanical part.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
-Les agents (sous-agents compris) committent, poussent et ouvrent les PR **eux-mêmes** ; la fusion reste humaine. Le hook décrit plus bas impose la partie mécanique.
+Agents (sub-agents included) commit, push and open PRs **themselves**; merging stays human. The hook described below enforces the mechanical part.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-commit -->
-Les agents (sous-agents compris) committent sur la branche du change ; push, PR et fusion restent humains : **l'agent ne pousse jamais**, tout `git push` est bloqué par le hook (`ALLOW_PUSH=0`). Le hook décrit plus bas impose la partie mécanique.
+Agents (sub-agents included) commit on the change branch; push, PR and merge stay human: **the agent never pushes**, every `git push` is blocked by the hook (`ALLOW_PUSH=0`). The hook described below enforces the mechanical part.
 <!-- sdd:endif -->
 
 ### Branches
-- `{{DEFAULT_BRANCH}}` : branche stable. Elle ne bouge **que par <!-- sdd:if github -->une PR fusionnée<!-- sdd:endif --><!-- sdd:if !github -->une fusion faite par un humain<!-- sdd:endif -->** : jamais de commit ni de push direct, hotfix compris.
-- Change OpenSpec : `<type>/<change-id>` — ex. `feat/user-invitations`, `fix/refresh-token-rotation`.
-- Hors change : `<type>/<scope>-<desc>` — ex. `fix/api-input-validation`, `docs/roadmap-resync`, `chore/tooling-hook-update`.
+- `{{DEFAULT_BRANCH}}`: stable branch. It only moves **through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->**: never a direct commit or push, hotfixes included.
+- OpenSpec change: `<type>/<change-id>` — e.g. `feat/user-invitations`, `fix/refresh-token-rotation`.
+- Outside a change: `<type>/<scope>-<desc>` — e.g. `fix/api-input-validation`, `docs/roadmap-resync`, `chore/tooling-hook-update`.
 
-`<type>` = le type Conventional Commits principal de la branche ; `<scope>` ∈ { <!-- sdd:fill: noms courts des modules ({{MODULE_NAME}}), plus `docs`, `tooling`, `ci` --> } ; `<desc>` en kebab-case {{CODE_LANG}}.
+`<type>` = the branch's main Conventional Commits type; `<scope>` ∈ { <!-- sdd:fill: short module names ({{MODULE_NAME}}), plus `docs`, `tooling`, `ci` --> }; `<desc>` in kebab-case {{CODE_LANG}}.
 
-- Session dans un worktree créé par l'app (nom de branche imposé) : renommer la branche selon la convention avant le premier push (`git branch -m <nom>`).
-- Une branche est supprimée après fusion, en local (`git branch -d`)<!-- sdd:if github --> et sur le remote (`git push origin --delete <branche>`)<!-- sdd:endif -->.
+- Session in a worktree created by the app (imposed branch name): rename the branch according to the convention before the first push (`git branch -m <name>`).
+- A branch is deleted after merge, locally (`git branch -d`)<!-- sdd:if github --> and on the remote (`git push origin --delete <branch>`)<!-- sdd:endif -->.
 
 ### Commits — Conventional Commits
 ```
-<type>(<scope>): <description impérative et courte>
+<type>(<scope>): <short imperative description>
 
-<corps descriptif : ce qui change + les décisions clés>
+<descriptive body: what changes + the key decisions>
 ```
-Types : `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`.
+Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`.
 
 **Scope**
-- Un commit qui appartient à un **change OpenSpec** a pour scope **l'id du change** : `feat(user-invitations): …`, `chore(user-invitations): …`.
-- Sinon, le scope est le **module** (`<module>`, `<module>/<sous-domaine>`), ou `docs`, `ci`, `tooling` (outillage de dev/agents hors change : hooks, skills).
+- A commit that belongs to an **OpenSpec change** has **the change id** as scope: `feat(user-invitations): …`, `chore(user-invitations): …`.
+- Otherwise, the scope is the **module** (`<module>`, `<module>/<sub-domain>`), or `docs`, `ci`, `tooling` (dev/agent tooling outside a change: hooks, skills).
 
-**Message = sujet + corps descriptif, toujours, en {{CODE_LANG}}.** Sujet impératif et court ; le corps dit ce qui change (quoi) et les décisions clés ; jamais le one-liner seul. Aucune attribution Claude : ni trailer `Co-Authored-By`, ni mention « Generated with Claude Code ».
+**Message = subject + descriptive body, always, in {{CODE_LANG}}.** Short imperative subject; the body says what changes (what) and the key decisions; never the one-liner alone. No Claude attribution: no `Co-Authored-By` trailer, no "Generated with Claude Code" mention.
 
-**Règles d'un commit**
-- Un commit = une tranche cohérente (un module, les tests, la doc…) ; pas de commit « wip ».
-- Staging par **chemins explicites** (`git add <chemins>`) : jamais `git add -A` / `.` / `-u`, ni `git commit -a` — un commit n'embarque que ce qu'on a décidé d'y mettre.
-- Avant un commit de **code** : contrôles du module touché au vert (les mêmes commandes que la CI) et review `code-reviewer` faite sur le diff. Avant tout commit qui touche `openspec/` : `openspec validate --all`.
-- Jamais de réécriture : pas d'`--amend`, pas de `rebase`, pas de `reset` vers une révision, pas de force-push. Une erreur se corrige par un nouveau commit.
-- Un message long ou qui cite des commandes (`--amend`, `` `git pull` ``…) : l'écrire dans un fichier et passer `git commit -F <fichier>` (`gh pr create --body-file <fichier>`), plutôt qu'un `-m`.
+**Commit rules**
+- One commit = one coherent slice (a module, the tests, the docs…); no "wip" commits.
+- Staging with **explicit paths** (`git add <paths>`): never `git add -A` / `.` / `-u`, nor `git commit -a` — a commit only carries what we decided to put in it.
+- Before a **code** commit: checks of the touched module green (the same commands as CI) and `code-reviewer` review done on the diff. Before any commit touching `openspec/`: `openspec validate --all`.
+- Never rewrite: no `--amend`, no `rebase`, no `reset` to a revision, no force-push. A mistake is fixed with a new commit.
+- A long message, or one that quotes commands (`--amend`, `` `git pull` ``…): write it to a file and use `git commit -F <file>` (`gh pr create --body-file <file>`), rather than `-m`.
 
-### Séquence d'un change OpenSpec
-Le même ordre que le cycle de [`CLAUDE.md`](../CLAUDE.md) §3, sur la branche `<type>/<change-id>` :
-1. `docs(<id>): …` — cadrage : proposal, puis deltas, design, tasks (un ou deux commits).
-2. `/opsx:apply` → review `code-reviewer` du diff → `/opsx:verify` OK → `feat|fix|…(<id>): …`, un commit par tranche cohérente d'implémentation.
+### Sequence of an OpenSpec change
+The same order as the cycle in [`CLAUDE.md`](../CLAUDE.md) §3, on the `<type>/<change-id>` branch:
+1. `docs(<id>): …` — framing: proposal, then deltas, design, tasks (one or two commits).
+2. `/opsx:apply` → `code-reviewer` review of the diff → `/opsx:verify` OK → `feat|fix|…(<id>): …`, one commit per coherent implementation slice.
 3. `/opsx:archive` + post-archive → `chore(<id>): archive change, sync specs, post-archive`.
 <!-- sdd:if autonomy-merge -->
-4. Push de la branche, PR, fusion (ci-dessous).
+4. Push the branch, PR, merge (below).
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
-4. Push de la branche, PR (ci-dessous) ; fusion humaine.
+4. Push the branch, PR (below); human merge.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-commit -->
-4. L'agent s'arrête au dernier commit ; un humain pousse, ouvre la PR s'il y a un remote, et fusionne.
+4. The agent stops at the last commit; a human pushes, opens the PR if there is a remote, and merges.
 <!-- sdd:endif -->
 
-Hors change (hotfix, outillage, doc) : même chemin en plus court — branche `<type>/<scope>-<desc>`, review `code-reviewer` si du code change, commit(s)<!-- sdd:if !autonomy-commit -->, PR<!-- sdd:endif --><!-- sdd:if autonomy-merge -->, fusion<!-- sdd:endif -->.
+Outside a change (hotfix, tooling, docs): same path, shorter — branch `<type>/<scope>-<desc>`, `code-reviewer` review if code changes, commit(s)<!-- sdd:if !autonomy-commit -->, PR<!-- sdd:endif --><!-- sdd:if autonomy-merge -->, merge<!-- sdd:endif -->.
 
-### Ce que le hook impose
-Le hook [`.claude/hooks/block-git-writes.sh`](../.claude/hooks/block-git-writes.sh) (enregistré dans [`.claude/settings.json`](../.claude/settings.json)) bloque, pour un agent (sous-agents compris) :
-- `commit`, `merge`, `revert`, `cherry-pick` sur une branche protégée. La branche est celle du dossier où la commande s'exécute vraiment : le `cwd`, puis chaque `cd`/`pushd`/`popd` et `git -C <dossier>` (un sous-shell rend le dossier à sa sortie), et un `git switch|checkout <branche>` placé plus tôt dans la même commande — vers une branche protégée, compté tout de suite ; vers une autre branche, seulement si la commande suivante est chaînée par `&&` (un switch qui échoue arrête la chaîne). Un dossier ou une branche impossible à résoudre (`$VAR`, `$(…)`, `cd -`, dossier inexistant) compte comme protégé : écrire des chemins littéraux, et faire `git worktree add <dossier>` dans un appel séparé du `cd <dossier>` qui suit ;
-- tout push d'une branche protégée (y compris via `HEAD`, `@` ou une référence `$…` quand on est dessus), un push sans remote **et** branche explicites (`git push -u origin <branche>`), le force-push (`--force*`, `-f`, `+refspec`, `--mirror`, `--all`)<!-- sdd:if autonomy-commit --> — et ici **tout** `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif --> ;
-- `pull` sans `--ff-only`, avec rebase, ou, sur une branche protégée, d'une autre branche qu'elle-même ;
-- la réécriture d'historique : `rebase`, `commit --amend`, `reset` vers une révision, `branch -f`, `am`, `commit-tree`, `filter-branch` ;
-- le staging en masse : `add -A` / `.` / `./` / `..` / `*` / `-u`, `commit -a` ;
-- ce qui jette du travail : `reset --hard`, `clean -f/--force`, `checkout .`/`-f`, `switch --discard-changes`, `restore .`, `stash drop/clear`, `branch -D`/`-M` ;
-- `--no-verify` ;
-- `gh pr merge` autrement qu'en `--merge` (pas de `--squash`, `--rebase`, `--admin`, `--auto`)<!-- sdd:if !autonomy-merge -->, et ici **tout** `gh pr merge` (`ALLOW_PR_MERGE=0`)<!-- sdd:endif -->.
+### What the hook enforces
+The hook [`.claude/hooks/block-git-writes.sh`](../.claude/hooks/block-git-writes.sh) (registered in [`.claude/settings.json`](../.claude/settings.json)) blocks, for an agent (sub-agents included):
+- `commit`, `merge`, `revert`, `cherry-pick` on a protected branch. The branch is the one of the directory where the command really runs: the `cwd`, then each `cd`/`pushd`/`popd` and `git -C <dir>` (a subshell gives the directory back when it exits), and a `git switch|checkout <branch>` placed earlier in the same command — to a protected branch, counted immediately; to another branch, only if the next command is chained with `&&` (a failed switch stops the chain). A directory or branch that cannot be resolved (`$VAR`, `$(…)`, `cd -`, nonexistent directory) counts as protected: write literal paths, and run `git worktree add <dir>` in a separate call from the `cd <dir>` that follows;
+- any push of a protected branch (including through `HEAD`, `@` or a `$…` reference while on it), a push without an explicit remote **and** branch (`git push -u origin <branch>`), force-push (`--force*`, `-f`, `+refspec`, `--mirror`, `--all`)<!-- sdd:if autonomy-commit --> — and here **every** `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif -->;
+- `pull` without `--ff-only`, with rebase, or, on a protected branch, of a branch other than itself;
+- history rewriting: `rebase`, `commit --amend`, `reset` to a revision, `branch -f`, `am`, `commit-tree`, `filter-branch`;
+- mass staging: `add -A` / `.` / `./` / `..` / `*` / `-u`, `commit -a`;
+- what throws work away: `reset --hard`, `clean -f/--force`, `checkout .`/`-f`, `switch --discard-changes`, `restore .`, `stash drop/clear`, `branch -D`/`-M`;
+- `--no-verify`;
+- `gh pr merge` other than `--merge` (no `--squash`, `--rebase`, `--admin`, `--auto`)<!-- sdd:if !autonomy-merge -->, and here **every** `gh pr merge` (`ALLOW_PR_MERGE=0`)<!-- sdd:endif -->.
 
-**Réglages** — [`.claude/hooks/block-git-writes.conf`](../.claude/hooks/block-git-writes.conf) (committé, lu par le hook s'il existe) :
+**Settings** — [`.claude/hooks/block-git-writes.conf`](../.claude/hooks/block-git-writes.conf) (committed, read by the hook if present):
 
-| Clé | Défaut | Effet |
+| Key | Default | Effect |
 |---|---|---|
-| `PROTECTED_BRANCHES` | `main\|master` | Branches protégées, séparées par `\|` (ici `{{DEFAULT_BRANCH}}`) |
-| `ALLOW_PUSH` | `1` | `1` : l'agent pousse sa branche (jamais une branche protégée) ; `0` : tout `git push` bloqué (un humain pousse) |
-| `ALLOW_PR_MERGE` | `1` | `1` : `gh pr merge --merge` permis à l'agent ; `0` : tout `gh pr merge` bloqué (fusion humaine) |
+| `PROTECTED_BRANCHES` | `main\|master` | Protected branches, separated by `\|` (here `{{DEFAULT_BRANCH}}`) |
+| `ALLOW_PUSH` | `1` | `1`: the agent pushes its branch (never a protected branch); `0`: every `git push` blocked (a human pushes) |
+| `ALLOW_PR_MERGE` | `1` | `1`: `gh pr merge --merge` allowed for the agent; `0`: every `gh pr merge` blocked (human merge) |
 
-Avant les contrôles, la commande est lue comme le shell la lit : échappements, commentaires `#` et corps de heredoc cités sont écartés, et les chaînes entre guillemets qui contiennent des espaces (messages, corps de PR) sont neutralisées — leur texte n'est jamais lu comme une option ou une commande. Ce que le shell exécute (`$(…)`, accents graves, y compris dans des guillemets doubles ou un heredoc non cité) reste contrôlé.
+Before the checks, the command is read the way the shell reads it: escapes, `#` comments and quoted heredoc bodies are set aside, and quoted strings containing spaces (messages, PR bodies) are neutralised — their text is never read as an option or a command. What the shell executes (`$(…)`, backticks, including inside double quotes or an unquoted heredoc) is still checked.
 
-Tests : `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci -->, lancés aussi en CI à chaque modification du hook ([`tooling.yml`](../.github/workflows/tooling.yml))<!-- sdd:endif -->.<!-- sdd:if !lean --> Détail : [`AGENT_TOOLBOX.md`](AGENT_TOOLBOX.md).<!-- sdd:endif --> C'est un **garde-fou contre l'erreur, pas un bac à sable** (`sh -c "…"`, `eval` volontaires non couverts) ; sans protection de branche côté serveur, la règle « `{{DEFAULT_BRANCH}}` ne bouge que par <!-- sdd:if github -->une PR<!-- sdd:endif --><!-- sdd:if !github -->une fusion humaine<!-- sdd:endif --> » repose sur ce hook et sur cette discipline. Sans `jq`, le hook bloque toute commande `git`/`gh` jusqu'à son installation.
+Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci -->, also run in CI on every change to the hook ([`tooling.yml`](../.github/workflows/tooling.yml))<!-- sdd:endif -->.<!-- sdd:if !lean --> Details: [`AGENT_TOOLBOX.md`](AGENT_TOOLBOX.md).<!-- sdd:endif --> It is a **guardrail against mistakes, not a sandbox** (deliberate `sh -c "…"`, `eval` are not covered); without server-side branch protection, the rule "`{{DEFAULT_BRANCH}}` only moves through <!-- sdd:if github -->a PR<!-- sdd:endif --><!-- sdd:if !github -->a human merge<!-- sdd:endif -->" relies on this hook and on this discipline. Without `jq`, the hook blocks every `git`/`gh` command until it is installed.
 
-**Restent à l'utilisateur**, hors git : les décisions de cadrage, tout engagement de dépense, toute action irréversible sur la prod ou sur des données.
+**Left to the user**, outside git: framing decisions, any spending commitment, any irreversible action on production or on data.
 
 <!-- sdd:if !github -->
-### Fusion
-- Pas de remote GitHub : la branche est relue (`code-reviewer` sans BLOQUANT ni MAJEUR ouvert ; pour un change, `/opsx:verify` OK et change archivé), puis **un humain** la fusionne dans `{{DEFAULT_BRANCH}}` en merge commit (`git merge --no-ff <branche>`).
+### Merge
+- No GitHub remote: the branch is reviewed (`code-reviewer` with no open BLOCKER or MAJOR; for a change, `/opsx:verify` OK and change archived), then **a human** merges it into `{{DEFAULT_BRANCH}}` as a merge commit (`git merge --no-ff <branch>`).
 <!-- sdd:endif -->
 <!-- sdd:if github -->
 ### Pull Requests
-- Titre = sujet du commit principal.
-- Description en {{DOC_LANG}} : contexte, choix techniques, impact, tests effectués<!-- sdd:if ui -->, captures d'écran<!-- sdd:endif -->. Aucune attribution Claude.
-- 1 PR = 1 sujet (un change OpenSpec, ou un correctif). Hors change, pas de mélange de modules sans raison.
-- CI verte obligatoire : les workflows de [`.github/workflows/`](../.github/workflows/). Ils sont filtrés par chemin : une PR qu'aucun ne concerne (doc seule, par exemple) ne déclenche aucun check — la condition est alors remplie, à condition que les vérifications locales aient tourné.
-- Review : la revue `code-reviewer` du diff est obligatoire ; elle tient lieu d'approbation quand le développeur est seul sur le dépôt.
+- Title = subject of the main commit.
+- Description in {{DOC_LANG}}: context, technical choices, impact, tests run<!-- sdd:if ui -->, screenshots<!-- sdd:endif -->. No Claude attribution.
+- 1 PR = 1 topic (one OpenSpec change, or one fix). Outside a change, no mixing of modules without a reason.
+- Green CI required: the workflows in [`.github/workflows/`](../.github/workflows/). They are path-filtered: a PR none of them concerns (docs only, for example) triggers no check — the condition is then met, provided the local checks have run.
+- Review: the `code-reviewer` review of the diff is mandatory; it counts as the approval when the developer is alone on the repository.
+- Waiting for CI with a fine-grained token: `gh pr checks` may fail (it needs permissions such tokens often lack). Use `gh run list --branch <branch>` to find the runs, then a single `gh run watch <run-id> --exit-status` in the background — no polling loop. A path-filtered PR that triggers no check at all meets the CI condition, provided the local checks have run.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-merge -->
-- **Un agent fusionne lui-même** seulement si : CI verte, review `code-reviewer` sans BLOQUANT ni MAJEUR ouvert, et — pour un change OpenSpec — `/opsx:verify` OK et change archivé sur la branche. Sinon il s'arrête et demande à l'utilisateur.
-- Fusion en **merge commit** (ni squash ni rebase), titre `<sujet> (#N)` : `gh pr merge <n> --merge --subject "<sujet> (#<n>)"`.
-- Après fusion, dans le checkout principal : `git switch {{DEFAULT_BRANCH}} && git pull --ff-only`, puis suppression de la branche (`git branch -d <branche>`, `git push origin --delete <branche>`). Depuis un worktree, `{{DEFAULT_BRANCH}}` est déjà extraite ailleurs : supprimer seulement la branche distante ; la branche locale et le worktree se nettoient depuis le checkout principal (`git worktree remove` puis `git branch -d`).
+- **An agent merges by itself** only if: green CI, `code-reviewer` review with no open BLOCKER or MAJOR, and — for an OpenSpec change — `/opsx:verify` OK and change archived on the branch. Otherwise it stops and asks the user.
+- Merge as a **merge commit** (neither squash nor rebase), title `<subject> (#N)`: `gh pr merge <n> --merge --subject "<subject> (#<n>)"`.
+- After the merge, in the main checkout: `git switch {{DEFAULT_BRANCH}} && git pull --ff-only`, then delete the branch (`git branch -d <branch>`, `git push origin --delete <branch>`). From a worktree, `{{DEFAULT_BRANCH}}` is already checked out elsewhere: only delete the remote branch; the local branch and the worktree are cleaned up from the main checkout (`git worktree remove` then `git branch -d`).
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
-- L'agent ouvre la PR, donne son lien et l'état de la CI, puis s'arrête : **un humain fusionne**, en merge commit.
+- The agent opens the PR, gives its link and the CI status, then stops: **a human merges**, as a merge commit.
 <!-- sdd:endif -->
 <!-- sdd:if github -->
-- Accès : `gh` doit voir le dépôt. Côté agents, un token limité au dépôt peut être posé en `GH_TOKEN` dans `.claude/settings.local.json` (gitignoré, copié dans les worktrees par [`.worktreeinclude`](../.worktreeinclude)). **Jamais dans `settings.json`, qui est committé.** Sans accès,<!-- sdd:if !autonomy-commit --> l'agent pousse la branche et donne à l'utilisateur le lien d'ouverture de la PR<!-- sdd:endif --><!-- sdd:if autonomy-commit --> l'utilisateur pousse la branche et ouvre la PR lui-même<!-- sdd:endif -->.
+- Access: `gh` must see the repository. On the agent side, a token limited to the repository can be set as `GH_TOKEN` in `.claude/settings.local.json` (gitignored, copied into worktrees by [`.worktreeinclude`](../.worktreeinclude)). **Never in `settings.json`, which is committed.** Fine-grained token, limited to this repository, with exactly: Contents read/write, Pull requests read/write, Actions read, Commit statuses read, Metadata read (template: [`.claude/settings.local.example.json`](../.claude/settings.local.example.json)). Tokens expire: a sudden 404 or 403 from `gh` on a repository that worked yesterday usually means an expired token. Such a token cannot create repositories — that needs a different token or the web UI. Without access,<!-- sdd:if !autonomy-commit --> the agent pushes the branch and gives the user the link to open the PR<!-- sdd:endif --><!-- sdd:if autonomy-commit --> the user pushes the branch and opens the PR themselves<!-- sdd:endif -->.
 <!-- sdd:endif -->
 
-## 3. Style de code
+## 3. Code style
 
 <!-- sdd:each module -->
 ### `{{MODULE_PATH}}` ({{MODULE_STACK}})
-- Voir [`{{MODULE_PATH}}/docs/CODING_RULES.md`](../{{MODULE_PATH}}/docs/CODING_RULES.md).
-<!-- sdd:fill: 2-3 règles phares du module, tirées de son CODING_RULES.md -->
+- See [`{{MODULE_PATH}}/docs/CODING_RULES.md`](../{{MODULE_PATH}}/docs/CODING_RULES.md).
+<!-- sdd:fill: 2-3 key rules of the module, taken from its CODING_RULES.md -->
 <!-- sdd:endeach -->
 
 ## 4. Tests
 
 <!-- sdd:each module -->
-- **`{{MODULE_PATH}}`** : {{MODULE_TEST_KINDS}} — `{{MODULE_CHECK}}`. Voir [`TESTING_STRATEGY.md`](../{{MODULE_PATH}}/docs/TESTING_STRATEGY.md).
+- **`{{MODULE_PATH}}`**: {{MODULE_TEST_KINDS}} — `{{MODULE_CHECK}}`. See [`TESTING_STRATEGY.md`](../{{MODULE_PATH}}/docs/TESTING_STRATEGY.md).
 <!-- sdd:endeach -->
 
 ## 5. Documentation
 
-- Toute fonctionnalité ajoutée met à jour le README du module concerné si l'API publique change.
-- Toute évolution d'un contrat observable **naît dans les spec deltas** du change OpenSpec (`openspec/changes/<id>/specs/`) ; la doc de `docs/` est mise à jour ensuite, au post-archive (`doc-writer`).
-- Si un concept métier nouveau apparaît : entrée dans [`GLOSSARY.md`](GLOSSARY.md).
-- Une décision structurante (techno, contrat transverse, style d'architecture) : un ADR dans [`adr/`](adr/).
+- Every added feature updates the README of the relevant module if the public API changes.
+- Every change to an observable contract **is born in the spec deltas** of the OpenSpec change (`openspec/changes/<id>/specs/`); the docs in `docs/` are updated afterwards, at post-archive (`doc-writer`).
+- If a new business concept appears: entry in [`GLOSSARY.md`](GLOSSARY.md).
+- A structural decision (technology, cross-cutting contract, architecture style): an ADR in [`adr/`](adr/).
 
-## 6. Sécurité
+## 6. Security
 
-- Jamais de secret commité (`.env.local`, secrets CI, `.claude/settings.local.json`).
-- Validation stricte de toute entrée externe.
-<!-- sdd:fill: règles de sécurité observées propres au projet (auth, rate-limit, données sensibles à ne pas logger) -->
+- Never commit a secret (`.env.local`, CI secrets, `.claude/settings.local.json`).
+- Strict validation of every external input.
+<!-- sdd:fill: project-specific security rules observed (auth, rate limiting, sensitive data not to log) -->

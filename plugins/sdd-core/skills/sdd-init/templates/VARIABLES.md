@@ -1,113 +1,116 @@
-# Convention des templates sdd-init
+# sdd-init template convention
 
-Les templates ne sont **pas** rendus par un moteur : c'est Claude (skill `sdd-init`) qui les remplit
-à partir de la rétro-documentation du projet cible. La convention ci-dessous rend le remplissage
-vérifiable : à la fin, `grep -rnE '(^|[^$])\{\{[A-Z_]+\}\}|sdd:(fill|if|endif|each|endeach|note)' <fichiers générés>` doit être vide.
+The templates are **not** rendered by an engine: Claude (the `sdd-init` skill) fills them in from the
+target project's reverse-documentation. The convention below makes the filling verifiable: at the end,
+`grep -rnE '(^|[^$])\{\{[A-Z_]+\}\}|sdd:(fill|if|endif|each|endeach|note)' <generated files>` must be empty.
 
-Les templates sont rédigés en **français**. Si le projet choisit des docs en anglais, Claude traduit la
-prose au remplissage (identifiants, chemins et commandes inchangés).
+The templates are written in **English**. If the project chooses docs in another language (French,
+for instance), Claude translates the prose while filling them in (identifiers, paths and commands
+unchanged).
 
-## 1. Valeurs simples — `{{NOM}}`
+## 1. Simple values — `{{NAME}}`
 
-| Variable | Contenu | Exemple |
+| Variable | Content | Example |
 |---|---|---|
-| `{{PROJECT_NAME}}` | Nom du projet | `Billing` |
-| `{{PROJECT_PITCH}}` | 1 à 2 phrases : ce que fait le produit, pour qui | `API de facturation pour PME…` |
-| `{{DOMAIN_RISKS}}` | Ce qui coûte cher quand ça casse dans ce domaine (à signaler explicitement) | `double facturation, perte de paiement, fuite de données client` |
-| `{{STACK_SUMMARY}}` | Stack en une ligne par module | `api : Python 3.12 / FastAPI / SQLAlchemy / Alembic` |
-| `{{DEFAULT_BRANCH}}` | Branche protégée | `main` |
-| `{{REPO_SLUG}}` | `owner/name` GitHub (vide si pas de remote GitHub) | `acme/billing` |
-| `{{DOC_LANG}}` | Langue des docs Markdown et des réponses, **nommée** dans cette langue (prose lisible : « en français ») | `français` |
-| `{{CODE_LANG}}` | Langue du code, des commits, des artefacts OpenSpec, nommée dans la langue des docs | `anglais` |
-| `{{INSTALL_DATE}}` | Date de l'installation, `AAAA-MM-JJ` (lue avec `date +%F`) | `2026-11-07` |
-| `{{AGENT_MODEL}}` | Modèle écrit dans chaque agent (`opus`, `sonnet`, `inherit`) | `opus` |
-| `{{CHECK_COMMANDS}}` | Les contrôles de la CI, tous modules, sous leur forme **lançable en local** (même outil, mêmes arguments ; seul l'exécutable peut différer, ex. `python` en CI → `python3` en local — l'écart est alors écrit à côté) | `uv run pytest && uv run ruff check .` |
-| `{{OPENSPEC_VERSION}}` | Sortie de `openspec --version` à l'installation, épinglée en CI | `1.16.1` |
-| `{{MIGRATION_PATHS}}` | Globs des dossiers de migrations (option `migrations`), pour `migrations.yml` | `migrations/**` |
-| `{{ARCH_STYLE}}` | Style d'architecture observé (pas souhaité : observé) | `monolithe modulaire, couches api/service/repository` |
+| `{{PROJECT_NAME}}` | Project name | `Billing` |
+| `{{PROJECT_PITCH}}` | 1 to 2 sentences: what the product does, for whom | `Invoicing API for small businesses…` |
+| `{{DOMAIN_RISKS}}` | What is expensive when it breaks in this domain (to be flagged explicitly) | `double billing, lost payment, customer data leak` |
+| `{{STACK_SUMMARY}}` | Stack, one line per module | `api: Python 3.12 / FastAPI / SQLAlchemy / Alembic` |
+| `{{DEFAULT_BRANCH}}` | Protected branch | `main` |
+| `{{REPO_SLUG}}` | GitHub `owner/name` (empty without a GitHub remote) | `acme/billing` |
+| `{{DOC_LANG}}` | Language of the Markdown docs and of the replies, **named** in the docs' language (readable prose: "in English") | `English` |
+| `{{CODE_LANG}}` | Language of the code, commits and OpenSpec artifacts, named in the docs' language | `English` |
+| `{{INSTALL_DATE}}` | Install date, `YYYY-MM-DD` (read with `date +%F`) | `2026-11-07` |
+| `{{AGENT_MODEL}}` | Model written into every agent (`opus`, `sonnet`, `inherit`) | `opus` |
+| `{{CHECK_COMMANDS}}` | The CI checks, all modules, in their **locally runnable** form (same tool, same arguments; only the executable may differ, e.g. `python` in CI → `python3` locally — the difference is then written next to it) | `uv run pytest && uv run ruff check .` |
+| `{{OPENSPEC_VERSION}}` | Output of `openspec --version` at install time, pinned in CI | `1.16.1` |
+| `{{MIGRATION_PATHS}}` | Globs of the migration folders (option `migrations`), for `migrations.yml` | `migrations/**` |
+| `{{ARCH_STYLE}}` | Architecture style as observed (not wished for: observed) | `modular monolith, api/service/repository layers` |
 
-## 2. Sections à rédiger — `<!-- sdd:fill: <consigne> -->`
+## 2. Sections to write — `<!-- sdd:fill: <instruction> -->`
 
-Un commentaire HTML qui porte une consigne. Claude le **remplace** par du contenu tiré du code
-réel (rétro-doc), jamais inventé. Ce qui n'est pas vérifiable dans le code est marqué
-« à confirmer » et listé dans le rapport final de `sdd-init`.
+An HTML comment carrying an instruction. Claude **replaces** it with content taken from the actual
+code (reverse-documentation), never invented. Whatever can't be verified in the code is marked
+"to confirm" and listed in the `sdd-init` final report.
 
 ```markdown
-## Règles non-négociables
-<!-- sdd:fill: règles d'architecture observées (couches, dépendances interdites, packages racine) -->
+## Non-negotiable rules
+<!-- sdd:fill: observed architecture rules (layers, forbidden dependencies, root packages) -->
 ```
 
-## 3. Blocs optionnels — `<!-- sdd:if <option> -->` … `<!-- sdd:endif -->`
+## 3. Optional blocks — `<!-- sdd:if <option> -->` … `<!-- sdd:endif -->`
 
-Gardés (sans les marqueurs) si l'option est active, supprimés sinon. Pas d'imbrication.
-`<!-- sdd:if !<option> -->` pour l'inverse. Un bloc peut aussi être **en ligne**, dans une phrase :
-`… lancer les tests<!-- sdd:if graphify --> puis `graphify update .`<!-- sdd:endif -->.`
-Dans un fichier YAML ou de config, les marqueurs sont en commentaire (`# sdd:if graphify` … `# sdd:endif`).
+Kept (without the markers) if the option is active, removed otherwise. No nesting.
+`<!-- sdd:if !<option> -->` for the opposite. A block can also be **inline**, inside a sentence:
+`… run the tests<!-- sdd:if graphify --> then `graphify update .`<!-- sdd:endif -->.`
+In a YAML or config file, the markers are comments (`# sdd:if graphify` … `# sdd:endif`).
 
-**Un marqueur seul sur sa ligne disparaît avec sa ligne** (pas de ligne vide laissée à sa place :
-elle casserait un tableau Markdown ou une liste).
+**A marker alone on its line goes away with its line** (no blank line left in its place: it would
+break a Markdown table or list).
 
-| Option | Active quand |
+| Option | Active when |
 |---|---|
-| `graphify` | l'utilisateur a choisi la carte du code graphify |
-| `ui` | le projet a une interface web (active aussi le plugin `sdd-ui`) |
-| `migrations` | le schéma de base évolue par fichiers versionnés appliqués dans l'ordre : un outil (Flyway, Alembic, Prisma, Rails, golang-migrate…) **ou** des fichiers SQL numérotés (`001_….sql`). Un schéma recréé à chaque démarrage ou généré par l'ORM n'en est pas |
-| `caveman` | l'utilisateur a choisi le mode caveman |
-| `cockpit` | l'utilisateur a installé les mods desktop `claude-mods` (contrat d'affichage) |
-| `autonomy-merge` | l'agent committe, pousse, ouvre **et fusionne** la PR (CI verte + review propre) |
-| `autonomy-pr` | l'agent committe, pousse et ouvre la PR ; un humain fusionne |
-| `autonomy-commit` | l'agent committe sur la branche ; push et PR par un humain |
-| `github` | remote GitHub présent : PR, `gh`, fusion via GitHub. Sans remote → textes « fusion faite par un humain » |
-| `ci` | les workflows du kit sont générés : remote GitHub **ou** `.github/workflows/` déjà présent |
-| `work-style` | l'équipe adopte le mode de travail du kit (`CLAUDE.md` §12 : cadrage court, jusqu'au bout, rapport structuré, passation) |
+| `graphify` | the user chose the graphify code map |
+| `ui` | the project has a web interface (also enables the `sdd-ui` plugin) |
+| `graphify-hooks` | with `graphify`: the developer installs graphify's local git hooks (`graphify hook install`) |
+| `migrations` | the database schema evolves through versioned files applied in order: a tool (Flyway, Alembic, Prisma, Rails, golang-migrate…) **or** numbered SQL files (`001_….sql`). A schema recreated at every start or generated by the ORM doesn't count |
+| `caveman` | the user chose caveman mode |
+| `cockpit` | the user installed the `claude-mods` desktop mods (display contract) |
+| `autonomy-merge` | the agent commits, pushes, opens **and merges** the PR (green CI + clean review) |
+| `autonomy-pr` | the agent commits, pushes and opens the PR; a human merges |
+| `autonomy-commit` | the agent commits on the branch; push and PR by a human |
+| `github` | GitHub remote present: PRs, `gh`, merge through GitHub. Without a remote → "merge done by a human" wording |
+| `ci` | the kit's workflows are generated: GitHub remote **or** `.github/workflows/` already present |
+| `work-style` | the team adopts the kit's way of working (`CLAUDE.md` §12: short framing, all the way through, structured report, handoff) |
 | `multi-module` | ≥ 2 modules |
-| `devops` | Docker / compose, IaC ou scripts de déploiement présents (une CI seule ne suffit pas) |
-| `lean` | module unique **et** moins de ~5 000 lignes de code : jeu de fichiers réduit (pas d'`AGENT_TOOLBOX.md`, `AGENTS.md` réduit à un renvoi) |
+| `devops` | Docker / compose, IaC or deployment scripts present (CI alone is not enough) |
+| `lean` | single module **and** fewer than ~5,000 lines of code: reduced file set (no `AGENT_TOOLBOX.md`, `AGENTS.md` reduced to a pointer) |
 
-Exactement une option `autonomy-*` est active.
+Exactly one `autonomy-*` option is active.
 
-## 4. Répétition par module — `<!-- sdd:each module -->` … `<!-- sdd:endeach -->`
+## 4. Repetition per module — `<!-- sdd:each module -->` … `<!-- sdd:endeach -->`
 
-Le bloc est dupliqué pour chaque module détecté, avec :
+The block is duplicated for each detected module, with:
 
-| Variable | Contenu |
+| Variable | Content |
 |---|---|
-| `{{MODULE_NAME}}` | nom court, kebab-case (`api`, `web`, `worker`) |
-| `{{MODULE_PATH}}` | dossier relatif à la racine |
-| `{{MODULE_STACK}}` | langage, framework, versions épinglées |
-| `{{MODULE_CHECK}}` | commande de contrôle du module, forme locale de ce que lance la CI (même règle que `{{CHECK_COMMANDS}}`) |
-| `{{MODULE_TEST_KINDS}}` | types de tests utilisés (`pytest unitaires + intégration`, `Vitest + Playwright`) |
-| `{{MODULE_DEPS_FILE}}` | fichier où les versions sont épinglées (`pyproject.toml`, `package.json`, `pom.xml`) |
-| `{{MODULE_TRIGGERS}}` | mots-clés de déclenchement de l'agent du module, pour sa `description` (ex. `endpoint, service, migration, worker`) |
+| `{{MODULE_NAME}}` | short name, kebab-case (`api`, `web`, `worker`) |
+| `{{MODULE_PATH}}` | folder relative to the root |
+| `{{MODULE_STACK}}` | language, framework, pinned versions |
+| `{{MODULE_CHECK}}` | the module's check command, local form of what CI runs (same rule as `{{CHECK_COMMANDS}}`) |
+| `{{MODULE_TEST_KINDS}}` | kinds of tests used (`pytest unit + integration`, `Vitest + Playwright`) |
+| `{{MODULE_DEPS_FILE}}` | file where versions are pinned (`pyproject.toml`, `package.json`, `pom.xml`) |
+| `{{MODULE_TRIGGERS}}` | trigger keywords for the module's agent, for its `description` (e.g. `endpoint, service, migration, worker`) |
 
-Un repo à module unique a `{{MODULE_PATH}}` = `.` : ses docs de module vont dans `docs/`. Après
-remplissage, **normalise les chemins** : `./docs/x` → `docs/x`, `../.././docs/x` → `../../docs/x`,
-`.././docs/x` → `../docs/x`, et vérifie que chaque lien relatif pointe sur un fichier existant.
+A single-module repo has `{{MODULE_PATH}}` = `.`: its module docs go into `docs/`. After filling,
+**normalise the paths**: `./docs/x` → `docs/x`, `../.././docs/x` → `../../docs/x`,
+`.././docs/x` → `../docs/x`, and check that every relative link points to an existing file.
 
-Un **module** = un ensemble déployable ou testable seul, avec son propre fichier de dépendances
-(monorepo : un par app/package significatif ; repo simple : un seul module, le repo).
+A **module** = a unit that can be deployed or tested on its own, with its own dependency file
+(monorepo: one per significant app/package; simple repo: a single module, the repo).
 
-## 5. Consignes de génération — `<!-- sdd:note: … -->`
+## 5. Generation instructions — `<!-- sdd:note: … -->`
 
-Une consigne pour `sdd-init` (ex. « ne générer que si ≥ 2 modules »), **toujours supprimée** du
-fichier généré. Placée avant un frontmatter YAML, elle le casse si elle reste : la phase 5 de
-`sdd-init` la cherche explicitement.
+An instruction for `sdd-init` (e.g. "only generate with ≥ 2 modules"), **always removed** from the
+generated file. Placed before a YAML frontmatter, it breaks it if it stays: phase 5 of `sdd-init`
+looks for it explicitly.
 
-## 6. Fichiers conditionnels et par module
+## 6. Conditional and per-module files
 
-Fichiers entiers conditionnés (signalés par un `sdd:note` en tête) : `docs/GRAPHIFY.md` et
-`misc/graphifyignore` → option `graphify` ; `github/workflows/*` → option `ci` ;
-`github/workflows/migrations.yml` → `ci` **et** `migrations`.
-`root/AGENTS.lean.md` remplace `root/AGENTS.md` (généré sous le nom `AGENTS.md`) avec `lean` ;
-`docs/AGENT_TOOLBOX.md` → sauf `lean` ; `agents/devops.md` → `devops` ;
-`agents/full-stack-dev.md` → `multi-module` et un module consomme l'autre (API + client).
+Whole files under a condition (flagged by a `sdd:note` at the top): `docs/GRAPHIFY.md` and
+`misc/graphifyignore` → option `graphify`; `github/workflows/*` → option `ci`;
+`github/workflows/migrations.yml` → `ci` **and** `migrations`.
+`root/AGENTS.lean.md` replaces `root/AGENTS.md` (generated under the name `AGENTS.md`) with `lean`;
+`docs/AGENT_TOOLBOX.md` → except with `lean`; `agents/devops.md` → `devops`;
+`agents/full-stack-dev.md` → `multi-module` and one module consumes the other (API + client).
+`claude/launch.json` → `ui` (one configuration per UI module; JSON, so no markers: built from
+the recon, not from markers). `claude/settings.local.example.json` → always, copied as is.
 
-`github/workflows/checks.yml` est instancié **une fois par module** en
-`.github/workflows/checks-{{MODULE_NAME}}.yml` (filtre de chemins propre au module).
+`github/workflows/checks.yml` is instantiated **once per module** as
+`.github/workflows/checks-{{MODULE_NAME}}.yml` (path filter specific to the module).
 
-Attention : les workflows contiennent des expressions GitHub `${{ … }}` — ce ne sont **pas** des
-variables du kit. Le contrôle final ignore les `{{` précédés de `$`.
+Careful: the workflows contain GitHub `${{ … }}` expressions — those are **not** kit variables. The
+final check ignores `{{` preceded by `$`.
 
-
-Les templates de `module-docs/` et `agents/module-dev.md` sont instanciés **une fois par module** :
+The `module-docs/` templates and `agents/module-dev.md` are instantiated **once per module**:
 `<MODULE_PATH>/docs/CODING_RULES.md`, `.claude/agents/<MODULE_NAME>-dev.md`, etc.

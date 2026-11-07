@@ -1,0 +1,17 @@
+{
+  "description": "Warns at session start when the project was set up with an older sdd-kit than the installed sdd-core plugin. Silent everywhere else.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-kit-version.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

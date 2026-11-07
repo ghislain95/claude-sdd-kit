@@ -16,6 +16,49 @@
       "name": "sdd-ui",
       "source": "./plugins/sdd-ui",
       "description": "Optional UI skills: web-design-guidelines, break-ui, emil-design-eng, animate, review-animations, improve-animations"
+    },
+    {
+      "name": "openspec-cockpit",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/ghislain95/claude-mods.git",
+        "path": "openspec-cockpit",
+        "ref": "main"
+      },
+      "description": "Desktop app only: OpenSpec cockpit pane (next action, cycle timeline, task groups, decisions), gate alerts, status line. Pairs with the `cockpit` option of sdd-init."
+    },
+    {
+      "name": "conversation-cards",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/ghislain95/claude-mods.git",
+        "path": "conversation-cards",
+        "ref": "main"
+      },
+      "description": "Desktop app only: Claude's messages as cards (questions, reports, QA, commits, cockpit block) and the display contract."
+    },
+    {
+      "name": "session-hud",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/ghislain95/claude-mods.git",
+        "path": "session-hud",
+        "ref": "main"
+      },
+      "description": "Desktop app only: session band above the prompt (context, cost or rate limit, time, tools, model, background count)."
+    },
+    {
+      "name": "background-tasks",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/ghislain95/claude-mods.git",
+        "path": "background-tasks",
+        "ref": "main"
+      },
+      "description": "Desktop app only: background pane listing services with their port and workflow runs with phases and agents."
     }
+  ],
+  "allowCrossMarketplaceDependenciesOn": [
+    "claude-plugins-official"
   ]
 }

@@ -1,67 +1,67 @@
-<!-- sdd:note: instancié une fois par module dans {{MODULE_PATH}}/docs/CODING_RULES.md. Chaque règle est tirée du code réel (pattern majoritaire observé, config de lint/format, test d'architecture) — jamais d'une « bonne pratique » générique absente du code. Une règle observée seulement en partie (pattern minoritaire) est notée « tendance, à confirmer ». Supprimer une section sans contenu observable plutôt que d'inventer, puis renuméroter les sections. -->
-# Règles de code — `{{MODULE_NAME}}`
+<!-- sdd:note: instantiated once per module in {{MODULE_PATH}}/docs/CODING_RULES.md. Every rule is taken from the real code (majority pattern observed, lint/format config, architecture test) — never from a generic "best practice" absent from the code. A rule only partly observed (minority pattern) is marked "trend, to be confirmed". Remove a section with no observable content rather than inventing, then renumber the sections. -->
+# Coding rules — `{{MODULE_NAME}}`
 
-**Ces règles sont strictes.** Toute dérogation est justifiée explicitement dans la PR (ou le `design.md` du change).
+**These rules are strict.** Any exception is justified explicitly in the PR (or in the change's `design.md`).
 
-Stack : {{MODULE_STACK}} — versions épinglées dans `{{MODULE_DEPS_FILE}}`.
+Stack: {{MODULE_STACK}} — versions pinned in `{{MODULE_DEPS_FILE}}`.
 
 ---
 
-## 1. Style architectural
+## 1. Architectural style
 
-<!-- sdd:fill: style observé ({{ARCH_STYLE}} pour ce module) en 2-4 puces, et ce qu'il N'EST PAS (ex. « pas de DDD canonique avec bounded contexts formels »). Un « ❌ Ne jamais… » sur la réorganisation non demandée -->
+<!-- sdd:fill: observed style ({{ARCH_STYLE}} for this module) in 2-4 bullets, and what it is NOT (e.g. "no canonical DDD with formal bounded contexts"). A "❌ Never…" about unrequested reorganisation -->
 
-## 2. Structure — source de vérité
+## 2. Structure — source of truth
 
-<!-- sdd:fill: liste FERMÉE des packages/dossiers racine du module (ex. `src/<pkg>/{a,b,c}`), avec la règle « ne pas inventer de nouveau package racine : discussion + mise à jour de MODULES.md avant tout code ». Renvoi vers MODULES.md -->
+<!-- sdd:fill: CLOSED list of the module's root packages/folders (e.g. `src/<pkg>/{a,b,c}`), with the rule "do not invent a new root package: discussion + update of MODULES.md before any code". Pointer to MODULES.md -->
 
-## 3. Conventions internes
+## 3. Internal conventions
 
-<!-- sdd:fill: arborescence type d'un package/feature telle qu'observée (ex. model/ service/ repository/ api/), en bloc de code, avec le rôle de chaque dossier -->
+<!-- sdd:fill: typical tree of a package/feature as observed (e.g. model/ service/ repository/ api/), in a code block, with the role of each folder -->
 
-## 4. Séparation domaine / adaptateurs
+## 4. Domain / adapter separation
 
-<!-- sdd:fill: ce qui est interdit dans les adaptateurs (contrôleurs HTTP, handlers de messages, jobs, CLI) : aucune logique métier ; dépendances interdites du domaine vers les frameworks ; où vit la logique (nom des services). Citer le contrôle automatique s'il existe (test d'architecture, lint d'import) avec son fichier, sinon « non outillé » -->
+<!-- sdd:fill: what is forbidden in adapters (HTTP controllers, message handlers, jobs, CLI): no business logic; forbidden dependencies from the domain to frameworks; where the logic lives (service names). Cite the automated check if one exists (architecture test, import lint) with its file, otherwise "not enforced by tooling" -->
 
-## 5. Frontières (API, messages, UI)
+## 5. Boundaries (API, messages, UI)
 
-<!-- sdd:fill: règles observées aux frontières : DTO/schémas de validation, format d'erreur, codes de statut, sérialisation, gestion de l'auth au niveau adaptateur. Pour un module UI : composants vs pages, état, accès données -->
+<!-- sdd:fill: rules observed at the boundaries: DTOs/validation schemas, error format, status codes, serialisation, auth handling at adapter level. For a UI module: components vs pages, state, data access -->
 
 <!-- sdd:if migrations -->
-## 6. Persistance
+## 6. Persistence
 
-<!-- sdd:fill: ORM/driver, outil et dossier de migrations, règles observées (transactions, requêtes filtrées par tenant, pas de génération auto de schéma), « une migration appliquée n'est jamais modifiée » -->
+<!-- sdd:fill: ORM/driver, migration tool and folder, observed rules (transactions, queries filtered by tenant, no automatic schema generation), "an applied migration is never modified" -->
 <!-- sdd:endif -->
 
-## 7. Style de code
+## 7. Code style
 
-<!-- sdd:fill: outils de format/lint et leur config (fichier), conventions de nommage observées, typage (strict ? `any`/ignore tolérés ?), règles d'import -->
+<!-- sdd:fill: format/lint tools and their config (file), observed naming conventions, typing (strict? `any`/ignore tolerated?), import rules -->
 
-## 8. Logs
+## 8. Logging
 
-<!-- sdd:fill: librairie de log, niveaux utilisés, ce qui ne doit jamais être loggé (secrets, tokens, données personnelles, payloads complets en info) -->
+<!-- sdd:fill: logging library, levels used, what must never be logged (secrets, tokens, personal data, full payloads at info level) -->
 
-## 9. Gestion d'erreurs
+## 9. Error handling
 
-<!-- sdd:fill: exceptions/erreurs métier typées ? handler global ? validation aux frontières ? isolation des erreurs par message dans un consommateur ? fail fast vs fallback -->
+<!-- sdd:fill: typed business exceptions/errors? global handler? validation at the boundaries? per-message error isolation in a consumer? fail fast vs fallback -->
 
 ## 10. Tests
 
-- Tests : {{MODULE_TEST_KINDS}}. Stratégie détaillée : [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md).
-- Contrôle complet, identique à la CI : `{{MODULE_CHECK}}`.
-<!-- sdd:fill: 2-3 règles de test propres au module (ex. pas de contexte applicatif complet pour de la logique pure) -->
+- Tests: {{MODULE_TEST_KINDS}}. Detailed strategy: [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md).
+- Full check, identical to CI: `{{MODULE_CHECK}}`.
+<!-- sdd:fill: 2-3 test rules specific to the module (e.g. no full application context for pure logic) -->
 
-## 11. Langue
+## 11. Language
 
-- Code, identifiants, commentaires inline techniques : **{{CODE_LANG}}**.
-- Documentation Markdown : **{{DOC_LANG}}**.
+- Code, identifiers, inline technical comments: **{{CODE_LANG}}**.
+- Markdown documentation: **{{DOC_LANG}}**.
 
-## 12. Garde-fous critiques
+## 12. Critical guardrails
 
-Quand on décrit, modifie ou génère du code dans ce module :
+When describing, modifying or generating code in this module:
 
-1. Toujours partir de la **structure existante**.
-2. **Ne jamais** inventer un domaine ou un package racine manquant.
-3. **Ne jamais** réorganiser l'architecture sans demande explicite.
-4. **Ne jamais** mettre de logique métier dans un adaptateur.
-<!-- sdd:fill: garde-fous propres au module et au domaine ({{DOMAIN_RISKS}}) -->
+1. Always start from the **existing structure**.
+2. **Never** invent a missing domain or root package.
+3. **Never** reorganise the architecture without an explicit request.
+4. **Never** put business logic in an adapter.
+<!-- sdd:fill: guardrails specific to the module and the domain ({{DOMAIN_RISKS}}) -->

@@ -1,24 +1,24 @@
-<!-- sdd:note: instancié une fois par module dans {{MODULE_PATH}}/docs/MODULES.md. Inventaire tiré du code : un `##` par package/dossier racine, rien d'inventé. Rester à la granularité « rôle + types/services clés + règles propres » (une dizaine de lignes par package au plus) : le détail fin vit dans le code et naîtra dans les specs. -->
+<!-- sdd:note: instantiated once per module in {{MODULE_PATH}}/docs/MODULES.md. Inventory taken from the code: one `##` per root package/folder, nothing invented. Stay at the "role + key types/services + specific rules" granularity (ten lines per package at most): the fine detail lives in the code and will be born in the specs. -->
 # Modules — `{{MODULE_NAME}}`
 
-Index des packages/dossiers racine de `{{MODULE_PATH}}`. Cette page est la **source de vérité de la structure** — toute évolution passe ici d'abord.
+Index of the root packages/folders of `{{MODULE_PATH}}`. This page is the **source of truth for the structure** — any evolution goes through here first.
 
-> Règle stricte : **ne pas inventer de nouveau package racine** sans validation. Voir [`CODING_RULES.md`](CODING_RULES.md).
+> Strict rule: **do not invent a new root package** without validation. See [`CODING_RULES.md`](CODING_RULES.md).
 
-Liste exhaustive : <!-- sdd:fill: liste des packages racine en backticks, séparés par des virgules -->
+Exhaustive list: <!-- sdd:fill: list of the root packages in backticks, comma-separated -->
 
 ---
 
-<!-- sdd:fill: pour chaque package racine, une section :
+<!-- sdd:fill: for each root package, one section:
 
-## `<package>` — <rôle en quelques mots>
+## `<package>` — <role in a few words>
 
-- `<type ou fichier clé>` — <ce qu'il porte>.
-- `<service clé>` — <responsabilité>, <règle métier notable>.
-- Dépend de : `<packages>` ; ne dépend jamais de : `<packages>` (si observable).
-- ⚠️ <dette ou ambiguïté observée, à confirmer> (si besoin).
+- `<key type or file>` — <what it carries>.
+- `<key service>` — <responsibility>, <notable business rule>.
+- Depends on: `<packages>`; never depends on: `<packages>` (if observable).
+- ⚠️ <observed debt or ambiguity, to be confirmed> (if needed).
 -->
 
-## Démarrage
+## Startup
 
-<!-- sdd:fill: point d'entrée du module (fichier), commande de lancement locale, configuration requise (noms des variables d'env, jamais de valeurs) -->
+<!-- sdd:fill: module entry point (file), local start command, required configuration (names of the environment variables, never values) -->

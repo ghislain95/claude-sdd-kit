@@ -22,8 +22,8 @@ Read-only on source code: this skill produces a report and a framing, never a re
 - `openspec/specs/` is the behavioural source of truth; a deepening must not change observable
   behaviour (APIs, events, messages, UI contracts). A candidate that would is a product change,
   not a refactor — say so.
-- **The project's architecture rules are fixed** — read them in `CLAUDE.md` (« Règles
-  non-négociables »), `docs/ARCHITECTURE.md` and each module's `<module>/docs/MODULES.md` /
+- **The project's architecture rules are fixed** — read them in `CLAUDE.md` ("Non-negotiable
+  rules"), `docs/ARCHITECTURE.md` and each module's `<module>/docs/MODULES.md` /
   `CODING_RULES.md`: fixed root packages or layers, adapters that hold no business logic, a
   domain that doesn't depend on frameworks, shared-code placement in a monorepo, known
   dependency directions (ex. a module that is a **sink** and must not depend on others). A
@@ -33,7 +33,7 @@ Read-only on source code: this skill produces a report and a framing, never a re
   candidate that needs one relaxed is flagged as reopening an architecture decision.
 - Respect the conventions and ADRs (`docs/adr/`); don't re-litigate them. Surface an ADR conflict
   only when the friction is real enough to reopen it, flagged in the card.
-- Critical paths (the ones listed as costly to break in `CLAUDE.md` §Identité / the domain risks —
+- Critical paths (the ones listed as costly to break in `CLAUDE.md` §Project identity / the domain risks —
   ex. payment, ingestion → processing → notification) get the highest bar: a candidate there
   states its effect on latency and on the risk of losing or corrupting data.
 
@@ -88,8 +88,8 @@ Once the user picks a candidate, frame it **with** them:
 
 ## 4. Outcome
 
-- Accepted candidate → **one line** in `docs/ROADMAP.md`, section « Backlog — chantiers
-  flaggés » (chantier | description | taille | origine), to be run later as an OpenSpec change.
+- Accepted candidate → **one line** in `docs/ROADMAP.md`, section "Backlog — flagged
+  work" (item | description | size | origin), to be run later as an OpenSpec change.
   No code here.
 - Rejected with a load-bearing reason → offer to record it (ADR in `docs/adr/` if it meets the
   three criteria of `sdd-core:domain-modeling`, otherwise a note in the relevant architecture doc) so future

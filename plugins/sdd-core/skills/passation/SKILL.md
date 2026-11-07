@@ -1,121 +1,119 @@
 ---
 name: passation
-description: Écrit un document de passation pour reprendre le travail dans une session neuve (/clear ou nouvelle conversation) sans traîner les impasses du contexte actuel. Fichier dans .claude/passation/ + copie dans le presse-papier si disponible.
-argument-hint: "[objectif de la prochaine session]"
+description: Writes a handoff document to resume work in a fresh session (/clear or new conversation) without dragging along the dead ends of the current context. File in .claude/passation/ + copy to the clipboard when available.
+argument-hint: "[goal of the next session]"
 disable-model-invocation: true
 allowed-tools: Write, Bash(mkdir -p .claude/passation), Bash(date *), Bash(command -v *), Bash(LC_ALL=en_US.UTF-8 pbcopy *), Bash(LC_ALL=en_US.UTF-8 pbpaste), Bash(LC_ALL=en_US.UTF-8 pbpaste *), Bash(wl-copy *), Bash(wl-paste *), Bash(xclip *), Bash(cmp *), Bash(echo OK), Bash(git status *), Bash(git log *), Bash(git branch *), Bash(openspec list), Bash(openspec list *)
 ---
 
-# Passation
+# Passation (handoff)
 
-Pourquoi : `/compact` résume la conversation, mais en garde la forme. Les impasses, les
-hypothèses fausses et les debugs ratés restent dedans. Une passation repart de zéro avec
-seulement ce qui compte. La session suivante doit pouvoir reprendre **exactement** là où on
-en est, sans relire cette conversation.
+Why: `/compact` summarises the conversation, but keeps its shape. The dead ends, the wrong
+assumptions and the failed debugging stay in. A handoff starts again from scratch with only what
+matters. The next session must be able to pick up **exactly** where things stand, without
+re-reading this conversation.
 
-Si `$ARGUMENTS` est fourni, il décrit l'objectif de la prochaine session : adapter tout le
-document à cet objectif (ce qui ne le sert pas sort).
+If `$ARGUMENTS` is given, it describes the goal of the next session: tailor the whole document to
+that goal (whatever doesn't serve it goes).
 
-## 1. Vérifier avant d'écrire (pas de mémoire seule)
+## 1. Check before writing (not from memory alone)
 
-- `git status --short`, `git log --oneline -5` et `git branch --show-current` pour l'état réel.
-- `openspec list` si un change OpenSpec est en cours.
-- Toute affirmation « c'est fait » doit être confirmée par un fichier, un test lancé ou un
-  commit. Si ce n'est pas vérifiable maintenant, elle est marquée **supposé**.
+- `git status --short`, `git log --oneline -5` and `git branch --show-current` for the real state.
+- `openspec list` if an OpenSpec change is in progress.
+- Every "it's done" claim must be confirmed by a file, a test run or a commit. If it can't be checked
+  now, it is marked **assumed**.
 
-## 2. Écrire le fichier
+## 2. Write the file
 
-Chemin : `.claude/passation/AAAA-MM-JJ-HHMM-<sujet-kebab>.md` (dossier gitignoré ; `mkdir -p` si
-absent). L'heure locale (heures + minutes, sans séparateur) départage plusieurs passations du même
-jour : la lire avec `date +%Y-%m-%d-%H%M`, jamais de mémoire. Prose dans la langue des docs du
-projet (`CLAUDE.md` §Langue ; français par défaut). Identifiants, chemins et commandes tels quels.
-Si `.claude/passation/` n'est pas encore gitignoré, le signaler à l'utilisateur (ne pas éditer
-`.gitignore` soi-même pendant une passation).
+Path: `.claude/passation/YYYY-MM-DD-HHMM-<topic-kebab>.md` (gitignored folder; `mkdir -p` if
+missing). The local time (hours + minutes, no separator) tells apart several handoffs on the same
+day: read it with `date +%Y-%m-%d-%H%M`, never from memory. Prose in the language of the project's
+docs (`CLAUDE.md` §Language; English by default). Identifiers, paths and commands as they are.
+If `.claude/passation/` is not gitignored yet, tell the user (don't edit `.gitignore` yourself during
+a handoff).
 
-Structure fixe. Une section vide s'écrit « — » ; on ne la supprime pas.
+Fixed structure. An empty section is written "—"; it is not removed.
 
 ```md
-# Passation — <sujet> (<AAAA-MM-JJ HH:MM>)
+# Handoff — <topic> (<YYYY-MM-DD HH:MM>)
 
-> Session suivante : lis ce document, reformule-moi l'objectif et la prochaine étape,
-> puis **attends mon GO** avant d'agir.
+> Next session: read this document, restate the goal and the next step to me,
+> then **wait for my GO** before acting.
 
-## Objectif
-<1–2 phrases : ce qu'on cherche à obtenir, et pourquoi.>
+## Goal
+<1–2 sentences: what we are trying to achieve, and why.>
 
-## Où on en est
-- Change OpenSpec : `<id>` — étape du cycle : cadrage | passe adversariale | ff | apply | review | verify | commit | archive | post-archive (ou « aucun »)
-- Branche : `<branche>` — état git : <propre | N fichiers modifiés non commités : lesquels>
-- <2–4 puces d'état factuel>
+## Where things stand
+- OpenSpec change: `<id>` — cycle step: framing | adversarial pass | ff | apply | review | verify | commit | archive | post-archive (or "none")
+- Branch: `<branch>` — git state: <clean | N modified uncommitted files: which ones>
+- <2–4 bullets of factual state>
 
-## Décisions prises
-- <décision> — pourquoi : <raison> — ✅ validée par l'utilisateur | 🟡 proposée, pas validée
+## Decisions taken
+- <decision> — why: <reason> — ✅ validated by the user | 🟡 proposed, not validated
 
-## Tenté et raté (ne pas refaire)
-- <tentative> → <pourquoi ça a échoué / ce que ça a appris>
+## Tried and failed (don't redo)
+- <attempt> → <why it failed / what it taught us>
 
-## Faits établis
-- ✔ vérifié : <fait> (preuve : `<fichier:ligne>` | `<commande>` | commit `<sha>`)
-- ? supposé : <fait non vérifié>
+## Established facts
+- ✔ verified: <fact> (evidence: `<file:line>` | `<command>` | commit `<sha>`)
+- ? assumed: <unverified fact>
 
-## Fichiers clés
-- `<chemin>` — <rôle en une ligne>
+## Key files
+- `<path>` — <role in one line>
 
-## Questions ouvertes (pour l'utilisateur)
+## Open questions (for the user)
 - <question>
 
-## Prochaine étape
-1. <action concrète et immédiate>
+## Next step
+1. <concrete, immediate action>
 2. …
 
-## Outils suggérés
-- <skill / agent / commande> — <pour quoi faire>
+## Suggested tools
+- <skill / agent / command> — <what for>
 
-## Mode de travail impératif
-- <Règles de langue du projet, reprises de `CLAUDE.md` §Langue.>
-- Cadrage **avec** l'utilisateur : objectif d'abord, peu de questions, un exemple concret
-  chacune. Proposal validé par lui **avant** `/opsx:ff`. Une fois le cadrage validé, mener le
-  change jusqu'au bout (back, front, tests, docs) **sans demander de GO entre les tranches** ;
-  ne s'arrêter que pour une vraie décision ou un trou de design.
-- Review `code-reviewer` sur le diff non commité avant `/opsx:verify`.
-- Git : selon `docs/CONTRIBUTING.md` §2 et le niveau d'autonomie de `CLAUDE.md` (commit seul,
-  jusqu'à la PR, ou jusqu'à la fusion) — branche `<type>/<change-id>`, jamais sur la branche
-  protégée, Conventional Commits sujet + corps, scope = id du change. Ordre : review →
-  `/opsx:verify` → commit(s) d'implémentation → `/opsx:archive` + post-archive → commit d'archive
-  → PR → fusion (si autorisée : CI verte + review sans BLOQUANT/MAJEUR). Le hook
-  `block-git-writes.sh` impose la partie mécanique ; les conditions de fusion relèvent de la
-  discipline de l'agent.
-- <Pièges d'environnement constatés dans la session (version de runtime, variable d'env,
-  port…) — ex. « l'outil de build exige une version précise du runtime, le shell par défaut en a
-  une autre ».>
-- Si `graphify-out/` existe : rafraîchir le graph (`graphify check-update .`) avant de s'y fier.
+## Mandatory way of working
+- <The project's language rules, taken from `CLAUDE.md` §Language.>
+- Framing **with** the user: goal first, few questions, one concrete example each. Proposal
+  validated by them **before** `/opsx:ff`. Once framing is validated, take the change all the way
+  (back end, front end, tests, docs) **without asking for a GO between slices**; only stop for a
+  real decision or a design gap.
+- `code-reviewer` review of the uncommitted diff before `/opsx:verify`.
+- Git: per `docs/CONTRIBUTING.md` §2 and the autonomy level in `CLAUDE.md` (commit only, up to the
+  PR, or up to the merge) — `<type>/<change-id>` branch, never on the protected branch, Conventional
+  Commits with subject + body, scope = change id. Order: review → `/opsx:verify` → implementation
+  commit(s) → `/opsx:archive` + post-archive → archive commit → PR → merge (if allowed: green CI +
+  review with no BLOCKER/MAJOR). The `block-git-writes.sh` hook enforces the mechanical part; the
+  merge conditions are down to the agent's discipline.
+- <Environment pitfalls found during the session (runtime version, environment variable,
+  port…) — e.g. "the build tool needs a specific runtime version, the default shell has another one".>
+- If `graphify-out/` exists: refresh the graph (`graphify check-update .`) before relying on it.
 ```
 
-## Règles de contenu
+## Content rules
 
-- **Ne pas recopier ce qui existe déjà** (proposal, design, tasks, specs, ADR, commits,
-  diffs) : pointer par chemin. La passation contient ce qui n'est écrit **nulle part
-  ailleurs** : décisions orales, impasses, hypothèses, intentions.
-- **Impasses = section la plus précieuse.** Un debug raté non consigné sera refait.
-- **Marquer les statuts honnêtement.** Une décision évoquée mais pas confirmée par
-  l'utilisateur est 🟡.
-- Masquer les secrets (clés, mots de passe, tokens, URLs signées) et les données personnelles
-  (aucune donnée réelle d'utilisateur, de client ou de patient).
-- Dense : viser 40–120 lignes. Pas de récit chronologique de la session.
+- **Don't copy what already exists** (proposal, design, tasks, specs, ADRs, commits, diffs): point to
+  it by path. The handoff holds what is written **nowhere else**: spoken decisions, dead ends,
+  assumptions, intentions.
+- **Dead ends = the most valuable section.** A failed debugging session that isn't recorded will be
+  done again.
+- **Mark statuses honestly.** A decision mentioned but not confirmed by the user is 🟡.
+- Mask secrets (keys, passwords, tokens, signed URLs) and personal data (no real user, customer or
+  patient data).
+- Dense: aim for 40–120 lines. No chronological account of the session.
 
-## 3. Livrer
+## 3. Deliver
 
-1. Presse-papier (optionnel, selon ce qui est installé — `command -v pbcopy wl-copy xclip`) :
-   - macOS : `LC_ALL=en_US.UTF-8 pbcopy < <chemin>`. **Le préfixe `LC_ALL` est obligatoire** : le
-     shell de l'agent n'a pas de locale, et `pbcopy` lit alors l'UTF-8 comme du MacRoman (« é »
-     devient « √© »). Vérifier l'aller-retour : `LC_ALL=en_US.UTF-8 pbpaste | cmp -s - <chemin> && echo OK`.
-   - Linux Wayland : `wl-copy < <chemin>` puis `wl-paste | cmp -s - <chemin> && echo OK`.
-   - Linux X11 : `xclip -selection clipboard < <chemin>` puis
-     `xclip -selection clipboard -o | cmp -s - <chemin> && echo OK`.
-   - Aucun outil, ou vérification en échec : ne pas annoncer « copié » ; ce n'est pas une erreur,
-     le chemin du fichier suffit.
-2. Répondre en 3 lignes max : le chemin du fichier, l'état du presse-papier (« copié (vérifié) » ou
-   « non copié »), et la phrase à coller si l'utilisateur préfère pointer le fichier :
-   `Lis .claude/passation/<fichier>.md et reprends exactement où on en était.`
+1. Clipboard (optional, depending on what is installed — `command -v pbcopy wl-copy xclip`):
+   - macOS: `LC_ALL=en_US.UTF-8 pbcopy < <path>`. **The `LC_ALL` prefix is mandatory**: the agent's
+     shell has no locale, and `pbcopy` then reads UTF-8 as MacRoman ("é" becomes "√©"). Check the
+     round trip: `LC_ALL=en_US.UTF-8 pbpaste | cmp -s - <path> && echo OK`.
+   - Linux Wayland: `wl-copy < <path>` then `wl-paste | cmp -s - <path> && echo OK`.
+   - Linux X11: `xclip -selection clipboard < <path>` then
+     `xclip -selection clipboard -o | cmp -s - <path> && echo OK`.
+   - No tool, or the check fails: don't announce "copied"; it is not an error, the file path is
+     enough.
+2. Reply in 3 lines max: the file path, the clipboard status ("copied (verified)" or "not copied"),
+   and the sentence to paste if the user prefers to point to the file:
+   `Read .claude/passation/<file>.md and pick up exactly where we left off.`
 
-Ne lancer aucun autre travail : la passation clôt la session.
+Don't start any other work: the handoff closes the session.

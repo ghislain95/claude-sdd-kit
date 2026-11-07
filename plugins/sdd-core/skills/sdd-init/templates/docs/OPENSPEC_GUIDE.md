@@ -1,108 +1,108 @@
-# {{PROJECT_NAME}} — Guide OpenSpec (SDD)
+# {{PROJECT_NAME}} — OpenSpec guide (SDD)
 
-> Guide pratique du workflow Spec Driven Development sur {{PROJECT_NAME}}.
-> Public : développeur (humain ou agent) travaillant dans Claude Code.
-> Référence amont : [OpenSpec](https://github.com/Fission-AI/OpenSpec), [`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md).
+> Practical guide to the Spec Driven Development workflow on {{PROJECT_NAME}}.
+> Audience: developer (human or agent) working in Claude Code.
+> Upstream reference: [OpenSpec](https://github.com/Fission-AI/OpenSpec), [`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md).
 
 ---
 
-## 1. Les concepts en 30 secondes
+## 1. The concepts in 30 seconds
 
-- **`openspec/specs/<domaine>/spec.md`** — la **source de vérité** : comment le
-  système se comporte *aujourd'hui*. Jamais éditée à la main.
-- **`openspec/changes/<change-id>/`** — un **change** = une évolution proposée,
-  dossier autonome : `proposal.md` (pourquoi), `specs/` (deltas : quoi),
-  `design.md` (comment), `tasks.md` (étapes).
-- **Delta** — un change déclare `ADDED` / `MODIFIED` / `REMOVED` Requirements
-  relatifs aux specs actuelles, sans les réécrire.
-- **Archive** — `/opsx:archive` fusionne les deltas dans `openspec/specs/` et
-  archive le change. Seul moment où les specs bougent : la boucle est
-  auto-alimentée.
-- **`openspec/config.yaml`** — le contexte projet et les règles de rédaction injectés
-  dans chaque artefact (proposal, specs, design, tasks).
+- **`openspec/specs/<domain>/spec.md`** — the **source of truth**: how the
+  system behaves *today*. Never edited by hand.
+- **`openspec/changes/<change-id>/`** — a **change** = a proposed evolution,
+  a self-contained folder: `proposal.md` (why), `specs/` (deltas: what),
+  `design.md` (how), `tasks.md` (steps).
+- **Delta** — a change declares `ADDED` / `MODIFIED` / `REMOVED` Requirements
+  relative to the current specs, without rewriting them.
+- **Archive** — `/opsx:archive` merges the deltas into `openspec/specs/` and
+  archives the change. The only moment the specs move: the loop
+  feeds itself.
+- **`openspec/config.yaml`** — the project context and writing rules injected
+  into every artifact (proposal, specs, design, tasks).
 
-Les specs naissent **au fil des changes** : un domaine existant sans spec reçoit la sienne
-par le premier change qui le touche (le delta `ADDED` décrit alors le comportement actuel
-qu'il touche, pas tout le domaine). Pas de rétro-spec massive : elle coûte cher et périme vite.
+Specs are born **change by change**: an existing domain without a spec gets its own
+from the first change that touches it (the `ADDED` delta then describes the current behaviour
+it touches, not the whole domain). No massive reverse-spec: it is expensive and goes stale fast.
 
-## 2. « J'ai envie de… » → quoi faire
+## 2. "I want to…" → what to do
 
-| Envie | Action |
+| I want to | Action |
 |---|---|
-| Implémenter un epic/ticket de la roadmap | `/opsx:new <change-id>` puis cycle complet (§3) |
-| Une feature pas encore cadrée | `/opsx:new <change-id>` — `product-owner` cadre avec toi |
-| Explorer une idée sans m'engager | `/opsx:explore` |
-| Corriger un bug qui contredit une spec | `/opsx:new fix-<bug>` |
-| Hotfix trivial (< 30 min, comportement spécifié intact) | Implémentation directe sur une branche `fix/…`, pas de change |
-| Reprendre un change en cours | `/opsx:continue` ou `/opsx:apply` |
-| Vérifier l'implémentation vs specs | `/opsx:verify` |
-| Terminer un change livré | `/opsx:archive` |
-| Corriger une spec (typo, précision) | Un petit change (`/opsx:new fix-spec-<domaine>`, delta `MODIFIED`) puis `/opsx:archive` — `/opsx:sync` ne fait que reporter dans `specs/` les deltas d'un change **existant** ; jamais d'édition manuelle de `specs/` |
-| Découvrir le cycle sur un vrai exemple | `/opsx:onboard` |
+| Implement an epic/ticket from the roadmap | `/opsx:new <change-id>` then the full cycle (§3) |
+| A feature not framed yet | `/opsx:new <change-id>` — `product-owner` frames it with you |
+| Explore an idea without committing | `/opsx:explore` |
+| Fix a bug that contradicts a spec | `/opsx:new fix-<bug>` |
+| Trivial hotfix (< 30 min, specified behaviour intact) | Direct implementation on a `fix/…` branch, no change |
+| Resume a change in progress | `/opsx:continue` or `/opsx:apply` |
+| Check the implementation against the specs | `/opsx:verify` |
+| Finish a delivered change | `/opsx:archive` |
+| Fix a spec (typo, precision) | A small change (`/opsx:new fix-spec-<domain>`, `MODIFIED` delta) then `/opsx:archive` — `/opsx:sync` only carries the deltas of an **existing** change over into `specs/`; never a manual edit of `specs/` |
+| Discover the cycle on a real example | `/opsx:onboard` |
 
-## 3. Le cycle complet d'une feature
+## 3. The full cycle of a feature
 
 ```
 /opsx:new <change-id> → /opsx:ff → /opsx:apply → /opsx:verify → /opsx:archive
 ```
 
-Avec l'équipe d'agents (routage : [`CLAUDE.md`](../CLAUDE.md) §8, détail : [`AGENTS.md`](../AGENTS.md)) :
+With the agent team (routing: [`CLAUDE.md`](../CLAUDE.md) §8, details: [`AGENTS.md`](../AGENTS.md)):
 
-1. **Cadrage** — `product-owner` : `proposal.md` (intent, scope, non-goals,
-   critères testables), epic de la roadmap référencé.
-1b. **Passe adversariale** — si le change est structurant, `architect` tente de casser le
-   proposal ; les objections sont résolues dans le proposal avant `/opsx:ff`.
-2. **Design** — `architect` : spec deltas (Given/When/Then, traduisibles 1:1 en tests) +
-   `design.md` (module d'appartenance, migration oui/non, frontières de couches, décisions
-   sourcées à la version épinglée).
-3. **Implémentation** — `<module>-dev`<!-- sdd:if multi-module --> / `full-stack-dev`<!-- sdd:endif --> : `tasks.md` coché au fur et à
-   mesure ; `tester` vérifie : 1 scénario de delta = 1 test.
-4. **Vérification** — `code-reviewer` sur le diff, puis `/opsx:verify` (conformité aux deltas,
-   tests réellement exécutés).
-5. **Archivage** — commit(s) d'implémentation par l'agent sur la branche du change (Conventional
+1. **Framing** — `product-owner`: `proposal.md` (intent, scope, non-goals,
+   testable criteria), roadmap epic referenced.
+1b. **Adversarial pass** — if the change is structural, `architect` tries to break the
+   proposal; objections are resolved in the proposal before `/opsx:ff`.
+2. **Design** — `architect`: spec deltas (Given/When/Then, translatable 1:1 into tests) +
+   `design.md` (owning module, migration yes/no, layer boundaries, decisions
+   sourced at the pinned version).
+3. **Implementation** — `<module>-dev`<!-- sdd:if multi-module --> / `full-stack-dev`<!-- sdd:endif -->: `tasks.md` ticked as
+   it goes; `tester` checks: 1 delta scenario = 1 test.
+4. **Verification** — `code-reviewer` on the diff, then `/opsx:verify` (compliance with the deltas,
+   tests actually run).
+5. **Archiving** — implementation commit(s) by the agent on the change branch (Conventional
    Commits, [`CONTRIBUTING.md`](CONTRIBUTING.md) §2), `/opsx:archive`, post-archive (`doc-writer`
-   vérifie que `docs/` ne contredit pas les specs fusionnées), commit `chore(<id>)` ; enfin<!-- sdd:if github --> push, PR et fusion<!-- sdd:endif --><!-- sdd:if !github --> fusion par un humain<!-- sdd:endif -->
-   selon le niveau d'autonomie de [`CONTRIBUTING.md`](CONTRIBUTING.md) §2.
+   checks that `docs/` does not contradict the merged specs), commit `chore(<id>)`; finally<!-- sdd:if github --> push, PR and merge<!-- sdd:endif --><!-- sdd:if !github --> a merge by a human<!-- sdd:endif -->
+   according to the autonomy level in [`CONTRIBUTING.md`](CONTRIBUTING.md) §2.
 
-**Hygiène de contexte** : un contexte frais par phase (`/clear`, ou `/sdd-core:passation` puis
-nouvelle session) — les artefacts portent la mémoire.
+**Context hygiene**: a fresh context per phase (`/clear`, or `/sdd-core:passation` then a
+new session) — the artifacts carry the memory.
 
-## 4. Règles de rédaction des specs et deltas
+## 4. Writing rules for specs and deltas
 
-- **SHALL ou MUST sur la première ligne** du texte de chaque requirement
-  (le validateur ne lit que la première ligne physique pour ce contrôle).
-- Comportement **observable uniquement** : endpoints, événements, commandes, formats
-  d'échange, codes d'erreur. Pas de noms de classes (→ `design.md`).
-- Scénarios `#### Scenario:` en GIVEN/WHEN/THEN, traduisibles 1:1 en tests.
-- Couvrir les cas d'erreur (entrée invalide, doublon, droits insuffisants, ressource
-  inconnue, limite atteinte), pas seulement le nominal.
-- Tout en **{{CODE_LANG}}** (comme le code et les tests).
-- Le futur ne va pas dans les specs : un epic non implémenté = un futur change
-  (l'intention vit dans [`ROADMAP.md`](ROADMAP.md)).
-- Tout impact sur {{DOMAIN_RISKS}} doit être explicite dans le proposal.
+- **SHALL or MUST on the first line** of each requirement's text
+  (the validator only reads the first physical line for this check).
+- **Observable behaviour only**: endpoints, events, commands, exchange
+  formats, error codes. No class names (→ `design.md`).
+- `#### Scenario:` scenarios in GIVEN/WHEN/THEN, translatable 1:1 into tests.
+- Cover the error cases (invalid input, duplicate, insufficient rights, unknown
+  resource, limit reached), not just the happy path.
+- Everything in **{{CODE_LANG}}** (like the code and the tests).
+- The future does not go into the specs: an unimplemented epic = a future change
+  (the intent lives in [`ROADMAP.md`](ROADMAP.md)).
+- Any impact on {{DOMAIN_RISKS}} must be explicit in the proposal.
 
-## 5. CLI utile
+## 5. Useful CLI
 
 ```bash
-openspec validate --all     # avant chaque commit touchant openspec/
-openspec list               # changes en cours
-openspec status             # état des artefacts d'un change
-openspec update             # après un upgrade du package npm (régénère /opsx:* et skills)
+openspec validate --all     # before every commit touching openspec/
+openspec list               # changes in progress
+openspec status             # state of a change's artifacts
+openspec update             # after an upgrade of the npm package (regenerates /opsx:* and skills)
 ```
 
-La version du CLI est épinglée en CI (`.github/workflows/openspec.yml`) : la monter **en même
-temps** en local et en CI, volontairement.
+The CLI version is pinned in CI (`.github/workflows/openspec.yml`): bump it **at the same
+time** locally and in CI, deliberately.
 
-## 6. Pièges connus
+## 6. Known pitfalls
 
-- ❌ Éditer `openspec/specs/` à la main → uniquement archive/sync. Seule exception : la section
-  `## Purpose` (les deltas ne la portent pas), corrigée dans le commit d'archive du change qui la
-  rend fausse (`CLAUDE.md` §3). La CI (`.github/workflows/openspec.yml`) refuse un diff de
-  `openspec/specs/` sans `openspec/changes/`.
-- ❌ SHALL/MUST repoussé en 2ᵉ ligne par un retour à la ligne → validation KO.
-- ❌ Implémenter un contrat absent des specs → c'est un change qui manque.
-- ❌ Dévier du `design.md` sans le mettre à jour.
-- ❌ Oublier `/opsx:archive` après livraison → les specs dérivent.
-- ❌ Croire que `/opsx:verify` termine le travail : il **audite**, il ne commit ni n'archive.
-- ❌ Committer ou pousser sur `{{DEFAULT_BRANCH}}` → jamais : tout passe par une branche et <!-- sdd:if github -->une PR<!-- sdd:endif --><!-- sdd:if !github -->une fusion humaine<!-- sdd:endif -->
+- ❌ Editing `openspec/specs/` by hand → archive/sync only. Single exception: the
+  `## Purpose` section (deltas do not carry it), fixed in the archive commit of the change that
+  makes it wrong (`CLAUDE.md` §3). CI (`.github/workflows/openspec.yml`) rejects a diff of
+  `openspec/specs/` without `openspec/changes/`.
+- ❌ SHALL/MUST pushed to the 2nd line by a line break → validation fails.
+- ❌ Implementing a contract absent from the specs → a change is missing.
+- ❌ Deviating from `design.md` without updating it.
+- ❌ Forgetting `/opsx:archive` after delivery → the specs drift.
+- ❌ Believing `/opsx:verify` finishes the work: it **audits**, it neither commits nor archives.
+- ❌ Committing or pushing on `{{DEFAULT_BRANCH}}` → never: everything goes through a branch and <!-- sdd:if github -->a PR<!-- sdd:endif --><!-- sdd:if !github -->a human merge<!-- sdd:endif -->
   ([`CONTRIBUTING.md`](CONTRIBUTING.md) §2).

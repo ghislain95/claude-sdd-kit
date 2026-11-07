@@ -1,81 +1,81 @@
-# Rétro-documentation — checklist
+# Reverse-documentation — checklist
 
-But : décrire le projet **tel qu'il est**, avec une preuve pour chaque affirmation, assez précisément
-pour que les règles et les agents générés ensuite soient justes. Pas de jugement de valeur, pas de
-« devrait » : ce qui est souhaitable va dans le backlog, pas dans la rétro-doc.
+Goal: describe the project **as it is**, with evidence for every claim, precisely enough for the
+rules and agents generated afterwards to be right. No value judgements, no "should": what would be
+desirable goes into the backlog, not into the reverse-documentation.
 
-## 1. Détecter les modules et les commandes
+## 1. Detect the modules and commands
 
-Cherche les fichiers de dépendances et de build, à toute profondeur (hors `node_modules`, `vendor`,
-`target`, `dist`, `build`, `.venv`) :
+Look for dependency and build files, at any depth (excluding `node_modules`, `vendor`, `target`,
+`dist`, `build`, `.venv`):
 
-| Écosystème | Fichiers | Commandes (à lire, pas à deviner) |
+| Ecosystem | Files | Commands (to read, not to guess) |
 |---|---|---|
-| JS / TS | `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `nx.json` | `scripts` (`test`, `lint`, `type-check`, `build`) ; gestionnaire = lockfile présent |
-| Python | `pyproject.toml`, `setup.cfg`, `requirements*.txt`, `tox.ini`, `noxfile.py` | `[tool.pytest]`, `[tool.ruff]`, `[tool.mypy]`, scripts `uv`/`poetry`/`hatch` |
-| JVM | `pom.xml`, `build.gradle(.kts)`, `settings.gradle` | `./mvnw test`, `./gradlew check` ; version JDK (`maven.compiler.release`, toolchain) |
-| Go | `go.mod`, `go.work` | `go test ./...`, `go vet`, `golangci-lint` si config |
+| JS / TS | `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `nx.json` | `scripts` (`test`, `lint`, `type-check`, `build`); package manager = the lockfile present |
+| Python | `pyproject.toml`, `setup.cfg`, `requirements*.txt`, `tox.ini`, `noxfile.py` | `[tool.pytest]`, `[tool.ruff]`, `[tool.mypy]`, `uv`/`poetry`/`hatch` scripts |
+| JVM | `pom.xml`, `build.gradle(.kts)`, `settings.gradle` | `./mvnw test`, `./gradlew check`; JDK version (`maven.compiler.release`, toolchain) |
+| Go | `go.mod`, `go.work` | `go test ./...`, `go vet`, `golangci-lint` if configured |
 | Rust | `Cargo.toml` (workspace) | `cargo test`, `cargo clippy`, `cargo fmt --check` |
 | .NET | `*.sln`, `*.csproj` | `dotnet test`, `dotnet format --verify-no-changes` |
 | Ruby | `Gemfile`, `Rakefile` | `bundle exec rspec`, `rubocop` |
 | PHP | `composer.json` | `scripts`, `phpunit`, `phpstan` |
-| Autres | `Makefile`, `justfile`, `Taskfile.yml`, `docker-compose*.yml`, `Dockerfile` | cibles déclarées |
+| Others | `Makefile`, `justfile`, `Taskfile.yml`, `docker-compose*.yml`, `Dockerfile` | declared targets |
 
-**Source de vérité des commandes, dans l'ordre** : la CI (`.github/workflows`, `.gitlab-ci.yml`,
-`Jenkinsfile`, `azure-pipelines.yml`…) > les scripts du projet > le README. Si la CI et les scripts
-divergent, note l'écart (il ira dans le rapport) et retiens ce que la CI lance.
+**Source of truth for commands, in order**: CI (`.github/workflows`, `.gitlab-ci.yml`,
+`Jenkinsfile`, `azure-pipelines.yml`…) > the project's scripts > the README. If CI and the scripts
+diverge, note the gap (it goes into the report) and keep what CI runs.
 
-**Module** = unité avec son propre fichier de dépendances, testable seule. Un monorepo JS avec
-`apps/*` et `packages/*` : un module par app, et les packages partagés regroupés si petits.
+**Module** = a unit with its own dependency file, testable on its own. A JS monorepo with `apps/*`
+and `packages/*`: one module per app, and the shared packages grouped together if small.
 
-## 2. Répartir la recon
+## 2. Split the recon
 
-Un sous-agent `Explore` par module (+ un transverse), lancés **dans le même message**. Donne à
-chacun : le chemin du module, les sections du §3 à remplir, la consigne « chaque affirmation cite
-`fichier:ligne` ; ce que tu ne peux pas prouver, écris-le dans *à confirmer* », et « si
-`graphify-out/graph.json` existe, interroge `graphify query/explain/path` avant de grep ».
+One `Explore` sub-agent per module (+ one cross-cutting), launched **in the same message**. Give each
+one: the module path, the §3 sections to fill in, the instruction "every claim cites `file:line`;
+whatever you can't prove, write it under *to confirm*", and "if `graphify-out/graph.json` exists,
+query `graphify query/explain/path` before grepping".
 
-## 3. Ce que chaque rapport doit contenir
+## 3. What each report must contain
 
-### Par module
-1. **Identité** : rôle du module en une phrase, point(s) d'entrée (`main`, serveur HTTP, CLI,
-   worker, handler serverless, bundle front).
-2. **Stack** : langage + version, framework(s) + version épinglée, base(s) de données, broker,
-   ORM / client, outil de migration (→ option `migrations`), lib de test.
-3. **Structure** : arborescence des 2 premiers niveaux du code, avec le rôle de chaque dossier.
-4. **Architecture observée** : couches et sens des dépendances (qui importe qui — vérifie par
-   échantillonnage d'imports, pas au nom des dossiers), où vit la logique métier, où vivent les
-   adaptateurs (HTTP, DB, file, externe), règles d'architecture **déjà outillées** (ArchUnit,
-   import-linter, dependency-cruiser, eslint boundaries, modules Go internes…).
-5. **Contrats exposés** : routes HTTP / GraphQL / gRPC, topics, événements, CLI, schéma de BDD
-   (dossier de migrations), avec leur fichier de définition.
-6. **Conventions** : nommage, gestion d'erreurs, logs, config / secrets (variables d'env,
-   fichiers), validation des entrées, formatage et lint (configs présentes).
-7. **Tests** : types (unitaires, intégration, e2e, BDD), emplacement, conventions de nommage,
-   fixtures, ce qui est mocké ; commande et **résultat réel** de la ligne de base.
-8. **Vocabulaire du domaine** : entités, agrégats, états, rôles, statuts — tels que nommés dans
-   le code (ils amorcent le glossaire).
-9. **Points chauds** : fichiers les plus modifiés (`git log --format= --name-only | sort | uniq -c
-   | sort -rn | head -20`), plus gros fichiers, TODO/FIXME notables.
-10. **À confirmer** : ce qui semble vrai sans preuve.
+### Per module
+1. **Identity**: the module's role in one sentence, entry point(s) (`main`, HTTP server, CLI,
+   worker, serverless handler, front-end bundle).
+2. **Stack**: language + version, framework(s) + pinned version, database(s), broker, ORM / client,
+   migration tool (→ option `migrations`), test library.
+3. **Structure**: tree of the first 2 levels of the code, with the role of each folder.
+4. **Observed architecture**: layers and dependency direction (who imports whom — check by sampling
+   imports, not by folder names), where the business logic lives, where the adapters live (HTTP, DB,
+   queue, external), architecture rules **already enforced by tooling** (ArchUnit, import-linter,
+   dependency-cruiser, eslint boundaries, Go internal packages…).
+5. **Exposed contracts**: HTTP / GraphQL / gRPC routes, topics, events, CLI, database schema
+   (migrations folder), with their definition file.
+6. **Conventions**: naming, error handling, logging, config / secrets (environment variables,
+   files), input validation, formatting and lint (configs present).
+7. **Tests**: kinds (unit, integration, e2e, BDD), location, naming conventions, fixtures, what is
+   mocked; command and **actual result** of the baseline.
+8. **Domain vocabulary**: entities, aggregates, states, roles, statuses — as named in the code (they
+   seed the glossary).
+9. **Hot spots**: most-changed files (`git log --format= --name-only | sort | uniq -c | sort -rn |
+   head -20`), largest files, notable TODO/FIXME.
+10. **To confirm**: what seems true without evidence.
 
-### Transverse
-- CI : jobs, déclencheurs, filtres de chemins, ce qu'ils lancent.
-- Infra : Docker / compose, IaC, scripts de déploiement, environnements.
-- Docs existantes : README, `docs/`, ADR, CONTRIBUTING — ce qu'elles disent **et** là où elles
-  contredisent le code.
-- Historique git : convention de commits déjà utilisée (`git log --oneline -30`), nommage des
-  branches, merge vs squash.
-- Sécurité : où vivent les secrets, `.env` committés par erreur (signaler, ne pas afficher la valeur).
+### Cross-cutting
+- CI: jobs, triggers, path filters, what they run.
+- Infra: Docker / compose, IaC, deployment scripts, environments.
+- Existing docs: README, `docs/`, ADRs, CONTRIBUTING — what they say **and** where they contradict
+  the code.
+- Git history: commit convention already in use (`git log --oneline -30`), branch naming, merge vs
+  squash.
+- Security: where secrets live, `.env` files committed by mistake (report them, never print the value).
 
-## 4. Transformer la recon en règles
+## 4. Turning the recon into rules
 
-| Trouvé | Devient |
+| Found | Becomes |
 |---|---|
-| Règle respectée partout et outillée (test d'archi, lint) | Règle non-négociable dans `CLAUDE.md` §5, avec le nom du contrôle |
-| Règle respectée partout, pas outillée | Règle non-négociable + ligne de backlog « outiller cette règle » |
-| Règle respectée avec exceptions | `CODING_RULES.md` du module, exceptions listées ; pas en non-négociable |
-| Convention implicite, divergente selon les endroits | « à confirmer » → question à l'utilisateur en porte 1 |
-| Choix structurant visible (framework, BDD, auth, archi) | ADR rétro-documentée |
-| Dette, code mort, TODO majeur | Backlog `docs/ROADMAP.md` |
-| Risque domaine (argent, santé, données perso, sécurité, temps réel) | `{{DOMAIN_RISKS}}` + règle `proposal` d'`openspec/config.yaml` |
+| Rule respected everywhere and enforced by tooling (architecture test, lint) | Non-negotiable rule in `CLAUDE.md` §5, with the name of the check |
+| Rule respected everywhere, not enforced | Non-negotiable rule + backlog line "enforce this rule with a check" |
+| Rule respected with exceptions | The module's `CODING_RULES.md`, exceptions listed; not non-negotiable |
+| Implicit convention, different from place to place | "to confirm" → question to the user at gate 1 |
+| Visible structural choice (framework, database, auth, architecture) | Reverse-documented ADR |
+| Debt, dead code, major TODO | `docs/ROADMAP.md` backlog |
+| Domain risk (money, health, personal data, security, real time) | `{{DOMAIN_RISKS}}` + `proposal` rule in `openspec/config.yaml` |

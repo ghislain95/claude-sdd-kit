@@ -1,6 +1,6 @@
 {
   "env": {
-    "GH_TOKEN": "<your own fine-grained token, repo scope only — never commit settings.local.json>"
+    "GH_TOKEN": "<your own fine-grained token, limited to this repository: Contents RW, Pull requests RW, Actions R, Commit statuses R, Metadata R — set an expiry and renew it; never commit settings.local.json>"
   },
   "permissions": {
     "allow": []
