@@ -1,5 +1,10 @@
 # Tuto — installer et utiliser le workflow SDD avec Claude Code
 
+> **Le plus simple** : copie le prompt de la section « Installer le workflow dans un projet, en un
+> seul prompt » du [`README.md`](README.md), colle-le dans Claude Code à la racine de ton projet.
+> Claude fait les §2 et §3 de ce guide à ta place. La suite du guide reste utile pour comprendre ce
+> qui a été installé et pour le travail au quotidien (§4 et suivants).
+
 Ce guide part d'une machine vierge et va jusqu'au premier change livré. Compte environ 15 min
 d'installation machine, puis 30 à 90 min pour `/sdd-core:sdd-init` sur un projet (selon sa taille ;
 il travaille en grande partie seul et ne t'interroge qu'à deux moments).
