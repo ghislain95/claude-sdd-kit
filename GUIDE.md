@@ -19,8 +19,8 @@ size; it works mostly on its own and only asks you things at two points).
 - **Specialised agents** (product-owner, architect, one dev per module, tester, code-reviewer,
   doc-writer, devops) each do one job, with their own context. The main session routes.
 - **Review is not optional**: the review harness (`/sdd-core:review-harness`) runs every relevant
-  angle on the diff before `/opsx:verify` — spec conformance, conventions, bugs, tests, and security,
-  performance, interface or sourced claims when the diff touches them —, has each serious finding
+  angle on the diff before `/opsx:verify` — spec conformance, conventions, bugs, tests and sourced
+  claims always, security, performance or interface when the diff touches them —, has each serious finding
   verified by an agent that tries to refute it, and loops fixes three rounds at most.
 - **Mechanical rules are checks**: a hook blocks dangerous git commands (commit on `main`,
   force-push, `reset --hard`…), and CI validates the specs and runs the tests.

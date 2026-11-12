@@ -4,7 +4,7 @@
 
 budget:
   minutes: 90
-  agent_runs: 24
+  agent_runs: 30
   effort: high
   heavy_builds: 1
   bug_hunt_level: medium
@@ -13,8 +13,8 @@ budget:
 angles:
   # sdd:fill: one line per conditional angle with the diff globs that select it in this project —
   # security (auth, input handling, persistence, dependency manifests), performance (hot paths,
-  # queries, bundle entry points), interface (UI components, styles, i18n; omit without a UI module),
-  # sourced-claims (Markdown, changelog). Omit an angle that has nothing to watch here.
+  # queries, bundle entry points), interface (UI components, styles, i18n; omit without a UI module).
+  # A missing key = the angle is never selected. The other angles always run.
 
 mechanical:
   # sdd:fill: commands proven during the reverse-documentation, written exactly as run.

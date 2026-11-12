@@ -10,21 +10,26 @@ do not fix. Format: `../review-harness/FINDINGS.md` (one line per finding, sever
 
 ## Method
 
-1. Read every requirement and scenario of the change's spec deltas, and `design.md` decisions.
-2. Read the diff (`git diff <base>...HEAD` plus uncommitted changes) and the files it touches.
-3. For each requirement: find the code that implements it, then walk each scenario through that code.
+1. Artifacts: a missing `proposal.md`, `design.md` or `tasks.md` is a 🔴 MAJOR on the change folder
+   (the cycle was skipped); continue with what exists. No `specs/` → nothing to conform to: say so,
+   report the missing specs as 🛑 BLOCKER, stop.
+2. Read every requirement and scenario of the spec deltas, and the `design.md` decisions.
+3. Read the diff (base...head plus uncommitted changes) and the files it touches.
+4. For each requirement: find the code that implements it, then walk each scenario through that code
+   with the scenario's exact values.
    - Requirement with no implementation → 🛑 BLOCKER.
    - Scenario whose outcome the code does not produce → 🛑 BLOCKER, `Fails when` = the scenario.
-4. For each behaviour the diff adds (endpoint, event, command, persisted field, UI action, config
-   key): find the requirement it serves. None → 🛑 BLOCKER "behaviour outside the deltas".
-5. Each `design.md` decision: followed, or deviated with an update of `design.md`. A silent deviation
+5. For each behaviour the diff adds — endpoint, event, command, persisted field, UI action, config
+   key, **exported or public function** — find the requirement it serves. None:
+   - reachable by a user or another module (called, routed, exported in a public API) → 🛑 BLOCKER
+     "behaviour outside the deltas";
+   - not called anywhere → 🔴 MAJOR "dead extra code outside the deltas".
+6. Each `design.md` decision: followed, or deviated with an update of `design.md`. A silent deviation
    → 🔴 MAJOR.
-6. `tasks.md`: a box checked whose work is absent → 🔴 MAJOR.
+7. `tasks.md`: a box checked whose work is absent → 🔴 MAJOR.
 
 ## Mechanical backing
 
-- Run the project's OpenSpec validation (`openspec validate <id> --strict`).
-- When `/opsx:verify` (skill `openspec-verify-change`) is available, run it and fold its findings in,
-  in the shared format.
-
-Report the commands and their results at the end, as `FINDINGS.md` says.
+- `openspec validate <id> --strict`.
+- `/opsx:verify` (skill `openspec-verify-change`) when `tasks.md` exists: run it and fold its findings
+  in, in the shared format. Without `tasks.md`: skip it and write the reason in the mechanical lines.

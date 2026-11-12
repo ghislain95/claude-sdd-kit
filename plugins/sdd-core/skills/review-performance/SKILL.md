@@ -12,7 +12,8 @@ description: Review angle of the harness — are the performance thresholds writ
 ## Method
 
 1. List the thresholds that apply to the change: from the proposal, and the project-wide ones in
-   `.sdd/harness.yaml` (response time of an endpoint, bundle size, render time, query count…).
+   `.sdd/harness.yaml` (response time of an endpoint, bundle size, render time, query count…). No
+   proposal or no threshold in it → only the configuration's thresholds; say so in the report.
 2. Measure each one with the command the configuration gives, on the change's code. A threshold
    exceeded → 🛑 BLOCKER with the measured value; within 10 % of it → 🟡 MINOR.
 3. A threshold that applies but cannot be measured locally (needs production data, a device) →
