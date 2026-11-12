@@ -40,7 +40,9 @@ claude plugin validate mods/openspec-cockpit
 claude plugin test mods/openspec-cockpit
 ```
 
-Requires a Claude Code build that knows mods (2.1.29x+, the desktop app's).
+Requires Claude Code 2.1.321 or newer (the desktop app's engine): the backdrop is set through `$.theme.set`, which older
+builds lack. Validate and test with a CLI at least as recent as that engine: an older one reports errors the engine no
+longer raises.
 
 ## Developing
 
