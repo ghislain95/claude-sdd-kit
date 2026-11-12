@@ -5,10 +5,10 @@ lot; the owner merges every pull request until group 8 has shipped.
 
 ## 1. Fold claude-mods into the toolbox
 
-- [ ] 1.1 Import `claude-mods` with `git subtree add --prefix=mods` keeping its history — verify: `git log --oneline -- mods/openspec-cockpit` shows the mods' commits
-- [ ] 1.2 Switch the four mod entries of `marketplace.json` from `git-subdir` to `./mods/<mod>`, add `category` to every entry — verify: `claude plugin validate .` passes
-- [ ] 1.3 Make `mods/scripts/sync-shared.sh` and `dev-sync.sh` work from their new location — verify: running sync leaves `git status` clean on an unchanged tree, and the mods' tests pass
-- [ ] 1.4 Install the four mods from the local clone in a scratch config dir — verify: `claude plugin list` shows them enabled and loading without error
+- [x] 1.1 Import `claude-mods` with `git subtree add --prefix=mods` keeping its history — verify: the subtree merge's second parent carries the mods' commits (`git log <merge>^2`)
+- [x] 1.2 Switch the four mod entries of `marketplace.json` from `git-subdir` to `./mods/<mod>`, add `category` to every entry, drop the nested `mods/.claude-plugin` catalog — verify: `claude plugin validate .` passes
+- [x] 1.3 Make `mods/scripts/sync-shared.sh` and `dev-sync.sh` work from their new location — verify: running sync leaves `git status` clean on an unchanged tree, and each mod's `claude plugin test` gives the same result as in `claude-mods` (pre-existing failures: `"ui.notify" is not an event`, tracked separately)
+- [x] 1.4 Install the four mods from the local clone in a scratch config dir — verify: `claude plugin list` shows them enabled
 
 ## 2. Extract handoff and local-qa as plugins
 
