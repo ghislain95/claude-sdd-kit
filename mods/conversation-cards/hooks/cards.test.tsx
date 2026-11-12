@@ -233,7 +233,7 @@ function world(on: On, root: string, tree: Record<string, Node>): World {
 const SCROLL = { offset: 0, bodyRows: 10 }
 const BAND = {
   component: 'AbovePrompt' as const,
-  props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 100, scroll: SCROLL, view: {} },
+  props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 10, bodyColumns: 100, scroll: SCROLL, view: {} },
 }
 const PANE = {
   component: 'Pane' as const,
@@ -653,9 +653,10 @@ test('the block’s « vérifier » lines name the checks of a compact QA card',
 
 // ---------------------------------------------------------------- Terre de Sienne
 
-type Mounted = Awaited<ReturnType<Engine['ui']['mount']>>
+/** Any drawing the kit mounted: only its `findAll` is read. */
+type Drawing = Pick<Awaited<ReturnType<Engine['ui']['mount']>>, 'findAll'>
 
-async function ribbons(ui: Mounted): Promise<{ alt: string; source: string }[]> {
+async function ribbons(ui: Drawing): Promise<{ alt: string; source: string }[]> {
   return (await ui.findAll({ type: 'Svg' })).map(found => ({ alt: String(found.props.alt), source: String(found.props.source) }))
 }
 

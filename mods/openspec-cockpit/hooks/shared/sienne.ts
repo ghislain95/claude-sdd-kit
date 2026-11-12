@@ -262,10 +262,10 @@ export function timeline(width: number, steps: string[], current: number, o: { s
   const xs = steps.map((_, index) => (steps.length > 1 ? pad + index * span : w / 2))
   const isAllDone = current >= steps.length
   const at = isAllDone ? steps.length : Math.max(-1, current)
-  const reach = isAllDone ? (xs.at(-1) ?? pad) - pad : at >= 0 ? xs[at] - pad : 0
+  const reach = isAllDone ? (xs.at(-1) ?? pad) - pad : at >= 0 ? (xs[at] ?? pad) - pad : 0
   const marks = steps
     .map((step, index) => {
-      const x = xs[index].toFixed(1)
+      const x = (xs[index] ?? 0).toFixed(1)
       const isDone = index < at
       const isCurrent = index === at
       const mark = isCurrent
@@ -360,9 +360,9 @@ export function contrast(fg: string, bg: string): number {
   const luminance = (hex: string): number => {
     const value = hex.replace('#', '')
     const channels = [0, 2, 4].map(at => parseInt(value.slice(at, at + 2), 16) / 255)
-    const [r, g, b] = channels.map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+    const [r = 0, g = 0, b = 0] = channels.map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
   }
-  const [light, dark] = [luminance(fg), luminance(bg)].sort((a, b) => b - a)
+  const [light = 0, dark = 0] = [luminance(fg), luminance(bg)].sort((a, b) => b - a)
   return (light + 0.05) / (dark + 0.05)
 }

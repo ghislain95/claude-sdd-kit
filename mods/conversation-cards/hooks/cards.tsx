@@ -3,7 +3,7 @@
 // QA, decisions to confirm. One « Envoyer mes réponses » gathers every answer
 // of a card into one prompt. The message itself is never changed.
 
-import type { EngineInterface, RenderChildren, RenderInput } from 'claude-code'
+import type { EngineInterface, RenderChildren, RenderElement, RenderInput } from 'claude-code'
 
 import { addToPrompt, copyText, insertAnswers, markQa, notePrompt, openFile, summarize, toggleReportSection } from './actions'
 import { cleanMarkdown, truncate } from './logic'
@@ -224,7 +224,8 @@ const RIBBON_RADIUS = 10
  * the accent border; on the terminal, the text header it always had.
  */
 function framed(els: Elements, key: string, context: CardContext, header: Header, textHeader: RenderChildren, body: RenderChildren, gap: 'xs' | 'sm' = 'xs'): RenderChildren {
-  const { Box, Svg } = els as Elements & { Svg?: (props: Record<string, unknown>) => RenderChildren }
+  const { Box } = els
+  const { Svg } = els as { Svg?: (props: Record<string, unknown>) => RenderElement }
   const width = context.ribbonWidth ?? null
   if (width === null || Svg === undefined) {
     return (

@@ -6,7 +6,7 @@ const NOW = Date.UTC(2026, 10, 6, 10, 0)
 const SCROLL = { offset: 0, bodyRows: 10 }
 const BAND = (isWorking: boolean) => ({
   component: 'AbovePrompt' as const,
-  props: { hasSurvey: false, isWorking, maxRows: 10, bodyColumns: 120, scroll: SCROLL, view: {} },
+  props: { hasSurvey: false, isCollapsed: false, isWorking, maxRows: 10, bodyColumns: 120, scroll: SCROLL, view: {} },
 })
 
 type Seen = { commands: string[]; toasts: string[]; clock: ReturnType<typeof mock.clock> }
@@ -103,9 +103,13 @@ type Backdrops = { set: unknown[]; store: Map<string, unknown> }
 
 function withBackdrop(on: On): Backdrops {
   const seen: Backdrops = { set: [], store: new Map() }
-  on('ui.backdrop', ($, e) => {
+  on('theme.set', ($, e) => {
     seen.set.push(e.backdrop)
-    return { value: { isDrawn: true, requestId: 'b' } as never }
+    return { value: { isDrawn: true as const, requestId: 'b' } }
+  })
+  on('theme.clear', () => {
+    seen.set.push(undefined)
+    return { value: { isDrawn: false as const, reason: 'cleared' } }
   })
   on('store.get', ($, e) => ({ value: seen.store.get(e.key) }))
   on('store.set', ($, e) => {
