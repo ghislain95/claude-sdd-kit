@@ -1,0 +1,6 @@
+{
+  "name": "openspec-cockpit",
+  "version": "0.14.0",
+  "description": "OpenSpec cockpit: next-action dashboard pane, live workflow runs, task-group progress, decision register, cards for questions/reports/commits/QA in the transcript, display contract, gate alerts",
+  "types": "./types/index.d.ts"
+}

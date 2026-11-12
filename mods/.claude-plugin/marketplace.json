@@ -1,0 +1,24 @@
+{
+  "name": "local-mods",
+  "owner": {
+    "name": "ghislain95"
+  },
+  "plugins": [
+    {
+      "name": "openspec-cockpit",
+      "source": "./openspec-cockpit"
+    },
+    {
+      "name": "session-hud",
+      "source": "./session-hud"
+    },
+    {
+      "name": "background-tasks",
+      "source": "./background-tasks"
+    },
+    {
+      "name": "conversation-cards",
+      "source": "./conversation-cards"
+    }
+  ]
+}
