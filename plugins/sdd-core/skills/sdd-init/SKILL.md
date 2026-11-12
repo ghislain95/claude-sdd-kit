@@ -56,9 +56,10 @@ This folder (the "base directory" given when the skill is invoked) contains:
    | gh | `gh auth status` | `brew install gh` | with option `github` |
    | uv + graphify | `graphify --version` | `uv tool install "graphifyy[sql]"` | with option `graphify` |
 
-4. Companion plugins: ask the user to run `/plugin` and confirm that `superpowers` is installed (the
-   workflow relies on `systematic-debugging`, `verification-before-completion`,
-   `test-driven-development`). If it is missing: `/plugin install superpowers@claude-plugins-official`.
+4. Companion plugins: ask the user to run `/plugin` and confirm that `superpowers` and `handoff` are
+   installed (the workflow relies on `systematic-debugging`, `verification-before-completion`,
+   `test-driven-development`, and the generated rules call `/handoff:passation`). If one is missing:
+   `/plugin install superpowers@claude-plugins-official`, `/plugin install handoff@claude-toolbox`.
 5. Files that already exist (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/`, `.claude/settings.json`,
    `openspec/`, `docs/`) → note them: they go through `references/adoption.md`.
 
@@ -112,7 +113,7 @@ the choices the code cannot settle:
    a web interface: `sdd-ui` plugin), `work-style` (offered ticked: the kit's way of working in
    `CLAUDE.md` §12 — short framing with examples, autonomy all the way once framing is agreed,
    structured final report, handoff), `caveman` / `cockpit` (display preferences installed at user
-   level; `cockpit` = the desktop mods `openspec-cockpit` + `conversation-cards` from the sdd-kit
+   level; `cockpit` = the desktop mods `openspec-cockpit` + `conversation-cards` from the claude-toolbox
    marketplace are installed — offered ticked if `claude plugin list` shows them).
 4. **Agent model** (`opus` recommended: the quality of the review and of the adversarial pass depends
    on it; `inherit` to follow the session's model).

@@ -211,7 +211,7 @@ Details: [`docs/GRAPHIFY.md`](docs/GRAPHIFY.md).
 
 | Request | Tool |
 |---|---|
-| Long session, change of topic, polluted context | `/sdd-core:passation [next goal]` then `/clear` or a new session (preferred over `/compact`) |
+| Long session, change of topic, polluted context | `/handoff:passation [next goal]` then `/clear` or a new session (preferred over `/compact`) |
 | Fuzzy or conflicting term during framing | skill `sdd-core:domain-modeling` → [`docs/GLOSSARY.md`](docs/GLOSSARY.md) |
 | Periodic architecture audit (every ~5 changes, never in the middle of one) | `/sdd-core:improve-codebase-architecture [area]` |
 | Failed session or painful post-archive | `/sdd-core:retro` |
@@ -235,14 +235,14 @@ No shared working style is imposed: each developer sets their own (Claude memory
 - **All the way once the framing is agreed**: chain all the slices (modules, tests, docs) without asking "go?" between them. Adversarial review and honest verification are kept. Stop only for a real decision, a design gap discovered along the way, or a failing merge condition (red CI, open BLOCKER/MAJOR).
 - **A single final report** on a large task (full change, several agents), with fixed sections: done / decisions taken / found and fixed / caveats / tests (with figures: N passed, M failed, names) / what I expect from you. No stream of partial messages between agents.
 - **Long agents in the background**: a dev or test agent on a full change → `run_in_background`, announce the agent + reason + approximate duration, move on to something else; never invent its result before the notification. One heavy build/test run at a time on the machine.
-- **Early handoff**: after each merged PR or archived change in a long session, and as soon as the context gets heavy, offer `/sdd-core:passation <next goal>` rather than chaining. Never start an `/opsx:new` in a loaded context without having offered it.
+- **Early handoff**: after each merged PR or archived change in a long session, and as soon as the context gets heavy, offer `/handoff:passation <next goal>` rather than chaining. Never start an `/opsx:new` in a loaded context without having offered it.
 <!-- sdd:endif -->
 <!-- sdd:if caveman -->
 - **Caveman**: compressed replies (`caveman` plugin); normal prose for security warnings, confirmations of irreversible actions, code, commits and PRs.
 <!-- sdd:endif -->
 <!-- sdd:if cockpit -->
 
-### Display contract (`claude-mods` desktop mods)
+### Display contract (claude-toolbox desktop mods)
 
 Decisions to make, commit messages and the ```cockpit block follow the display contract injected by the `conversation-cards` / `openspec-cockpit` mods: `### Q1 · <title>` + options `- A · <label> — <explanation>` (the recommended one marked `(recommandé)`) + `Recommandation : …`; commits in a ```text block; a ```cockpit block at the end of a message when the user has to decide, do or check something, with the prefixes `trancher:`, `confirmer:`, `faire:`, `vérifier:`, `info:`. These keywords stay in French because the mods parse them verbatim.
 <!-- sdd:endif -->

@@ -58,35 +58,34 @@ In a Claude Code session (any folder):
 
 ```
 /plugin marketplace add anthropics/claude-plugins-official
-/plugin marketplace add ghislain95/claude-sdd-kit
-/plugin install sdd-core@sdd-kit
+/plugin marketplace add ghislain95/claude-toolbox
+/plugin install sdd-core@claude-toolbox
 ```
 
-`sdd-core` declares `superpowers` (official marketplace) as a dependency: it is installed along with
-it **only if the official marketplace is added** (first line, harmless if it already is). Without it,
-`sdd-core` installs but refuses to load. Check with `/plugin` that both are enabled.
+`sdd-core` declares `superpowers` (official marketplace) and `handoff` (this catalog) as dependencies:
+they are installed along with it, `superpowers` **only if the official marketplace is added** (first line, harmless if it already is). Without it,
+`sdd-core` installs but refuses to load. Check with `/plugin` that all three are enabled.
 
 Then turn on auto-update for the kit — it is **off by default** for third-party marketplaces:
-`/plugin` → **Marketplaces** → `sdd-kit` → **Enable auto-update** (see §6).
+`/plugin` → **Marketplaces** → `claude-toolbox` → **Enable auto-update** (see §6).
 
 Optional:
 
 ```
-/plugin install sdd-ui@sdd-kit                     # projects with a web interface
+/plugin install sdd-ui@claude-toolbox                     # projects with a web interface
 /plugin install frontend-design@claude-plugins-official   # building a UI from scratch
 /plugin marketplace add JuliusBrussee/caveman
 /plugin install caveman@caveman                    # compressed replies (saves tokens)
 ```
 
 For the desktop app only, display mods (OpenSpec cockpit pane, message cards, session band,
-background-tasks pane), listed in this marketplace and maintained in
-https://github.com/ghislain95/claude-mods:
+background-tasks pane), in this catalog under `mods/`:
 
 ```
-/plugin install openspec-cockpit@sdd-kit
-/plugin install conversation-cards@sdd-kit
-/plugin install session-hud@sdd-kit
-/plugin install background-tasks@sdd-kit
+/plugin install openspec-cockpit@claude-toolbox
+/plugin install conversation-cards@claude-toolbox
+/plugin install session-hud@claude-toolbox
+/plugin install background-tasks@claude-toolbox
 ```
 
 If you install them, tick the `cockpit` option when `sdd-init` asks: it adds to `CLAUDE.md` the
@@ -174,7 +173,7 @@ because…").
 
 | Situation | Tool |
 |---|---|
-| Long session, change of topic, polluted context | `/sdd-core:passation [next goal]`, then `/clear` — preferred over `/compact` |
+| Long session, change of topic, polluted context | `/handoff:passation [next goal]`, then `/clear` — preferred over `/compact` |
 | Fuzzy or disputed domain term | the `domain-modeling` skill updates `docs/GLOSSARY.md` |
 | Every ~5 changes, never in the middle of one | `/sdd-core:improve-codebase-architecture` |
 | Failed session, painful post-archive | `/sdd-core:retro` (improves the agent's environment, not the code) |
@@ -209,8 +208,8 @@ during a session and tells you when a new version is installed (`/reload-plugins
 applies it). Without auto-update, by hand:
 
 ```
-/plugin marketplace update sdd-kit
-/plugin update sdd-core@sdd-kit
+/plugin marketplace update claude-toolbox
+/plugin update sdd-core@claude-toolbox
 ```
 
 When you open a session in a project set up with an older kit, `sdd-core` shows a one-line notice:

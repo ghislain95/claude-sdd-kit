@@ -1,9 +1,33 @@
 # Changelog
 
-Versions of the `sdd-core` and `sdd-ui` plugins. A version only reaches users when the `version`
-in `plugins/*/.claude-plugin/plugin.json` changes (see [`MAINTAINING.md`](MAINTAINING.md)). After
-updating the plugin, run `/sdd-core:sdd-init --refresh` in each installed project to bring its
-generated files up to date.
+Versions of the `sdd-core` plugin, with what changed in the catalog around it. A version only reaches
+users when the `version` in the plugin's `.claude-plugin/plugin.json` changes (see
+[`MAINTAINING.md`](MAINTAINING.md)). After updating the plugin, run `/sdd-core:sdd-init --refresh` in
+each installed project to bring its generated files up to date.
+
+## 0.3.0 — 2026-11-12
+
+### Changed
+- **BREAKING — the catalog is renamed `claude-toolbox`** (repository `ghislain95/claude-toolbox`,
+  marketplace `name` `claude-toolbox`). A marketplace keeps the name it was added under: remove
+  `sdd-kit` and add `ghislain95/claude-toolbox` to switch (see the README). Until then, an existing
+  `sdd-kit` install keeps working, once `handoff` is installed (next point).
+- The handoff skill moves to its own plugin, `handoff`: `/sdd-core:passation` becomes
+  `/handoff:passation`. `sdd-core` depends on it, so installing `sdd-core` installs it too. It still
+  writes into `.claude/passation/`. **Updating in place** (auto-update included) does not install a
+  dependency added since: run `claude plugin install handoff@<catalog name>` once, otherwise
+  `sdd-core` 0.3.0 refuses to load (`Dependency "handoff@…" is not installed`).
+- The install marker becomes `claude-toolbox: installed <version>`; the former `sdd-kit: installed`
+  marker is still recognised by the version check and rewritten by `--refresh`. Refresh branches and
+  commits are named `chore/sdd-init-refresh-<version>` and `chore(sdd-init)`.
+
+### Added
+- The four desktop mods live in the catalog under `mods/` (folded in from `claude-mods`, history
+  kept), each entry with a category (`workflow`, `skill`, `mod`).
+- `.sdd/triggers.yaml`: the toolbox's own release triggers.
+
+Projects set up with 0.2.0: `--refresh` updates the `/handoff:passation` references in the generated
+`CLAUDE.md`, `AGENT_TOOLBOX.md` and `OPENSPEC_GUIDE.md`.
 
 ## 0.2.0 — 2026-11-07
 

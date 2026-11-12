@@ -1,0 +1,27 @@
+# Triggers of the claude-toolbox repository itself (change-risk-classification).
+# A pull request whose diff matches a path below opens the gate it is listed under.
+# First version, written in lot 1 of the dev-factory change; the schema is fixed in group 5.
+
+# What users see and do: skill behaviour, mod display.
+intent:
+  paths:
+    - plugins/*/skills/**
+    - mods/*/hooks/**
+
+# Reaches users' machines or projects as soon as it is merged (auto-update), and a revert does not
+# undo what a refresh or an install already wrote into their projects.
+irreversible:
+  paths:
+    - plugins/sdd-core/skills/sdd-init/**
+    - plugins/sdd-core/hooks/**
+    - .claude-plugin/marketplace.json
+    - plugins/*/.claude-plugin/plugin.json
+    - mods/*/.claude-plugin/plugin.json
+
+# The gate machinery itself: never waivable.
+gate_machinery:
+  paths:
+    - .sdd/**
+    - .claude/hooks/**
+    - .claude/settings.json
+    - .github/workflows/**

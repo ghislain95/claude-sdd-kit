@@ -23,7 +23,7 @@ conflict).
 Last line of the generated `CLAUDE.md`:
 
 ```markdown
-<!-- sdd-kit: installed <sdd-core plugin version> on <YYYY-MM-DD> — options: <list> — autonomy: <level> -->
+<!-- claude-toolbox: installed <sdd-core plugin version> on <YYYY-MM-DD> — options: <list> — autonomy: <level> -->
 ```
 
 It is what `--refresh` relies on. Read the version in the plugin's `.claude-plugin/plugin.json` (two
@@ -31,9 +31,10 @@ levels above this skill).
 
 ## 3. `/sdd-init --refresh` — resync with a newer version of the kit
 
-1. Read the marker: installed version, options, autonomy. Missing → this project was not set up by
+1. Read the marker (`claude-toolbox: installed …`, or `sdd-kit: installed …` for a project set up before
+   the catalog was renamed — rewrite it to the new form): installed version, options, autonomy. Missing → this project was not set up by
    the kit: offer a full install in adoption mode (§1).
-2. Branch `chore/sdd-kit-refresh-<version>`.
+2. Branch `chore/sdd-init-refresh-<version>`.
 3. For every file generated from a template (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/*`,
    `docs/{CONTRIBUTING,OPENSPEC_GUIDE,AGENT_TOOLBOX,GRAPHIFY}.md`, `openspec/config.yaml`,
    `.claude/hooks/*`, `.claude/settings.json` (union of the `allow` lists and hooks, nothing removed),
@@ -47,5 +48,5 @@ levels above this skill).
    `bash .claude/hooks/block-git-writes.test.sh`; the local `.conf` is kept.
 5. Never touch: `openspec/specs/`, `openspec/changes/`, the reverse-documentation (`ARCHITECTURE.md`,
    module docs, glossary, ADRs, roadmap) — it belongs to the project.
-6. Phase 5 of `SKILL.md` (checks), then one commit `chore(sdd-kit): refresh workflow to <version>`
+6. Phase 5 of `SKILL.md` (checks), then one commit `chore(sdd-init): refresh workflow to <version>`
    listing in its body what comes from the kit and the local differences kept. Marker updated.

@@ -1,0 +1,9 @@
+# Laid by Claude Code at each load: types for the editor, regenerated
+.claude-plugin/types/
+**/.claude-plugin/types/
+.DS_Store
+node_modules/
+*.log
+.claude/
+
+.superpowers/

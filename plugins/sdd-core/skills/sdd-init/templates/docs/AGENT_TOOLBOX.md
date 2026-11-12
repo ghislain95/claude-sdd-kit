@@ -3,7 +3,7 @@
 
 Catalogue of the skills, hooks and checks adopted for AI-assisted development of {{PROJECT_NAME}},
 **and of those rejected, with the reason**, so the evaluation is not redone. Base: the
-`claude-sdd-kit` kit (plugins `sdd-core`<!-- sdd:if ui --> and `sdd-ui`<!-- sdd:endif -->), installed by `/sdd-core:sdd-init`.
+`claude-toolbox` catalog (plugins `sdd-core`<!-- sdd:if ui --> and `sdd-ui`<!-- sdd:endif -->), installed by `/sdd-core:sdd-init`.
 
 The everyday "request → tool" table is in [`CLAUDE.md` §11](../CLAUDE.md).
 This document is the full catalogue. Every tool added or removed is recorded here, with its date.
@@ -28,7 +28,7 @@ This document is the full catalogue. Every tool added or removed is recorded her
 |---|---|---|---|
 | OpenSpec (`/opsx:*`) | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) (npm CLI `@fission-ai/openspec`) | Specs as source of truth + changes (proposal, deltas, design, tasks), archive that merges the deltas | Every non-trivial feature ([`OPENSPEC_GUIDE.md`](OPENSPEC_GUIDE.md)) |
 | superpowers | official plugin `claude-plugins-official` | `brainstorming`, `systematic-debugging`, `test-driven-development`, `verification-before-completion`… | Everywhere, except as a replacement for `/opsx:new` / `/opsx:ff` |
-| `/sdd-core:passation` | `sdd-core` (ideas: mattpocock `handoff`) | Handoff document: goal, state, decisions, tried and failed, verified vs assumed facts, key files, next step, working style. Written to `.claude/passation/` (gitignored) + clipboard | Before `/clear` or a new session, as soon as the context gets heavy or the topic changes |
+| `/handoff:passation` | `handoff` (ideas: mattpocock `handoff`) | Handoff document: goal, state, decisions, tried and failed, verified vs assumed facts, key files, next step, working style. Written to `.claude/passation/` (gitignored) + clipboard | Before `/clear` or a new session, as soon as the context gets heavy or the topic changes |
 | `sdd-core:domain-modeling` | `sdd-core` (mattpocock, adapted) | Challenges terms against [`GLOSSARY.md`](GLOSSARY.md), proposes the canonical term, updates the glossary when the user decides | Framing, design; also read by `product-owner`, `architect`, `code-reviewer` |
 | `/sdd-core:improve-codebase-architecture` | `sdd-core` (mattpocock, adapted) | Hotspot audit (git<!-- sdd:if graphify --> + graphify<!-- sdd:endif -->) → report of "shallow" modules → framing of the chosen candidate → line in [`ROADMAP.md`](ROADMAP.md), section "Backlog — flagged work" | By hand, every ~5 changes, never in the middle of one |
 | `/sdd-core:retro` | `sdd-core` (mattpocock, adapted) | Retro on the agent's **environment**: navigation, automated checks, reviewer rules, steering files, tool economy | After a painful archive or a failed session |
@@ -48,7 +48,7 @@ This document is the full catalogue. Every tool added or removed is recorded her
 | caveman | [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Compressed replies (~-75% tokens), status line | Developer's choice, at user level |
 <!-- sdd:endif -->
 <!-- sdd:if cockpit -->
-| claude-mods | [ghislain95/claude-mods](https://github.com/ghislain95/claude-mods) | Desktop app mods: OpenSpec cockpit, messages as cards, session band, background tasks | Desktop app only, at user level |
+| desktop mods (`openspec-cockpit`, `conversation-cards`, `session-hud`, `background-tasks`) | [claude-toolbox `mods/`](https://github.com/ghislain95/claude-toolbox/tree/main/mods) | Desktop app mods: OpenSpec cockpit, messages as cards, session band, background tasks | Desktop app only, at user level |
 <!-- sdd:endif -->
 <!-- sdd:fill: project-specific automated checks already in place (architecture test, import lint, migration guard…) — or nothing if none -->
 
@@ -107,7 +107,7 @@ This document is the full catalogue. Every tool added or removed is recorded her
 - **All agents run on `model: {{AGENT_MODEL}}`**, written explicitly in each
   `.claude/agents/*.md` rather than inherited: a session started on a cheaper model does not
   silently degrade an agent.
-- **`/compact` or `/sdd-core:passation`?** `/compact` keeps the shape of the conversation, dead ends
+- **`/compact` or `/handoff:passation`?** `/compact` keeps the shape of the conversation, dead ends
   included. Prefer the handoff + a fresh session as soon as the topic changes or after a
   laborious debug.
 - **Messaging between sessions** (`SendMessage` / `ListAgents`, native): possible, but the handoff

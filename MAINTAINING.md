@@ -1,4 +1,4 @@
-# Maintaining the kit
+# Maintaining the toolbox
 
 How to publish a new version, and what users experience.
 
@@ -10,6 +10,7 @@ How to publish a new version, and what users experience.
    claude plugin validate .
    claude plugin validate plugins/sdd-core
    claude plugin validate plugins/sdd-ui
+   claude plugin validate plugins/handoff
    bash plugins/sdd-core/skills/sdd-init/templates/claude/hooks/block-git-writes.test.sh
    bash plugins/sdd-core/hooks/check-kit-version.test.sh
    ```
@@ -27,18 +28,54 @@ How to publish a new version, and what users experience.
 
 ## The desktop mods
 
-The marketplace lists the four desktop mods with a `git-subdir` source on
-`ghislain95/claude-mods` (`ref: main`). They follow their own `version` in that repository: a
-version bump there reaches users without any change here. Change the entries in
-`.claude-plugin/marketplace.json` only to add, remove or pin a mod (`ref` to a tag or `sha`).
+The four desktop mods live under `mods/` (folded in from `ghislain95/claude-mods` with
+`git subtree`). They are relative-path plugins like the others: bump the `version` in
+`mods/<mod>/.claude-plugin/plugin.json` to ship a change, and check them with
+`claude plugin validate mods/<mod>` and `claude plugin test mods/<mod>`.
+
+Known failures, already present in `claude-mods` before the fold: `claude plugin validate` fails on
+`openspec-cockpit`, `conversation-cards` and `background-tasks` ("$ is passed to … imported from …"),
+and `claude plugin test` fails on every mod (`"ui.notify" is not an event`). Both come from a change
+of the mods API in Claude Code and are tracked as their own fix, outside `dev-factory`.
+
+## Release triggers
+
+`main` is production for everyone who installed from this catalog with auto-update on. The paths
+listed in [`.sdd/triggers.yaml`](.sdd/triggers.yaml) under `irreversible` reach users' machines or
+projects as soon as they are merged; a pull request touching one of them is merged by the owner, never
+by an agent.
+
+## Renaming the catalog (`sdd-kit` → `claude-toolbox`)
+
+Rehearsed on a scratch `CLAUDE_CONFIG_DIR` on 2026-11-12, with the catalog added from a local clone:
+
+- A marketplace keeps the name it was **added** under. After the `name` in `marketplace.json`
+  changed, `claude plugin marketplace update sdd-kit` succeeded and the plugins stayed installed and
+  enabled as `<plugin>@sdd-kit`.
+- Adding the same source again is refused as already present (`Marketplace 'sdd-kit' already on
+  disk`): the new name is only picked up by removing and re-adding.
+- `claude plugin marketplace remove sdd-kit` uninstalls its plugins and deletes their saved options,
+  secrets and data. Adding `claude-toolbox` then installing `sdd-core@claude-toolbox` works, with its
+  dependencies.
+
+- Updating `sdd-core` in place from 0.2.0 to 0.3.0 (`marketplace update` then `plugin update`)
+  succeeds but leaves `sdd-core` failing to load: `Dependency "handoff@sdd-kit" is not installed`. An
+  update never installs a dependency added since; `claude plugin install handoff@sdd-kit` fixes it.
+  **Adding a dependency is a breaking change for in-place updates**: say so in the CHANGELOG with
+  the install command.
+
+So users of `sdd-kit` keep working until they choose to switch, once `handoff` is installed; the
+README tells them how. Projects
+set up with the former kit keep their `sdd-kit: installed` marker, which the version check still
+reads.
 
 ## What users experience
 
-- **Plugin, with auto-update on** (`/plugin` → Marketplaces → `sdd-kit` → Enable auto-update): during
+- **Plugin, with auto-update on** (`/plugin` → Marketplaces → `claude-toolbox` → Enable auto-update): during
   a session, Claude Code refreshes the marketplace in the background, installs the new version and
   tells them; `/reload-plugins` or a restart applies it.
 - **Plugin, with auto-update off** (the default for third-party marketplaces): nothing happens until
-  they run `claude plugin marketplace update sdd-kit && claude plugin update sdd-core@sdd-kit`.
+  they run `claude plugin marketplace update claude-toolbox && claude plugin update sdd-core@claude-toolbox`.
 - **Projects**: the files `sdd-init` generated are copies. When a session opens in a project whose
   `CLAUDE.md` marker is older than the installed `sdd-core`, the plugin's session-start hook
   (`plugins/sdd-core/hooks/check-kit-version.sh`) shows a one-line notice.
