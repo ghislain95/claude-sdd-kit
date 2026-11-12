@@ -42,10 +42,10 @@ Every non-trivial feature follows the cycle:
 
 ```
 /opsx:new <change-id>   → framing (proposal)
-[adversarial pass]      → the architect tries to break the proposal (if structural)
+[adversarial pass]      → the proposal is challenged before design (always, scaled to the change)
 /opsx:ff                → spec deltas + design + tasks
 /opsx:apply             → task-by-task implementation
-code-reviewer           → review of the uncommitted diff (mandatory)
+review-harness          → every review angle, adversarially verified, 3 fix rounds max (mandatory)
 /opsx:verify            → implementation vs specs check
 commit (agent)          → on the change branch (docs/CONTRIBUTING.md §2)
 /opsx:archive           → deltas merged into openspec/specs/
@@ -61,8 +61,8 @@ PR (agent)              → opened by the agent; a human reviews and merges
 <!-- sdd:endif -->
 ```
 
-- **Adversarial pass** (structural changes: new contract, migration, cross-cutting choice, new mechanism): dispatch `architect` on the proposal with the mission to **break** it (fragile assumptions, ignored alternatives, hidden costs in {{DOMAIN_RISKS}}, conflicts with `docs/adr/`). Objections are resolved in the proposal before `/opsx:ff`. Simple change → straight to `/opsx:ff`.
-- **Mandatory review after `/opsx:apply`**: `code-reviewer` on the uncommitted diff, **before `/opsx:verify`**<!-- sdd:if ui -->; UI diff → also `/sdd-ui:web-design-guidelines <files>`; motion → `/sdd-ui:review-animations` (user-invoked skill: otherwise an agent reads the sdd-ui plugin's `review-animations/SKILL.md` + `STANDARDS.md` and applies them)<!-- sdd:endif -->. BLOCKER/MAJOR findings go back to the relevant dev agent, re-review if needed.
+- **Adversarial pass, always, scaled to the change**: before `/opsx:ff`, dispatch `architect` on the proposal with the mission to **break** it (fragile assumptions, ignored alternatives, hidden costs in {{DOMAIN_RISKS}}, conflicts with `docs/adr/`). Structural change (new contract, migration, cross-cutting choice, new mechanism) → a full attempt, every objection with its failure scenario. Small change → a short challenge: the five strongest objections at most, one pass. Objections are resolved in the proposal, or put to the user, before `/opsx:ff`.
+- **Mandatory review after `/opsx:apply`**: `/sdd-core:review-harness <id>`, **before `/opsx:verify`**. It selects the angles from the diff and `.sdd/harness.yaml` (spec conformance, conventions — the `code-reviewer` agent —, bugs and tests always; security, performance, interface, sourced claims when the diff touches their ground), runs them one after the other, has every BLOCKER/MAJOR verified by an agent that tries to refute it, sends the confirmed ones to the relevant dev agent and loops three rounds at most, then escalates. Report: `openspec/changes/<id>/review.md`. Outside a change (hotfix), the `code-reviewer` agent alone is enough.
 - **Post-archive**: (1) tick or remove the ticket in [`docs/ROADMAP.md`](docs/ROADMAP.md) (its "Update process"); (2) "did this change touch a contract, a convention, the stack?" → yes: `doc-writer` on the affected docs; no: say so ("post-archive: no doc impact"); (3) is the `## Purpose` of each touched spec (or created one, "TBD") still accurate? if not, the session that archives fixes it in the archive commit (exception above; not `doc-writer`)<!-- sdd:if graphify -->; (4) refresh the graph (§10, `--force` rule)<!-- sdd:endif -->.
 - The roadmap is the pool: an epic/ticket = a future change; a deferred idea = a line in "Backlog — flagged work", not a session memory.
 - Trivial hotfix (< 30 min, specified behaviour intact): direct implementation allowed, without an OpenSpec change — but on a `fix/<scope>-<desc>` branch, delivered like everything else (§7).
@@ -135,7 +135,7 @@ PR (agent)              → opened by the agent; a human reviews and merges
   - `git add` with explicit paths; module tests green and review done before a code commit; never `--amend`, `rebase`, `reset` to a revision or force-push; long message → `git commit -F <file>`;
   - parallel sessions on the same checkout share one working tree: before validating or committing, `git status` to spot files that are not yours and name the paths to commit explicitly; run full test suites in a throwaway clone while other sessions are active; prefer one session per worktree;
 <!-- sdd:if autonomy-merge -->
-  - merge with `gh pr merge <n> --merge` only if CI is green and the `code-reviewer` review has no BLOCKER/MAJOR (and, for a change, verify OK + archive done); otherwise stop and ask; branch deleted after merge.
+  - merge with `gh pr merge <n> --merge` only if CI is green and the review (review harness for a change, `code-reviewer` otherwise) has no open BLOCKER/MAJOR (and, for a change, verify OK + archive done); otherwise stop and ask; branch deleted after merge.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-pr -->
   - never `gh pr merge`: the agent gives the PR link and the CI status, then stops.
@@ -156,7 +156,8 @@ PR (agent)              → opened by the agent; a human reviews and merges
 <!-- sdd:if multi-module -->
 | small feature touching 2 modules as one coherent batch | `full-stack-dev` |
 <!-- sdd:endif -->
-| review of a diff, a PR, checking a change | `code-reviewer` |
+| full review of an implemented change | `/sdd-core:review-harness <id>` |
+| review of a diff or a PR outside a change | `code-reviewer` |
 | write/complete tests | `tester` |
 | update docs, README, glossary, docs/ | `doc-writer` |
 <!-- sdd:if devops -->

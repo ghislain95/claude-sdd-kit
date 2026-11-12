@@ -1,0 +1,26 @@
+# Review harness settings of {{PROJECT_NAME}} — read by /sdd-core:review-harness.
+# Schema and defaults: the sdd-core plugin's skills/review-harness/HARNESS_CONFIG.md.
+# Part of the gate machinery: a pull request that changes this file is merged by the owner.
+
+budget:
+  minutes: 90
+  agent_runs: 24
+  effort: high
+  heavy_builds: 1
+  bug_hunt_level: medium
+  rounds: 3
+
+angles:
+  # sdd:fill: one line per conditional angle with the diff globs that select it in this project —
+  # security (auth, input handling, persistence, dependency manifests), performance (hot paths,
+  # queries, bundle entry points), interface (UI components, styles, i18n; omit without a UI module),
+  # sourced-claims (Markdown, changelog). Omit an angle that has nothing to watch here.
+
+mechanical:
+  # sdd:fill: commands proven during the reverse-documentation, written exactly as run.
+  # conventions: architecture tests, layer or import lint, formatter in check mode.
+  # tests: `run` = the module test command; `mutation` = the mutation command scoped to {files},
+  #   or null when the project has no mutation tooling (the tests angle then mutates by hand).
+  # security: dependency audit, secret scanner, if present.
+  # performance: name / command / threshold for each measured budget (bundle size, response time).
+  # interface: accessibility linter, component or snapshot tests, if present.

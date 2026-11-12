@@ -18,8 +18,10 @@ size; it works mostly on its own and only asks you things at two points).
   design, tasks). Specs are never edited by hand: they are updated when the change is archived.
 - **Specialised agents** (product-owner, architect, one dev per module, tester, code-reviewer,
   doc-writer, devops) each do one job, with their own context. The main session routes.
-- **Review is not optional**: `code-reviewer` reads the diff before `/opsx:verify`, without
-  politeness, one line per problem, and hunts for tests "fixed so they pass".
+- **Review is not optional**: the review harness (`/sdd-core:review-harness`) runs every relevant
+  angle on the diff before `/opsx:verify` — spec conformance, conventions, bugs, tests, and security,
+  performance, interface or sourced claims when the diff touches them —, has each serious finding
+  verified by an agent that tries to refute it, and loops fixes three rounds at most.
 - **Mechanical rules are checks**: a hook blocks dangerous git commands (commit on `main`,
   force-push, `reset --hard`…), and CI validates the specs and runs the tests.
 - **Facts are the agent's job**: it only asks you for choices, never for what the code can tell it.
@@ -147,11 +149,11 @@ The level is enforced mechanically by `.claude/hooks/block-git-writes.conf` (`AL
 
 ```
 /opsx:new <change-id>     framing: product-owner writes proposal.md (intent, scope, non-goals)
-                           → structural change (new contract, migration, cross-cutting choice):
-                             the architect tries to break the proposal before going on
+                           → adversarial pass, always: the architect tries to break the proposal
+                             (full attempt if structural, five objections at most otherwise)
 /opsx:ff                  architect: spec deltas + design.md + tasks.md
 /opsx:apply               the dev agents carry out the tasks, tests included
-                           → code-reviewer reads the uncommitted diff (mandatory)
+                           → review harness: every angle, verified findings, 3 rounds max
 /opsx:verify              does the implementation match the specs?
                            → commit feat(<id>) on the feat/<id> branch
 /opsx:archive             the deltas are merged into openspec/specs/

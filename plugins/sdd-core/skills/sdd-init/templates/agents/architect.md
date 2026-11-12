@@ -79,7 +79,7 @@ You are the **design phase** (`/opsx:ff`). From the `proposal.md`, you produce, 
   <!-- sdd:if migrations -->migration yes / no and where, <!-- sdd:endif -->domain component
   that owns the logic, shared code vs app code boundary, sourced decisions.
 - The **`tasks.md`**: small batches doable in one session, each implementation group ends with
-  its test tasks, then a `code-reviewer` review task, then a final task that runs the CI checks.
+  its test tasks, then a `/sdd-core:review-harness <id>` review task, then a final task that runs the CI checks.
 
 ### tasks.md — wide-radius changes: add → migrate → remove
 A rename, or a change of contract or shared type whose impact crosses more than one module: split

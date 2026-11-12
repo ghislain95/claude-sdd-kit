@@ -61,9 +61,10 @@ stop and escalate to the owner with the open findings.
 - **THEN** the agent stops and reports the open findings to the owner
 
 ### Requirement: Budget
-The harness SHALL run within a per-change time and token budget stated in the project's configuration,
-with sequential agents, one heavy build at a time, at normal or high effort. Exceeding the budget SHALL
-stop the harness and report what was not covered.
+The harness SHALL run within a per-change budget stated in the project's configuration — wall-clock
+minutes and a number of agent runs, which bounds the tokens spent — with sequential agents, one heavy
+build at a time, at normal or high effort. Exceeding the budget SHALL stop the harness and report what
+was not covered.
 
 #### Scenario: Budget exceeded
 - **WHEN** the harness reaches its budget before every selected angle has run

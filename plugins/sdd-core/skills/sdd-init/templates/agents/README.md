@@ -29,8 +29,9 @@ agent fits or the task is trivial (quick read, factual question).
 ### Routing rules
 - Several agents fit → the one that **maximises specialisation**<!-- sdd:if multi-module --> (the module's agent rather than `full-stack-dev` when the task touches a single module)<!-- sdd:endif -->.
 - Ambiguous request → **at most 1 question** to the user, then route.
-- Large feature → OpenSpec cycle: `product-owner` (proposal) → [`architect` adversarial pass]
-  → `architect` (deltas + design + tasks) → dev agents (tasks) → `tester` → `code-reviewer` →
+- Large feature → OpenSpec cycle: `product-owner` (proposal) → `architect` adversarial pass
+  → `architect` (deltas + design + tasks) → dev agents (tasks) → `tester` → `/sdd-core:review-harness`
+  (which runs `code-reviewer` as its conventions angle) →
   `/opsx:verify` → commit → `/opsx:archive` → post-archive (`doc-writer` if docs are impacted).
 - Bug → the module's dev agent (reproduce, root cause), `tester` (failing test), fix,
   `code-reviewer`.

@@ -34,7 +34,7 @@ A project's rules can't be copied from another project. So `/sdd-core:sdd-init` 
 vocabulary), and only generates rules and agents from what it has proven.
 
 ```
-/opsx:new → [adversarial pass] → /opsx:ff → /opsx:apply → code-reviewer → /opsx:verify
+/opsx:new → adversarial pass → /opsx:ff → /opsx:apply → review-harness → /opsx:verify
          → commit → /opsx:archive → post-archive → PR (+ merge, depending on the autonomy level)
 ```
 

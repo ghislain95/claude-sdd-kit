@@ -53,7 +53,7 @@ contract handed from one agent to the next.
 3b. devops           ← /opsx:apply: if CI/infra/secrets are affected
 <!-- sdd:endif -->
 4. tester            ← 1 delta scenario = 1 test
-5. code-reviewer     ← review of the uncommitted diff (mandatory, before verify)
+5. review-harness    ← every review angle on the diff, code-reviewer included (mandatory, before verify)
 6. /opsx:verify      ← implementation vs specs, tasks ticked
 7. commit            ← by the agent, on the change branch (docs/CONTRIBUTING.md §2)
 8. /opsx:archive     ← deltas merged into openspec/specs/
