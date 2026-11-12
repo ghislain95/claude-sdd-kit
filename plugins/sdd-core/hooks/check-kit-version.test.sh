@@ -41,7 +41,8 @@ t warn  "new marker, project behind plugin" "# P
 <!-- claude-toolbox: installed 0.1.0 on 2026-11-12 — options: lean — autonomy: autonomy-pr -->"
 t warn  "former then new marker, last wins" "<!-- sdd-kit: installed 0.2.0 on 2026-11-01 -->
 <!-- claude-toolbox: installed 0.1.0 on 2026-11-12 -->"
-t quiet "unrelated tool's marker" "<!-- other-kit: installed 0.1.0 on 2026-11-12 -->"
+t quiet "unrelated tool's marker ending like ours" "<!-- other-sdd-kit: installed 0.1.0 on 2026-11-12 -->"
+t quiet "unrelated tool's marker ending like the new one" "<!-- my-claude-toolbox: installed 0.1.0 on 2026-11-12 -->"
 
 # Missing plugin manifest: quiet.
 n=$((n+1))

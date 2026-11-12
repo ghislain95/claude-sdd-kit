@@ -33,6 +33,11 @@ The four desktop mods live under `mods/` (folded in from `ghislain95/claude-mods
 `mods/<mod>/.claude-plugin/plugin.json` to ship a change, and check them with
 `claude plugin validate mods/<mod>` and `claude plugin test mods/<mod>`.
 
+Known failures, already present in `claude-mods` before the fold: `claude plugin validate` fails on
+`openspec-cockpit`, `conversation-cards` and `background-tasks` ("$ is passed to … imported from …"),
+and `claude plugin test` fails on every mod (`"ui.notify" is not an event`). Both come from a change
+of the mods API in Claude Code and are tracked as their own fix, outside `dev-factory`.
+
 ## Release triggers
 
 `main` is production for everyone who installed from this catalog with auto-update on. The paths
@@ -53,7 +58,14 @@ Rehearsed on a scratch `CLAUDE_CONFIG_DIR` on 2026-11-12, with the catalog added
   secrets and data. Adding `claude-toolbox` then installing `sdd-core@claude-toolbox` works, with its
   dependencies.
 
-So users of `sdd-kit` keep working until they choose to switch; the README tells them how. Projects
+- Updating `sdd-core` in place from 0.2.0 to 0.3.0 (`marketplace update` then `plugin update`)
+  succeeds but leaves `sdd-core` failing to load: `Dependency "handoff@sdd-kit" is not installed`. An
+  update never installs a dependency added since; `claude plugin install handoff@sdd-kit` fixes it.
+  **Adding a dependency is a breaking change for in-place updates**: say so in the CHANGELOG with
+  the install command.
+
+So users of `sdd-kit` keep working until they choose to switch, once `handoff` is installed; the
+README tells them how. Projects
 set up with the former kit keep their `sdd-kit: installed` marker, which the version check still
 reads.
 

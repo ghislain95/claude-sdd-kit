@@ -19,7 +19,7 @@ MANIFEST="$PLUGIN_ROOT/.claude-plugin/plugin.json"
 [ -f "$CLAUDE_MD" ] && [ -f "$MANIFEST" ] || exit 0
 
 VERSION_RE='[0-9]+\.[0-9]+\.[0-9]+'
-installed=$(grep -oE "(claude-toolbox|sdd-kit): installed ${VERSION_RE}" "$CLAUDE_MD" 2>/dev/null | tail -n 1 | grep -oE "$VERSION_RE")
+installed=$(grep -oE "<!--[[:space:]]*(claude-toolbox|sdd-kit): installed ${VERSION_RE}" "$CLAUDE_MD" 2>/dev/null | tail -n 1 | grep -oE "$VERSION_RE")
 current=$(grep -oE "\"version\"[[:space:]]*:[[:space:]]*\"${VERSION_RE}\"" "$MANIFEST" 2>/dev/null | head -n 1 | grep -oE "$VERSION_RE")
 [ -n "$installed" ] && [ -n "$current" ] || exit 0
 [ "$installed" = "$current" ] && exit 0

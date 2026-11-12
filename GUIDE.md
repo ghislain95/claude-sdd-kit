@@ -62,9 +62,9 @@ In a Claude Code session (any folder):
 /plugin install sdd-core@claude-toolbox
 ```
 
-`sdd-core` declares `superpowers` (official marketplace) as a dependency: it is installed along with
-it **only if the official marketplace is added** (first line, harmless if it already is). Without it,
-`sdd-core` installs but refuses to load. Check with `/plugin` that both are enabled.
+`sdd-core` declares `superpowers` (official marketplace) and `handoff` (this catalog) as dependencies:
+they are installed along with it, `superpowers` **only if the official marketplace is added** (first line, harmless if it already is). Without it,
+`sdd-core` installs but refuses to load. Check with `/plugin` that all three are enabled.
 
 Then turn on auto-update for the kit — it is **off by default** for third-party marketplaces:
 `/plugin` → **Marketplaces** → `claude-toolbox` → **Enable auto-update** (see §6).
@@ -79,8 +79,7 @@ Optional:
 ```
 
 For the desktop app only, display mods (OpenSpec cockpit pane, message cards, session band,
-background-tasks pane), listed in this marketplace and maintained in
-https://github.com/ghislain95/claude-mods:
+background-tasks pane), in this catalog under `mods/`:
 
 ```
 /plugin install openspec-cockpit@claude-toolbox

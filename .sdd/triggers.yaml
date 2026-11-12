@@ -5,7 +5,7 @@
 # What users see and do: skill behaviour, mod display.
 intent:
   paths:
-    - plugins/*/skills/**/SKILL.md
+    - plugins/*/skills/**
     - mods/*/hooks/**
 
 # Reaches users' machines or projects as soon as it is merged (auto-update), and a revert does not

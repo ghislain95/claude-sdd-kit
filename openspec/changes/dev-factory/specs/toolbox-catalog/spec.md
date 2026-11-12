@@ -32,6 +32,10 @@ another plugin of the catalog SHALL declare it as a dependency instead of embedd
 - **WHEN** a user installs `sdd-core@claude-toolbox`
 - **THEN** `handoff` is installed as its dependency
 
+#### Scenario: Dependency added to an installed plugin
+- **WHEN** a release adds a dependency to a plugin users may already have installed
+- **THEN** its changelog entry and the README give the command that installs the new dependency, since an in-place update does not install it
+
 ### Requirement: Every entry carries a category
 Each plugin entry of the catalog SHALL carry a `category` among `workflow`, `skill` and `mod`, and a
 description that states what it does and, for a mod, that it only works in the desktop app.

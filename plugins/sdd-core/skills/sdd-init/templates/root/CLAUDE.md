@@ -242,7 +242,7 @@ No shared working style is imposed: each developer sets their own (Claude memory
 <!-- sdd:endif -->
 <!-- sdd:if cockpit -->
 
-### Display contract (`claude-mods` desktop mods)
+### Display contract (claude-toolbox desktop mods)
 
 Decisions to make, commit messages and the ```cockpit block follow the display contract injected by the `conversation-cards` / `openspec-cockpit` mods: `### Q1 · <title>` + options `- A · <label> — <explanation>` (the recommended one marked `(recommandé)`) + `Recommandation : …`; commits in a ```text block; a ```cockpit block at the end of a message when the user has to decide, do or check something, with the prefixes `trancher:`, `confirmer:`, `faire:`, `vérifier:`, `info:`. These keywords stay in French because the mods parse them verbatim.
 <!-- sdd:endif -->

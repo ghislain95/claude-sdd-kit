@@ -48,7 +48,7 @@ This document is the full catalogue. Every tool added or removed is recorded her
 | caveman | [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Compressed replies (~-75% tokens), status line | Developer's choice, at user level |
 <!-- sdd:endif -->
 <!-- sdd:if cockpit -->
-| claude-mods | [ghislain95/claude-mods](https://github.com/ghislain95/claude-mods) | Desktop app mods: OpenSpec cockpit, messages as cards, session band, background tasks | Desktop app only, at user level |
+| desktop mods (`openspec-cockpit`, `conversation-cards`, `session-hud`, `background-tasks`) | [claude-toolbox `mods/`](https://github.com/ghislain95/claude-toolbox/tree/main/mods) | Desktop app mods: OpenSpec cockpit, messages as cards, session band, background tasks | Desktop app only, at user level |
 <!-- sdd:endif -->
 <!-- sdd:fill: project-specific automated checks already in place (architecture test, import lint, migration guard…) — or nothing if none -->
 

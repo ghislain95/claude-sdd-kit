@@ -10,4 +10,4 @@ Le panneau s'ouvre tout seul au démarrage de chaque session, pour que les tâch
 
 Le panneau ne se redessine qu'au rafraîchissement (30 s) et en fin de tour, et seulement si quelque chose a changé : jamais à chaque appel d'outil des agents.
 
-Code partagé : `hooks/shared/` est une copie de `shared/` à la racine du dépôt (`scripts/sync-shared.sh`) ; on modifie l'original.
+Code partagé : `hooks/shared/` est une copie de `mods/shared/` (`mods/scripts/sync-shared.sh`) ; on modifie l'original.

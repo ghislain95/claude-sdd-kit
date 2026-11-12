@@ -18,6 +18,10 @@ claude plugin marketplace add ghislain95/claude-toolbox
 > under, so replace it once: `claude plugin marketplace remove sdd-kit` (this uninstalls its plugins
 > and deletes their saved data), then add `ghislain95/claude-toolbox` and reinstall. Projects set up
 > with the former kit keep working: their `sdd-kit: installed` marker is still recognised.
+>
+> **Updating `sdd-core` in place to 0.3.0** (auto-update included): run
+> `claude plugin install handoff@<catalog name>` once. An update does not install a dependency added
+> since, and without `handoff` `sdd-core` refuses to load.
 
 ## The spec-driven workflow (`sdd-core`)
 
@@ -52,12 +56,12 @@ Install the spec-driven development workflow from claude-toolbox in this project
 
 1. Prerequisites — check with Bash: `node -v` (≥ 20), `openspec --version`, `jq --version`, `perl -v`, `gh auth status`, `git status`. For each missing tool, give me the install command (npm install -g @fission-ai/openspec@latest, brew install jq, brew install gh…) and wait for my go-ahead before installing anything on my machine. Without jq, the git guardrail would block every one of your git commands: this one is blocking.
 
-2. Claude Code plugins — run through Bash:
+2. Claude Code plugins — first run `claude plugin marketplace list`. If it shows a marketplace named `sdd-kit` (the former name of this catalog), remove it before anything else: `claude plugin marketplace remove sdd-kit` (it uninstalls its plugins and deletes their saved data; tell me before running it). Then run through Bash:
    claude plugin marketplace add anthropics/claude-plugins-official
    claude plugin marketplace add ghislain95/claude-toolbox
    claude plugin install sdd-core@claude-toolbox
-   The first line is needed even if it seems redundant (it is a no-op when the official marketplace is already there): sdd-core depends on superpowers from that marketplace and won't load without it. The install should report "+ 1 dependency: superpowers"; check with claude plugin list that both sdd-core and superpowers are enabled.
-   If sdd-core is already installed, update instead: claude plugin marketplace update claude-toolbox, then claude plugin update sdd-core@claude-toolbox.
+   The first line is needed even if it seems redundant (it is a no-op when the official marketplace is already there): sdd-core depends on superpowers from that marketplace and won't load without it. The install should report "+ 2 dependencies: superpowers, handoff"; check with claude plugin list that sdd-core, superpowers and handoff are enabled.
+   If sdd-core is already installed, update instead: claude plugin marketplace update claude-toolbox, then claude plugin update sdd-core@claude-toolbox, then claude plugin install handoff@claude-toolbox (an update does not install a dependency added since; without handoff, sdd-core 0.3.0 refuses to load).
    If the project has a web interface, also offer me: claude plugin install sdd-ui@claude-toolbox and claude plugin install frontend-design@claude-plugins-official.
    Ask me whether I use the Claude desktop app. If yes, offer the optional desktop mods (OpenSpec cockpit pane, message cards, session band, background-tasks pane): claude plugin install openspec-cockpit@claude-toolbox, conversation-cards@claude-toolbox, session-hud@claude-toolbox, background-tasks@claude-toolbox (one command each). If I take them, tick the `cockpit` option in phase 2 of the setup.
 
@@ -71,7 +75,7 @@ Full guide if needed: ~/.claude/plugins/marketplaces/claude-toolbox/GUIDE.md
 ```
 
 What the prompt changes on your machine, outside the project: it adds the `claude-toolbox` marketplace and
-enables the `sdd-core` and `superpowers` plugins (plus `sdd-ui`, `frontend-design` and the desktop
+enables the `sdd-core`, `superpowers` and `handoff` plugins (plus `sdd-ui`, `frontend-design` and the desktop
 mods if you accept them) in `~/.claude/settings.json`, so for all your projects. `sdd-core` holds
 skills and one session-start hook: it only speaks in a project set up with an older kit (see
 [Staying up to date](#staying-up-to-date)), takes a few milliseconds and stays silent everywhere
@@ -102,8 +106,8 @@ In Claude Code:
 /plugin install sdd-core@claude-toolbox
 ```
 
-`superpowers` comes with it as a declared dependency, provided the official marketplace is added
-(first line; harmless if it already is).
+`superpowers` and `handoff` come with it as declared dependencies, provided the official marketplace
+is added (first line; harmless if it already is).
 
 Then, in the project to set up:
 
