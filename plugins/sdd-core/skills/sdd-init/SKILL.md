@@ -210,7 +210,7 @@ openspec validate --all
 bash .claude/hooks/block-git-writes.test.sh                      # ALL n CASES OK, whatever the autonomy level
 python3 -c "import json; json.load(open('.claude/settings.json'))"
 # YAML: the first tool available
-for f in openspec/config.yaml .github/workflows/*.yml; do ruby -ryaml -e "YAML.load_file('$f')" 2>/dev/null || python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" || echo "YAML KO: $f"; done
+for f in openspec/config.yaml .sdd/*.yaml .github/workflows/*.yml; do ruby -ryaml -e "YAML.load_file('$f')" 2>/dev/null || python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" || echo "YAML KO: $f"; done
 ```
 
 plus: every command cited in the "Before finishing" section of `CLAUDE.md` run at least once; every

@@ -1,6 +1,6 @@
 ---
 name: review-sourced-claims
-description: Review angle of the harness — does every figure, date, cause, version or "verified" statement written by the change (docs, code comments, changelog, commit messages, PR text, reports) have a source the reader can check? Runs on every change. USE WHEN the review-harness runs, or when asked to fact-check a document an agent wrote.
+description: Review-harness angle — every figure, date, cause or 'verified' claim in a change's docs, comments and commits has a checkable source.
 ---
 
 # Review angle — sourced claims

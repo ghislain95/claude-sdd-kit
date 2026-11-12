@@ -1,6 +1,6 @@
 ---
 name: review-spec-conformance
-description: Review angle of the harness — does the diff do exactly what the change's spec deltas say, no more, no less? USE WHEN the review-harness runs on an OpenSpec change, or when asked to check an implementation against its specs. DO NOT USE to review code quality (other angles) nor to fix anything.
+description: Review-harness angle — does a change's code do exactly what its spec deltas say, no more, no less?
 ---
 
 # Review angle — spec conformance

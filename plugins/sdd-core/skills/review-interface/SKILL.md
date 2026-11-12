@@ -1,6 +1,6 @@
 ---
 name: review-interface
-description: Review angle of the harness — accessibility, worst-case data, visual consistency and motion of a UI diff. USE WHEN the review-harness selects the interface angle (a UI component, style, copy or interaction changed), or when asked to review a UI change. DO NOT USE to judge the product intent (that is the owner's QA).
+description: Review-harness angle — accessibility, worst-case data, design rules and motion of a UI change.
 ---
 
 # Review angle — interface
@@ -11,15 +11,24 @@ robustness to bad data, consistency with the project's design rules, motion. Whe
 
 ## Method
 
-1. With the `sdd-ui` plugin installed, use its skills on the changed UI files:
-   `sdd-ui:web-design-guidelines` (accessibility and UX rules), `sdd-ui:break-ui` (worst-case data),
-   and read `sdd-ui:review-animations`' `SKILL.md` and `STANDARDS.md` when motion changed.
+1. With the `sdd-ui` plugin installed (its files are under the plugin cache, next to `sdd-core`:
+   `<plugins>/sdd-ui/skills/<skill>/`), apply on the changed UI files:
+   - `web-design-guidelines` (accessibility and UX rules) — convert each of its remarks into the
+     shared format, with a `Fails when` (the user and the action that fails);
+   - `break-ui`'s **analysis only**: map the fields the changed components render and pick worst-case
+     values; check by reading the code or rendering with those values in a scratch file. Never build
+     its demo toggle or fixtures in the project, never wait for a user;
+   - `review-animations`' `SKILL.md` and `STANDARDS.md` when motion changed.
    Without `sdd-ui`, check by hand: labels and roles, keyboard path, visible focus, contrast, long and
    empty values, loading and error states.
 2. Check the diff against the project's design rules (tokens only, no arbitrary values, components
    from the shared library, copy in the product language) from `CLAUDE.md` and the frontend docs.
 3. Severity: an action unusable by keyboard or screen reader, or a layout broken by realistic data →
    🛑 BLOCKER; a state missing (loading, empty, error) → 🔴 MAJOR; inconsistency → 🟡 MINOR.
+
+## Never
+
+- Leave a scratch file or a fixture in the working tree: check `git status` before reporting.
 
 ## Mechanical backing
 

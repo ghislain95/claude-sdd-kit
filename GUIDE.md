@@ -153,9 +153,9 @@ The level is enforced mechanically by `.claude/hooks/block-git-writes.conf` (`AL
                              (full attempt if structural, five objections at most otherwise)
 /opsx:ff                  architect: spec deltas + design.md + tasks.md
 /opsx:apply               the dev agents carry out the tasks, tests included
-                           → review harness: every angle, verified findings, 3 rounds max
+                           → commit feat(<id>) per task group on the feat/<id> branch
+                           → review harness on the commits: every angle, verified findings, 3 rounds max
 /opsx:verify              does the implementation match the specs?
-                           → commit feat(<id>) on the feat/<id> branch
 /opsx:archive             the deltas are merged into openspec/specs/
                            → post-archive: roadmap, doc impact, spec Purpose, graph
                            → commit chore(<id>), PR

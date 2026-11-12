@@ -1,6 +1,6 @@
 ---
 name: review-conventions
-description: Review angle of the harness — does the diff respect the project's own rules (CLAUDE.md, module coding rules, ADRs, architecture), do comments and commit messages tell the truth, and did quality silently drop to make something pass? The brief given to the project's code-reviewer agent when the review-harness runs. USE WHEN the review-harness dispatches the conventions angle, or when asked to check a diff against the project's conventions. DO NOT USE to fix code.
+description: Review-harness angle (brief of the code-reviewer agent) — project rules, comments against code, commit messages, hidden quality drops.
 ---
 
 # Review angle — project conventions and architecture

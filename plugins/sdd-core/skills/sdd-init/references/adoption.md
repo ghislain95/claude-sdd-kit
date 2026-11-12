@@ -38,7 +38,10 @@ levels above this skill).
 3. For every file generated from a template (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/*`,
    `docs/{CONTRIBUTING,OPENSPEC_GUIDE,AGENT_TOOLBOX,GRAPHIFY}.md`, `openspec/config.yaml`,
    `.claude/hooks/*`, `.claude/settings.json` (union of the `allow` lists and hooks, nothing removed),
-   `.claude/settings.local.example.json`, `.claude/launch.json` (option `ui`), the kit's CI workflows):
+   `.claude/settings.local.example.json`, `.claude/launch.json` (option `ui`), the kit's CI workflows).
+   `.sdd/harness.yaml` is the project's own settings: created from phase 4 step 5 of `SKILL.md` when
+   absent, never rewritten when present (new keys of the template are listed in the report). For the
+   template-generated files:
    - fill the **new** template with the project's values (read back from the current files, not
      deduced again);
    - compare with the current file: what differs comes either from the kit (to apply) or from a local

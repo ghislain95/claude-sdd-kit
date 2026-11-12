@@ -1,6 +1,6 @@
 ---
 name: review-security
-description: Review angle of the harness — security review of the diff (injection, secrets, authorisation, personal data, unsafe input handling) through Claude Code's /security-review. USE WHEN the review-harness selects the security angle (auth, input handling, storage, network, secrets, dependencies touched), or when asked for a security review of a change.
+description: Review-harness angle — security review of a change through /security-review plus project-specific checks.
 ---
 
 # Review angle — security
@@ -11,7 +11,9 @@ to run it on the change and bring its findings into the shared format
 
 ## Method
 
-1. Invoke the `security-review` skill on the change's diff.
+1. Invoke the `security-review` skill on the change, targeted like `review-bugs` §2: it reviews the
+   current branch against the default branch, so when the change sits on the default branch, give it
+   the orchestrator's diff command and the changed files in the request. Count it as one forked run.
 2. Add the project-specific checks the generic review cannot know, from `CLAUDE.md` and the module
    docs: who may call each new entry point, which data is personal, which logs must stay clean.
 3. Convert each finding: exploitable from outside, or exposing secrets or personal data → 🛑 BLOCKER;

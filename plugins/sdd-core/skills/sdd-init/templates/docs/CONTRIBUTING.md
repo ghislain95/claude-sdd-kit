@@ -50,14 +50,14 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`
 **Commit rules**
 - One commit = one coherent slice (a module, the tests, the docs…); no "wip" commits.
 - Staging with **explicit paths** (`git add <paths>`): never `git add -A` / `.` / `-u`, nor `git commit -a` — a commit only carries what we decided to put in it.
-- Before a **code** commit: checks of the touched module green (the same commands as CI) and the review done on the diff (review harness for an OpenSpec change, `code-reviewer` otherwise). Before any commit touching `openspec/`: `openspec validate --all`.
+- Before a **code** commit: checks of the touched module green (the same commands as CI). The review runs on the committed work before the pull request (review harness for an OpenSpec change, `code-reviewer` otherwise). Before any commit touching `openspec/`: `openspec validate --all`.
 - Never rewrite: no `--amend`, no `rebase`, no `reset` to a revision, no force-push. A mistake is fixed with a new commit.
 - A long message, or one that quotes commands (`--amend`, `` `git pull` ``…): write it to a file and use `git commit -F <file>` (`gh pr create --body-file <file>`), rather than `-m`.
 
 ### Sequence of an OpenSpec change
 The same order as the cycle in [`CLAUDE.md`](../CLAUDE.md) §3, on the `<type>/<change-id>` branch:
 1. `docs(<id>): …` — framing: proposal, then deltas, design, tasks (one or two commits).
-2. `/opsx:apply` → `/sdd-core:review-harness <id>` → `/opsx:verify` OK → `feat|fix|…(<id>): …`, one commit per coherent implementation slice.
+2. `/opsx:apply` with `feat|fix|…(<id>): …`, one commit per coherent implementation slice → `/sdd-core:review-harness <id>` (its fixes as further commits, its report as `docs(<id>): review report`) → `/opsx:verify` OK.
 3. `/opsx:archive` + post-archive → `chore(<id>): archive change, sync specs, post-archive`.
 <!-- sdd:if autonomy-merge -->
 4. Push the branch, PR, merge (below).

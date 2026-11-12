@@ -10,17 +10,11 @@ budget:
   bug_hunt_level: medium
   rounds: 3
 
+# Conditional angles and the diff globs that select them; a missing key takes the default globs of
+# HARNESS_CONFIG.md, `[]` turns the angle off. The other angles always run.
 angles:
-  # sdd:fill: one line per conditional angle with the diff globs that select it in this project —
-  # security (auth, input handling, persistence, dependency manifests), performance (hot paths,
-  # queries, bundle entry points), interface (UI components, styles, i18n; omit without a UI module).
-  # A missing key = the angle is never selected. The other angles always run.
+  # sdd:fill: security, performance and interface globs of this project (interface: [] without a UI module)
 
+# Commands proven during the reverse-documentation, written exactly as run (schema: HARNESS_CONFIG.md).
 mechanical:
-  # sdd:fill: commands proven during the reverse-documentation, written exactly as run.
-  # conventions: architecture tests, layer or import lint, formatter in check mode.
-  # tests: `run` = the module test command; `mutation` = the mutation command scoped to {files},
-  #   or null when the project has no mutation tooling (the tests angle then mutates by hand).
-  # security: dependency audit, secret scanner, if present.
-  # performance: name / command / threshold for each measured budget (bundle size, response time).
-  # interface: accessibility linter, component or snapshot tests, if present.
+  # sdd:fill: conventions, tests (run, mutation or null), security, performance and interface commands

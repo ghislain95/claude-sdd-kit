@@ -10,17 +10,18 @@ mechanical evidence, adversarial verification of findings, and a bounded fix loo
 ### Requirement: Reviewer angles
 The harness SHALL provide one reviewer per angle: spec conformance, project conventions and
 architecture, bug hunting, tests, security, performance, interface, and sourced claims. Each reviewer
-SHALL report findings with a severity among BLOCKER, MAJOR and MINOR, the location and a failure
-scenario.
+SHALL report findings with a severity among BLOCKER, MAJOR and MINOR and the location, plus, for a
+BLOCKER or a MAJOR, the concrete scenario in which it fails.
 
 #### Scenario: Finding format
 - **WHEN** a reviewer reports a finding
-- **THEN** the finding names its severity, its file and line, and the concrete scenario in which it fails
+- **THEN** the finding names its severity, its file and line, and, for a BLOCKER or MAJOR, the concrete scenario in which it fails
 
 ### Requirement: Angles selected by technical risk
-The angles run on a change SHALL follow its technical risk: spec conformance, conventions, bug hunting
-and tests always run; security, performance, interface and sourced claims run when the change touches
-their ground. The selection SHALL be stated in the review report.
+The angles run on a change SHALL follow its technical risk: spec conformance, conventions, bug hunting,
+tests and sourced claims always run, bug hunting and tests being skipped on a documentation-only
+change; security, performance and interface run when the change touches their ground. The selection
+SHALL be stated in the review report.
 
 #### Scenario: Documentation-only change
 - **WHEN** a change only edits documentation
@@ -53,11 +54,11 @@ before it is fixed. A refuted finding SHALL be dropped, with the refutation kept
 
 ### Requirement: Bounded fix loop
 Confirmed findings SHALL be sent to the developer agent, then re-reviewed by the angles concerned. The
-loop SHALL stop at zero BLOCKER and zero MAJOR, or after three rounds, in which case the agent SHALL
-stop and escalate to the owner with the open findings.
+loop SHALL stop at zero BLOCKER and zero MAJOR, or after the configured number of rounds (three by
+default), in which case the agent SHALL stop and escalate to the owner with the open findings.
 
 #### Scenario: Three rounds without convergence
-- **WHEN** a MAJOR finding is still open after the third round
+- **WHEN** a MAJOR finding is still open after the last configured round (the third by default)
 - **THEN** the agent stops and reports the open findings to the owner
 
 ### Requirement: Budget

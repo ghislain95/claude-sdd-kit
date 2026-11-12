@@ -1,6 +1,6 @@
 ---
 name: review-bugs
-description: Review angle of the harness — bug hunting on the diff (wrong results, crashes, races, edge cases) through Claude Code's /code-review, followed by a domain edge pass. USE WHEN the review-harness runs, or when asked to hunt for bugs in a change. DO NOT USE for conventions, tests or security (other angles).
+description: Review-harness angle — bug hunting on a change through /code-review plus a domain edge pass (numbers, boundaries, time).
 ---
 
 # Review angle — bug hunting
@@ -14,10 +14,10 @@ catches the classes it tends to miss (numbers, boundaries, time). Format:
 1. **Level**: the `bug_hunt_level` the orchestrator gives (default `medium`). Use at least `medium`
    when the diff computes money, quantities, percentages or thresholds. Never `max` or `ultra` unless
    the owner asked for it.
-2. **Run `code-review`** on the change, from the checkout where the change is checked out, with the
-   level and a target: the branch name (`<level> <branch>`, reviewed against the default branch) when
-   the change branch is not the default branch; otherwise the changed files as path targets. Changes
-   not committed yet → no target (current diff). Count it
+2. **Run `code-review`** on the change (committed, per the harness §0), from the checkout where the
+   change is checked out, with the level and a target: the branch name (`<level> <branch>`, reviewed
+   against the default branch) when the change branch is not the default branch; otherwise the
+   changed files as path targets. Count it
    as one forked run in your mechanical lines.
 3. **Domain edge pass**, by hand, on each computation and condition the diff adds:
    - decimal arithmetic in binary floating point (sums of prices, `0.1 + 0.2`, a sum that lands just

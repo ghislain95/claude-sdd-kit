@@ -62,7 +62,8 @@ steps, infrastructure, consumed public endpoints, and quota consumption.
 
 ### Requirement: Gate machinery is always gated
 A change that modifies the triggers file, an approved classification, the agent hooks or settings, the
-deployment profile or the CI workflows SHALL open the irreversible gate, and this trigger SHALL NOT be
+project's `.sdd/` settings (deployment profile, review harness settings) or the CI workflows SHALL
+open the irreversible gate, and this trigger SHALL NOT be
 waivable.
 
 #### Scenario: Pull request weakens a trigger

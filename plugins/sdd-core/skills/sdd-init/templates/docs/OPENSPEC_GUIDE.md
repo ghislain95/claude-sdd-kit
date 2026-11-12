@@ -51,7 +51,8 @@ With the agent team (routing: [`CLAUDE.md`](../CLAUDE.md) §8, details: [`AGENTS
 1. **Framing** — `product-owner`: `proposal.md` (intent, scope, non-goals,
    testable criteria), roadmap epic referenced.
 1b. **Adversarial pass** — always, scaled: `architect` tries to break the proposal (a full
-   attempt for a structural change, the five strongest objections for a small one); objections are
+   attempt for a structural change — new module, new contract, migration, cross-cutting choice, new
+   mechanism —, the five strongest objections for a small one); objections are
    resolved in the proposal, or put to the user, before `/opsx:ff`.
 2. **Design** — `architect`: spec deltas (Given/When/Then, translatable 1:1 into tests) +
    `design.md` (owning module, migration yes/no, layer boundaries, decisions

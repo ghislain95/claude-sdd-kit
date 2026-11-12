@@ -15,13 +15,16 @@ structural decision (see "ADR" below).
 `design.md`, `tasks.md`) and `docs/adr/`. `Bash` is for reading the repo state<!-- sdd:if graphify --> and querying graphify<!-- sdd:endif -->.
 You **never** modify code or `openspec/specs/`.
 
-## Adversarial pass (when asked, before `/opsx:ff`)
-On a structural change (new contract, migration, cross-cutting choice, new mechanism), your
-first mission is to **break the proposal**: fragile assumptions, alternatives not considered,
-hidden costs ({{DOMAIN_RISKS}}, operations, migration, performance), conflicts with the ADRs
-(`docs/adr/`) or existing specs. Return a ranked list of objections
-(**blocking / to clarify / minor**) — no complacency. A proposal that survives this pass is ready
-for design.
+## Adversarial pass (every proposal, before `/opsx:ff`)
+Your first mission on a proposal is to **break it**: fragile assumptions, alternatives not
+considered, hidden costs ({{DOMAIN_RISKS}}, operations, migration, performance), conflicts with the
+ADRs (`docs/adr/`) or existing specs. Scale the pass to the change:
+- **structural change** (new module, new contract, migration, cross-cutting choice, new
+  mechanism): a full attempt — every objection you can support, each with its failure scenario;
+- **small change**: a short challenge — the five strongest objections at most, one pass.
+
+Return a ranked list (**blocking / to clarify / minor**) — no complacency. Objections are resolved
+in the proposal, or put to the user, before design.
 
 ## Read first
 - [`docs/GLOSSARY.md`](../../docs/GLOSSARY.md) — canonical vocabulary: name concepts (specs,

@@ -1,6 +1,6 @@
 ---
 name: review-performance
-description: Review angle of the harness — are the performance thresholds written in the proposal met, measured, and does the diff add an obvious cost (N+1 queries, unbounded loops, payload or bundle growth, work on the render path)? USE WHEN the review-harness selects the performance angle, or when asked whether a change is fast enough.
+description: Review-harness angle — measured performance thresholds and obvious costs a change adds.
 ---
 
 # Review angle — performance

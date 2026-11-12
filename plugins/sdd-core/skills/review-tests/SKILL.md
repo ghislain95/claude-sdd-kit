@@ -1,6 +1,6 @@
 ---
 name: review-tests
-description: Review angle of the harness — does every scenario of the spec deltas have a test, and would those tests actually catch a regression of the changed code (mutation evidence when the tooling exists, hand mutation and adversarial inputs otherwise)? USE WHEN the review-harness runs, or when asked to judge the tests of a change. DO NOT USE to write the missing tests (that is the tester's job).
+description: Review-harness angle — is every spec scenario tested, and would the tests catch a regression (mutation, adversarial inputs)?
 ---
 
 # Review angle — tests
@@ -23,14 +23,16 @@ fail if the changed code were wrong?). Format: `../review-harness/FINDINGS.md`.
 
 ## Strength
 
-1. Run `mechanical.tests.run` from `.sdd/harness.yaml` (the changed modules' tests); red → 🛑 BLOCKER.
+1. Run `mechanical.tests.run` from `.sdd/harness.yaml` (the changed modules' tests); absent → the
+   module check commands of `CLAUDE.md`, said in the report. Red → 🛑 BLOCKER.
 2. Mutation: when `mechanical.tests.mutation` is set, run it on the changed files (`{files}`), never
    the whole codebase. Each surviving mutant on changed code is a finding at the mutated line:
    🛑 BLOCKER if it changes a specified outcome, 🔴 MAJOR otherwise; the missing test goes in `Fix`.
    When the mutant only proves a gap already reported (an untested scenario), attach it as evidence
    under that finding instead of reporting it twice.
 3. Without mutation tooling, mutate by hand: for the riskiest changed lines (conditions, boundaries,
-   arithmetic, early returns), flip one thing in a scratch copy, run the relevant tests, restore.
+   arithmetic, early returns), copy the file aside, flip one thing in place, run the relevant tests,
+   restore the file from the copy, and check `git diff` shows nothing left.
    Report each survivor the same way and add `no mechanical backing: mutation tooling absent (manual
    mutation of N lines)`.
 4. **Adversarial inputs**: mutants cannot reveal what the code never computed right. For each numeric
