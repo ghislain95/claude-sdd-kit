@@ -1,7 +1,8 @@
-# claude-mods
+# Desktop mods
 
 Claude Code mods (function-hook plugins) for the desktop app: a session band, the background tasks, Claude's
-messages as cards, and an OpenSpec cockpit. The repository is a marketplace named `local-mods`.
+messages as cards, and an OpenSpec cockpit. They are plugins of the `claude-toolbox` catalog, category `mod`.
+They lived in the `ghislain95/claude-mods` repository until they were folded in here, history included.
 
 | Mod | What it does |
 |---|---|
@@ -15,38 +16,28 @@ Its tokens and SVG drawings live in `shared/sienne.ts`; `scripts/sync-shared.sh`
 
 ## Install from GitHub
 
-At the prompt of a Claude Code session, one line per mod (answer `y` to add the marketplace, then pick a scope):
-
-```
-/plugin install session-hud --marketplace ghislain95/claude-mods
-/plugin install background-tasks --marketplace ghislain95/claude-mods
-/plugin install conversation-cards --marketplace ghislain95/claude-mods
-/plugin install openspec-cockpit --marketplace ghislain95/claude-mods
-```
-
-From a shell:
-
 ```bash
+claude plugin marketplace add ghislain95/claude-toolbox
 for mod in session-hud background-tasks conversation-cards openspec-cockpit; do
-  claude plugin install "$mod" --marketplace ghislain95/claude-mods
+  claude plugin install "$mod@claude-toolbox"
 done
 ```
 
 ## Install from a local clone (to edit the mods)
 
 ```bash
-claude plugin marketplace add ~/dev/workspace/claude/claude-mods
+claude plugin marketplace add <path to your claude-toolbox clone>
 for mod in session-hud background-tasks conversation-cards openspec-cockpit; do
-  claude plugin install "$mod@local-mods" --scope user
+  claude plugin install "$mod@claude-toolbox" --scope user
 done
 ```
 
-The marketplace is read in place: edit a mod here, then run `/reload-plugins` (or start a
-new session). Check and test a mod before using it:
+A local clone is read in place: edit a mod here, then run `/reload-plugins` (or start a new session). Check and
+test a mod before using it, from the clone's root:
 
 ```bash
-claude plugin validate ~/dev/workspace/claude/claude-mods/openspec-cockpit
-claude plugin test ~/dev/workspace/claude/claude-mods/openspec-cockpit
+claude plugin validate mods/openspec-cockpit
+claude plugin test mods/openspec-cockpit
 ```
 
 Requires a Claude Code build that knows mods (2.1.29x+, the desktop app's).
@@ -57,5 +48,5 @@ Edit the files in `shared/`, never their copies under `<mod>/hooks/shared/`. To 
 hot-reloads its own mods folder:
 
 ```bash
-scripts/dev-sync.sh <session-id>
+mods/scripts/dev-sync.sh <session-id>
 ```

@@ -112,7 +112,7 @@ the choices the code cannot settle:
    a web interface: `sdd-ui` plugin), `work-style` (offered ticked: the kit's way of working in
    `CLAUDE.md` §12 — short framing with examples, autonomy all the way once framing is agreed,
    structured final report, handoff), `caveman` / `cockpit` (display preferences installed at user
-   level; `cockpit` = the desktop mods `openspec-cockpit` + `conversation-cards` from the sdd-kit
+   level; `cockpit` = the desktop mods `openspec-cockpit` + `conversation-cards` from the claude-toolbox
    marketplace are installed — offered ticked if `claude plugin list` shows them).
 4. **Agent model** (`opus` recommended: the quality of the review and of the adversarial pass depends
    on it; `inherit` to follow the session's model).

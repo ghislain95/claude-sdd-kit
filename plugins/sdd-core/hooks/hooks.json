@@ -1,5 +1,5 @@
 {
-  "description": "Warns at session start when the project was set up with an older sdd-kit than the installed sdd-core plugin. Silent everywhere else.",
+  "description": "Warns at session start when the project was set up with an older sdd-core workflow than the installed sdd-core plugin. Silent everywhere else.",
   "hooks": {
     "SessionStart": [
       {

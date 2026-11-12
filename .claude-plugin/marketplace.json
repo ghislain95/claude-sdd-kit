@@ -1,10 +1,10 @@
 {
-  "name": "sdd-kit",
+  "name": "claude-toolbox",
   "owner": {
     "name": "ghislain95"
   },
   "metadata": {
-    "description": "Spec-driven development workflow for Claude Code: OpenSpec cycle, specialised agents, mandatory review, git guardrails, CI — installed in any project from its own code."
+    "description": "Every Claude tool of the owner in one catalog: the spec-driven development workflow (OpenSpec cycle, specialised agents, review, git guardrails, CI), standalone skills and desktop mods."
   },
   "plugins": [
     {

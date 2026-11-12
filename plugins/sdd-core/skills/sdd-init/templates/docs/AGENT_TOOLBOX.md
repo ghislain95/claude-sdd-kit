@@ -3,7 +3,7 @@
 
 Catalogue of the skills, hooks and checks adopted for AI-assisted development of {{PROJECT_NAME}},
 **and of those rejected, with the reason**, so the evaluation is not redone. Base: the
-`claude-sdd-kit` kit (plugins `sdd-core`<!-- sdd:if ui --> and `sdd-ui`<!-- sdd:endif -->), installed by `/sdd-core:sdd-init`.
+`claude-toolbox` catalog (plugins `sdd-core`<!-- sdd:if ui --> and `sdd-ui`<!-- sdd:endif -->), installed by `/sdd-core:sdd-init`.
 
 The everyday "request → tool" table is in [`CLAUDE.md` §11](../CLAUDE.md).
 This document is the full catalogue. Every tool added or removed is recorded here, with its date.

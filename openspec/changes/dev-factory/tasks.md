@@ -18,12 +18,12 @@ lot; the owner merges every pull request until group 8 has shipped.
 
 ## 3. Rename to claude-toolbox and protect its release
 
-- [ ] 3.1 Rehearse the rename on a scratch `CLAUDE_CONFIG_DIR` (install from `sdd-kit`, switch to `claude-toolbox`) and write down the observed behaviour in `MAINTAINING.md` — verify: the notes exist and the README upgrade notice follows them
-- [ ] 3.2 Marketplace `name` → `claude-toolbox`; README install prompt, GUIDE and every `marketplaces/sdd-kit` path updated — verify: `grep -rn "sdd-kit" --exclude=CHANGELOG.md` lists only the compatibility code and the upgrade notice
-- [ ] 3.3 Install marker `claude-toolbox: installed <version>`; `check-kit-version.sh` accepts both markers; its test covers both — verify: `bash plugins/sdd-core/hooks/check-kit-version.test.sh` passes
-- [ ] 3.4 Write the toolbox's own `.sdd/triggers.yaml` (guardrail and hook templates, `sdd-init`, `marketplace.json`, version-check hook = irreversible) and its contributing note — verify: file present and referenced from `MAINTAINING.md`
+- [x] 3.1 Rehearse the rename on a scratch `CLAUDE_CONFIG_DIR` (install from `sdd-kit`, switch to `claude-toolbox`) and write down the observed behaviour in `MAINTAINING.md` — verify: the notes exist and the README upgrade notice follows them
+- [x] 3.2 Marketplace `name` → `claude-toolbox`; README install prompt, GUIDE and every `marketplaces/sdd-kit` path updated; README opens on the catalog; `mods/README.md` installs from `claude-toolbox` — verify: `grep -rn "sdd-kit" --exclude=CHANGELOG.md --exclude=SOURCE.md` lists only the compatibility code and the upgrade notices
+- [x] 3.3 Install marker `claude-toolbox: installed <version>`; `check-kit-version.sh` accepts both markers; its test covers both — verify: `bash plugins/sdd-core/hooks/check-kit-version.test.sh` passes (12 cases) and the new cases fail against the former hook
+- [x] 3.4 Write the toolbox's own `.sdd/triggers.yaml` (guardrail and hook templates, `sdd-init`, `marketplace.json`, version-check hook = irreversible) and its contributing note — verify: file present and referenced from `MAINTAINING.md`
 - [ ] 3.5 Owner-confirmed outward steps: `gh repo rename claude-toolbox`; `claude-mods` README points to the toolbox, then archive it; ruleset on the toolbox's `main` requiring pull requests — verify: `gh repo view ghislain95/claude-toolbox` works and the old URL redirects
-- [ ] 3.6 Bump `sdd-core` to 0.3.0, CHANGELOG entry (BREAKING catalog name) — verify: `claude plugin validate .` passes and the version-check test passes
+- [x] 3.6 Bump `sdd-core` to 0.3.0, CHANGELOG entry (BREAKING catalog name) — verify: `claude plugin validate .` passes and the version-check test passes
 
 ## 4. Review harness
 

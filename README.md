@@ -1,4 +1,25 @@
-# claude-sdd-kit
+# claude-toolbox
+
+One catalog for every Claude Code tool of this toolbox: the spec-driven workflow, standalone skills
+and desktop-app mods. Add it once, install what you need:
+
+```bash
+claude plugin marketplace add ghislain95/claude-toolbox
+```
+
+| Plugin | Category | What it is |
+|---|---|---|
+| `sdd-core` | workflow | The spec-driven development workflow (below) |
+| `sdd-ui` | skill | Optional UI review and polish skills |
+| `handoff` | skill | `/handoff:passation`, a handoff document to resume in a fresh session |
+| `openspec-cockpit`, `conversation-cards`, `session-hud`, `background-tasks` | mod | Desktop app only, see [`mods/README.md`](mods/README.md) |
+
+> **Coming from `sdd-kit`?** The catalog was renamed. A marketplace keeps the name it was added
+> under, so replace it once: `claude plugin marketplace remove sdd-kit` (this uninstalls its plugins
+> and deletes their saved data), then add `ghislain95/claude-toolbox` and reinstall. Projects set up
+> with the former kit keep working: their `sdd-kit: installed` marker is still recognised.
+
+## The spec-driven workflow (`sdd-core`)
 
 A **spec-driven** development workflow for Claude Code that you can install in any project, whatever
 the language: the OpenSpec cycle, specialised sub-agents, mandatory review, mechanical git
@@ -27,38 +48,38 @@ Allow 30 to 90 minutes depending on the size of the project. The same prompt, ru
 that is already set up, updates it to the latest version of the kit while keeping your changes.
 
 ```text
-Install the "sdd-kit" development workflow in this project (https://github.com/ghislain95/claude-sdd-kit): spec-driven development with OpenSpec, specialised agents, mandatory review, git guardrail and CI. Go through the steps in order, without skipping any.
+Install the spec-driven development workflow from claude-toolbox in this project (https://github.com/ghislain95/claude-toolbox): spec-driven development with OpenSpec, specialised agents, mandatory review, git guardrail and CI. Go through the steps in order, without skipping any.
 
 1. Prerequisites — check with Bash: `node -v` (≥ 20), `openspec --version`, `jq --version`, `perl -v`, `gh auth status`, `git status`. For each missing tool, give me the install command (npm install -g @fission-ai/openspec@latest, brew install jq, brew install gh…) and wait for my go-ahead before installing anything on my machine. Without jq, the git guardrail would block every one of your git commands: this one is blocking.
 
 2. Claude Code plugins — run through Bash:
    claude plugin marketplace add anthropics/claude-plugins-official
-   claude plugin marketplace add ghislain95/claude-sdd-kit
-   claude plugin install sdd-core@sdd-kit
+   claude plugin marketplace add ghislain95/claude-toolbox
+   claude plugin install sdd-core@claude-toolbox
    The first line is needed even if it seems redundant (it is a no-op when the official marketplace is already there): sdd-core depends on superpowers from that marketplace and won't load without it. The install should report "+ 1 dependency: superpowers"; check with claude plugin list that both sdd-core and superpowers are enabled.
-   If sdd-core is already installed, update instead: claude plugin marketplace update sdd-kit, then claude plugin update sdd-core@sdd-kit.
-   If the project has a web interface, also offer me: claude plugin install sdd-ui@sdd-kit and claude plugin install frontend-design@claude-plugins-official.
-   Ask me whether I use the Claude desktop app. If yes, offer the optional desktop mods (OpenSpec cockpit pane, message cards, session band, background-tasks pane): claude plugin install openspec-cockpit@sdd-kit, conversation-cards@sdd-kit, session-hud@sdd-kit, background-tasks@sdd-kit (one command each). If I take them, tick the `cockpit` option in phase 2 of the setup.
+   If sdd-core is already installed, update instead: claude plugin marketplace update claude-toolbox, then claude plugin update sdd-core@claude-toolbox.
+   If the project has a web interface, also offer me: claude plugin install sdd-ui@claude-toolbox and claude plugin install frontend-design@claude-plugins-official.
+   Ask me whether I use the Claude desktop app. If yes, offer the optional desktop mods (OpenSpec cockpit pane, message cards, session band, background-tasks pane): claude plugin install openspec-cockpit@claude-toolbox, conversation-cards@claude-toolbox, session-hud@claude-toolbox, background-tasks@claude-toolbox (one command each). If I take them, tick the `cockpit` option in phase 2 of the setup.
 
 3. OpenSpec profile — run `openspec config list`. The workflow needs these workflows: propose, explore, new, continue, apply, ff, sync, archive, bulk-archive, verify, onboard. If any are missing, ask me to run `openspec config profile` in my terminal (it is interactive), pick the custom profile, tick them all, then carry on.
 
-4. Project setup — newly installed plugins only load in the next session, so don't look for /sdd-core:sdd-init now. Read ~/.claude/plugins/marketplaces/sdd-kit/plugins/sdd-core/skills/sdd-init/SKILL.md directly and follow it to the letter, with ~/.claude/plugins/marketplaces/sdd-kit/plugins/sdd-core/skills/sdd-init/ as the base directory (templates/, references/). If the last line of CLAUDE.md contains "sdd-kit: installed", the project is already set up: follow the skill's --refresh mode. Respect its stopping points: the validation gate after the reverse-documentation, and the round of questions in phase 2. Only ask me for choices; anything the code, the CI or git can tell you, look it up yourself. Never work on the main branch.
+4. Project setup — newly installed plugins only load in the next session, so don't look for /sdd-core:sdd-init now. Read ~/.claude/plugins/marketplaces/claude-toolbox/plugins/sdd-core/skills/sdd-init/SKILL.md directly and follow it to the letter, with ~/.claude/plugins/marketplaces/claude-toolbox/plugins/sdd-core/skills/sdd-init/ as the base directory (templates/, references/). If the last line of CLAUDE.md contains "claude-toolbox: installed" (or "sdd-kit: installed", from before the rename), the project is already set up: follow the skill's --refresh mode. Respect its stopping points: the validation gate after the reverse-documentation, and the round of questions in phase 2. Only ask me for choices; anything the code, the CI or git can tell you, look it up yourself. Never work on the main branch.
 
-5. Wrap-up — give me the final report the skill describes, then tell me to restart Claude Code to load the agents, the hook and the /opsx:* commands. Remind me to turn on auto-update for this marketplace (/plugin → Marketplaces → sdd-kit → Enable auto-update): it is off by default for third-party marketplaces, so without it I won't get new versions of the kit. My first step after that will be /opsx:onboard (a first guided cycle) or the first baseline-<domain> change you proposed.
+5. Wrap-up — give me the final report the skill describes, then tell me to restart Claude Code to load the agents, the hook and the /opsx:* commands. Remind me to turn on auto-update for this marketplace (/plugin → Marketplaces → claude-toolbox → Enable auto-update): it is off by default for third-party marketplaces, so without it I won't get new versions of the kit. My first step after that will be /opsx:onboard (a first guided cycle) or the first baseline-<domain> change you proposed.
 
-Full guide if needed: ~/.claude/plugins/marketplaces/sdd-kit/GUIDE.md
+Full guide if needed: ~/.claude/plugins/marketplaces/claude-toolbox/GUIDE.md
 ```
 
-What the prompt changes on your machine, outside the project: it adds the `sdd-kit` marketplace and
+What the prompt changes on your machine, outside the project: it adds the `claude-toolbox` marketplace and
 enables the `sdd-core` and `superpowers` plugins (plus `sdd-ui`, `frontend-design` and the desktop
 mods if you accept them) in `~/.claude/settings.json`, so for all your projects. `sdd-core` holds
 skills and one session-start hook: it only speaks in a project set up with an older kit (see
 [Staying up to date](#staying-up-to-date)), takes a few milliseconds and stays silent everywhere
 else. `superpowers` adds a session-start hook that loads its guide to using skills; the desktop mods
 change the desktop app's display. To remove the kit:
-`claude plugin uninstall sdd-core@sdd-kit`, then `claude plugin marketplace remove sdd-kit`.
+`claude plugin uninstall sdd-core@claude-toolbox`, then `claude plugin marketplace remove claude-toolbox`.
 Context cost: `sdd-core`'s skill descriptions add about 400 tokens to every session
-(`claude plugin details sdd-core@sdd-kit` shows the breakdown).
+(`claude plugin details sdd-core@claude-toolbox` shows the breakdown).
 
 ## Contents
 
@@ -67,7 +88,7 @@ Context cost: `sdd-core`'s skill descriptions add about 400 tokens to every sess
 | **`sdd-core`** | `/sdd-core:sdd-init` (reverse-documentation + workflow install, `--refresh` to update), `/sdd-core:retro`, `sdd-core:domain-modeling`, `/sdd-core:improve-codebase-architecture`, and the templates (agents, `CLAUDE.md`, OpenSpec rules, git hook, CI). Depends on `handoff` |
 | **`handoff`** | `/handoff:passation` — handoff document to resume in a fresh session; usable in any project, installed with `sdd-core` |
 | **`sdd-ui`** (optional) | `web-design-guidelines`, `break-ui`, `emil-design-eng`, `animate`, `review-animations`, `improve-animations` |
-| **Desktop mods** (optional, desktop app only) | `openspec-cockpit`, `conversation-cards`, `session-hud`, `background-tasks` — listed in this marketplace, maintained in [`ghislain95/claude-mods`](https://github.com/ghislain95/claude-mods) |
+| **Desktop mods** (optional, desktop app only) | `openspec-cockpit`, `conversation-cards`, `session-hud`, `background-tasks` — in [`mods/`](mods/README.md) |
 
 What `sdd-init` installs in the project: see [`GUIDE.md`](GUIDE.md) §3.
 
@@ -77,8 +98,8 @@ In Claude Code:
 
 ```
 /plugin marketplace add anthropics/claude-plugins-official
-/plugin marketplace add ghislain95/claude-sdd-kit
-/plugin install sdd-core@sdd-kit
+/plugin marketplace add ghislain95/claude-toolbox
+/plugin install sdd-core@claude-toolbox
 ```
 
 `superpowers` comes with it as a declared dependency, provided the official marketplace is added
@@ -97,10 +118,10 @@ The full guide (prerequisites, what happens, day-to-day use, pitfalls) is in [`G
 There are two levels, and both matter:
 
 1. **The plugin on your machine.** Auto-update is **off by default** for third-party marketplaces
-   like this one. Turn it on once: `/plugin` → **Marketplaces** → `sdd-kit` → **Enable
+   like this one. Turn it on once: `/plugin` → **Marketplaces** → `claude-toolbox` → **Enable
    auto-update**. Claude Code then checks in the background during a session and tells you when a
    new version is ready (`/reload-plugins` or a restart applies it). Without auto-update:
-   `claude plugin marketplace update sdd-kit && claude plugin update sdd-core@sdd-kit`.
+   `claude plugin marketplace update claude-toolbox && claude plugin update sdd-core@claude-toolbox`.
 2. **Each project you set up.** The files `sdd-init` generated (CLAUDE.md, agents, hook, CI…) are
    copies: a new kit version doesn't change them. In each project, run the install prompt again (or
    `/sdd-core:sdd-init --refresh`): it applies what comes from the kit and keeps your local edits.
