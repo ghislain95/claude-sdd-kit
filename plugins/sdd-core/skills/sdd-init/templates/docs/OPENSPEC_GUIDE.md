@@ -64,7 +64,7 @@ With the agent team (routing: [`CLAUDE.md`](../CLAUDE.md) §8, details: [`AGENTS
    checks that `docs/` does not contradict the merged specs), commit `chore(<id>)`; finally<!-- sdd:if github --> push, PR and merge<!-- sdd:endif --><!-- sdd:if !github --> a merge by a human<!-- sdd:endif -->
    according to the autonomy level in [`CONTRIBUTING.md`](CONTRIBUTING.md) §2.
 
-**Context hygiene**: a fresh context per phase (`/clear`, or `/sdd-core:passation` then a
+**Context hygiene**: a fresh context per phase (`/clear`, or `/handoff:passation` then a
 new session) — the artifacts carry the memory.
 
 ## 4. Writing rules for specs and deltas

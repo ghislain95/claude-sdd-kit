@@ -64,7 +64,8 @@ Context cost: `sdd-core`'s skill descriptions add about 400 tokens to every sess
 
 | Plugin | Contents |
 |---|---|
-| **`sdd-core`** | `/sdd-core:sdd-init` (reverse-documentation + workflow install, `--refresh` to update), `/sdd-core:passation`, `/sdd-core:retro`, `sdd-core:domain-modeling`, `/sdd-core:improve-codebase-architecture`, and the templates (agents, `CLAUDE.md`, OpenSpec rules, git hook, CI) |
+| **`sdd-core`** | `/sdd-core:sdd-init` (reverse-documentation + workflow install, `--refresh` to update), `/sdd-core:retro`, `sdd-core:domain-modeling`, `/sdd-core:improve-codebase-architecture`, and the templates (agents, `CLAUDE.md`, OpenSpec rules, git hook, CI). Depends on `handoff` |
+| **`handoff`** | `/handoff:passation` — handoff document to resume in a fresh session; usable in any project, installed with `sdd-core` |
 | **`sdd-ui`** (optional) | `web-design-guidelines`, `break-ui`, `emil-design-eng`, `animate`, `review-animations`, `improve-animations` |
 | **Desktop mods** (optional, desktop app only) | `openspec-cockpit`, `conversation-cards`, `session-hud`, `background-tasks` — listed in this marketplace, maintained in [`ghislain95/claude-mods`](https://github.com/ghislain95/claude-mods) |
 

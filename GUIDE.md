@@ -174,7 +174,7 @@ because…").
 
 | Situation | Tool |
 |---|---|
-| Long session, change of topic, polluted context | `/sdd-core:passation [next goal]`, then `/clear` — preferred over `/compact` |
+| Long session, change of topic, polluted context | `/handoff:passation [next goal]`, then `/clear` — preferred over `/compact` |
 | Fuzzy or disputed domain term | the `domain-modeling` skill updates `docs/GLOSSARY.md` |
 | Every ~5 changes, never in the middle of one | `/sdd-core:improve-codebase-architecture` |
 | Failed session, painful post-archive | `/sdd-core:retro` (improves the agent's environment, not the code) |

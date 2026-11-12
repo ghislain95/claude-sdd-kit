@@ -1,12 +1,13 @@
 {
   "name": "sdd-core",
   "version": "0.2.0",
-  "description": "Spec-driven workflow kit: /sdd-init reverse-documents any project and installs OpenSpec, specialised agents, mandatory review, git guardrail hook and CI; plus passation, retro, domain-modeling and improve-codebase-architecture skills.",
+  "description": "Spec-driven workflow kit: /sdd-init reverse-documents any project and installs OpenSpec, specialised agents, mandatory review, git guardrail hook and CI; plus retro, domain-modeling and improve-codebase-architecture skills. Depends on handoff.",
   "author": {
     "name": "ghislain95"
   },
   "license": "MIT",
   "dependencies": [
-    "superpowers@claude-plugins-official"
+    "superpowers@claude-plugins-official",
+    "handoff"
   ]
 }

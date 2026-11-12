@@ -12,9 +12,9 @@ lot; the owner merges every pull request until group 8 has shipped.
 
 ## 2. Extract handoff and local-qa as plugins
 
-- [ ] 2.1 Move `sdd-core/skills/passation` to `plugins/handoff/skills/passation`, with its own `plugin.json` (category `skill`); keep the output folder `.claude/passation/` — verify: `/handoff:passation` writes into `.claude/passation/` and the cockpit lists the file
-- [ ] 2.2 Create `plugins/local-qa` (empty skill skeleton, category `skill`) — verify: `claude plugin validate .` passes
-- [ ] 2.3 Declare `handoff` and `local-qa` as dependencies of `sdd-core`; update every reference to `sdd-core:passation` in templates and docs — verify: installing `sdd-core` alone in a scratch config also installs both; `grep -r "sdd-core:passation"` is empty
+- [x] 2.1 Move `sdd-core/skills/passation` to `plugins/handoff/skills/passation`, with its own `plugin.json` (category `skill`); keep the output folder `.claude/passation/` — verify: `handoff` installs alone in a scratch config and lists the `passation` skill; the skill still writes into `.claude/passation/`, the folder the mods read
+- [x] 2.2 `local-qa` plugin: not created empty here — a plugin with a placeholder skill would install a skill that does nothing; it is created with its implementation in 8.5
+- [x] 2.3 Declare `handoff` as a dependency of `sdd-core` (`local-qa` added in 8.5); update every reference to `sdd-core:passation` in templates and docs — verify: installing `sdd-core` in a scratch config reports "+ 2 dependencies: superpowers, handoff"; `grep -r "sdd-core:passation"` outside the CHANGELOG is empty
 
 ## 3. Rename to claude-toolbox and protect its release
 
@@ -57,7 +57,7 @@ lot; the owner merges every pull request until group 8 has shipped.
 - [ ] 8.2 Add `.sdd/deployment.yaml` template and its generation in `sdd-init` (targets, rollback, probes, scheduled jobs, unconfirmed values listed) — verify: dry run on a sample project with a deploy workflow lists an unconfirmed rollback
 - [ ] 8.3 Templates for wiring the guard into a GitHub Actions deploy job (with `concurrency`) and into Vercel's `ignoreCommand`, plus the push workflow that opens an alert issue — verify: on a sample repository a direct push to `main` produces no deploy and an issue
 - [ ] 8.4 Delivery steps in the workflow templates: `in-flight` label, verification window from scheduled jobs, platform rollback then revert PR with `revert-of` classification, alert, fix change, final report format — verify: templates state each step; the merge-conditions matcher accepts an exact inverse revert and rejects a modified one (test)
-- [ ] 8.5 Implement the `local-qa` skill: inventory (docker labels, listening ports with cwd), reuse/start rule, isolated database on pending migration, `started.json`, cleanup, QA brief format — verify: with another project's container on the default port, the skill starts on a free port and cleanup stops only what it started
+- [ ] 8.5 Create the `local-qa` plugin (category `skill`, dependency of `sdd-core`) and implement its skill: inventory (docker labels, listening ports with cwd), reuse/start rule, isolated database on pending migration, `started.json`, cleanup, QA brief format — verify: with another project's container on the default port, the skill starts on a free port and cleanup stops only what it started
 - [ ] 8.6 `sdd-init` adoption mode starts with the mapping table approved before any write; marker records the version; `--refresh` three-way merges from the tag `sdd-core-v<version>` — verify: refresh on a sample project with a local edit and a template change on different lines keeps both
 - [ ] 8.7 Bump `sdd-core` to 0.4.0, CHANGELOG, tag `sdd-core-v0.4.0` — verify: `claude plugin validate .` and every test suite pass
 

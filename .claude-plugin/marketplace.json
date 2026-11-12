@@ -10,13 +10,19 @@
     {
       "name": "sdd-core",
       "source": "./plugins/sdd-core",
-      "description": "/sdd-init (reverse-documents a project and installs the workflow), passation, retro, domain-modeling, improve-codebase-architecture",
+      "description": "/sdd-init (reverse-documents a project and installs the workflow), retro, domain-modeling, improve-codebase-architecture",
       "category": "workflow"
     },
     {
       "name": "sdd-ui",
       "source": "./plugins/sdd-ui",
       "description": "Optional UI skills: web-design-guidelines, break-ui, emil-design-eng, animate, review-animations, improve-animations",
+      "category": "skill"
+    },
+    {
+      "name": "handoff",
+      "source": "./plugins/handoff",
+      "description": "/handoff:passation: handoff document to resume work in a fresh session, in any project",
       "category": "skill"
     },
     {
