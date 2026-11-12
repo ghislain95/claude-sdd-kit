@@ -18,13 +18,18 @@ You are the orchestrator: you dispatch agents and keep the count; you do not rev
 1. **Change id**: the argument; otherwise the only directory under `openspec/changes/` other than
    `archive/`; otherwise ask the user. Note which of `proposal.md`, `design.md`, `tasks.md` and
    `specs/` exist: the angles need to know (a missing artifact is reported, not guessed).
-2. **Diff range**: base = `git merge-base HEAD <default branch>`. If that diff is empty (the change
+2. **Diff range**: default branch = `git symbolic-ref --short refs/remotes/origin/HEAD` without its
+   `origin/` prefix, else `git config init.defaultBranch`, else `main`. Base = `git merge-base HEAD
+   <default branch>`. If that diff is empty (the change
    was committed on the default branch), base = the parent of the first commit that touched
    `openspec/changes/<id>/` (the empty tree, `git hash-object -t tree /dev/null`, when that commit is
    the root commit). Still empty → stop and tell the user there is nothing to review.
-   Head = `HEAD`, plus uncommitted changes. Record **head reviewed first**.
+   Head = `HEAD`, plus uncommitted changes. Record **head reviewed first**. The angles receive the
+   exact diff command, two-dot form: `git diff <base> <head>` (a three-dot range fails on the empty
+   tree), and the list of changed files.
 3. **Settings**: `.sdd/harness.yaml`. Missing file → the defaults of `HARNESS_CONFIG.md`, said in the
-   report. Present file → its keys only: an angle with no `angles.<angle>` key is never selected.
+   report. Present file → its keys only: a **conditional** angle with no `angles.<angle>` key is never
+   selected; a key for an always-on angle is ignored (and reported as such).
 4. **Clock and counter**: start time (`date +%s`); agent runs = 0.
 
 ## 1. Select the angles
@@ -39,7 +44,7 @@ Write the selection, with the reason for each angle left out, at the top of the 
 ## 2. Review pass 1 — angles one after the other
 
 For each selected angle, in the order above, dispatch **one** agent with: the change id, the diff
-range, the artifacts present, the angle's skill to follow (`sdd-core:review-<angle>`), its
+command and the changed files, whether the change branch is the default branch, the artifacts present, the angle's skill to follow (`sdd-core:review-<angle>`), its
 `mechanical.<angle>` entries, `budget.effort`, `budget.bug_hunt_level` (for `bugs`), and the
 instruction to answer in the format of `FINDINGS.md`.
 
@@ -70,10 +75,15 @@ verified; they go to the developer, who fixes them when cheap.
 A **fix round** = the developer fixes the confirmed BLOCKER and MAJOR findings, then a new review
 pass checks the result. Review pass n+1 follows fix round n.
 
-1. Send the confirmed BLOCKER and MAJOR findings, verbatim, to the developer agent: the one the
+1. Findings that are not code — a missing `proposal.md`, `design.md` or `tasks.md`, a decision only the
+   owner can take — are marked `owner` and escalated at once, outside the rounds; they keep the status
+   at `failure` until resolved. Send the confirmed BLOCKER and MAJOR **code** findings, verbatim, to
+   the developer agent: the one the
    project's routing table in `CLAUDE.md` names for the code concerned; none → the agent that
    implemented the change; none → a general agent. It **commits on the change branch** and runs the
    touched modules' tests green before handing back.
+   Dispatch the developer only if the budget also covers the review pass that checks its fixes
+   (§6); otherwise stop and escalate: fixes are never left unreviewed.
 2. Next review pass: re-run the angles that produced those findings, **plus** `conventions` and
    `tests` whenever code changed, on the diff base..new head, then §3.
 3. Stop when no BLOCKER and no MAJOR is open. After fix round `budget.rounds` with one still open:
@@ -86,8 +96,8 @@ Write `openspec/changes/<id>/review.md`:
 
 ```markdown
 # Review — <id>
-Base: <sha> · Head reviewed first: <sha> · Head reviewed last: <sha>
-Review passes: <n> · Fix rounds: <n> · Duration: <min> · Agent runs: <n>/<budget>
+Base: <sha> · Head reviewed first: <sha> · Head reviewed last: <sha of the last head a pass reviewed>
+Review passes: <n> · Fix rounds: <n> (<m> reviewed) · Duration: <min> · Agent runs: <n>/<budget>
 ## Angles
 | Angle | Ran | Why / why not | Mechanical checks |
 ## Findings
@@ -127,7 +137,8 @@ the pull request is what makes it auditable.
   report the forks they made.
 - **Rule**: a dispatch that would bring the runs above `budget.agent_runs`, or that starts after
   `budget.minutes` have elapsed, is not made.
-- **Minimum to plan for**: pass 1 = selected angles + 1 verifier; each fix round = 1 developer + the
-  re-run angles + 1 verifier. With the five constant angles and one round: about 13 runs.
+- **Minimum to plan for**: pass 1 = selected angles + 1 `code-review` fork + 1 verifier; each fix round
+  = 1 developer + the re-run angles (+ 1 fork if `bugs` re-runs) + 1 verifier. With the five constant
+  angles and one round: about 15 runs.
 - When the rule stops you: finish the report, list what was not covered, post `failure`, tell the
   owner. Never raise the effort above `budget.effort`; never use an ultracode-scale fan-out.

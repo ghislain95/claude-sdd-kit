@@ -12,7 +12,7 @@ not dispatch another agent.
 
 ## Method
 
-1. Review the diff (base...head plus uncommitted changes) with the project's rules: root `CLAUDE.md`,
+1. Review the diff (the command the orchestrator gives, plus uncommitted changes) with the project's rules: root `CLAUDE.md`,
    `AGENTS.md`, module docs (`CODING_RULES.md`), ADRs, and — if you are the `code-reviewer` agent —
    your own checklist. Give a `Fails when` on every BLOCKER and MAJOR.
 2. Run the commands under `mechanical.conventions` of `.sdd/harness.yaml`. A failing command is a

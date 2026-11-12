@@ -15,7 +15,7 @@ budget:
   bug_hunt_level: medium # level given to /code-review: low | medium | high
   rounds: 3              # fix rounds before escalating to the owner
 
-angles:                  # conditional angles only; a missing key = the angle is never selected
+angles:                  # conditional angles only; a missing key = never selected; keys for always-on angles are ignored
   security:    ["**/auth/**", "**/*.sql", "**/migration/**", "**/*Controller*", "package*.json", "pom.xml"]
   performance: ["src/main/**", "src/features/**"]
   interface:   ["**/*.tsx", "**/*.css", "**/i18n/**"]
@@ -38,8 +38,8 @@ mechanical:              # omit a key when the tooling is absent
 
 - `{files}` is replaced with the changed files the command applies to: those under the path the
   command works on (for a multi-module project, the module's folder).
-- `budget.agent_runs` should cover at least the selected angles + 1 verifier for the first pass, plus
-  `rounds` × (1 developer + the re-run angles + 1 verifier). `sdd-init` writes 30, enough for three
+- `budget.agent_runs` should cover at least the selected angles + 1 `code-review` fork + 1 verifier for
+  the first pass, plus `rounds` × (1 developer + the re-run angles + their forks + 1 verifier). `sdd-init` writes 30, enough for three
   rounds on a typical change.
 - `effort` uses the agent effort vocabulary; `bug_hunt_level` uses `/code-review`'s levels. They are
   independent: a `high` effort agent may run `/code-review` at `medium`.

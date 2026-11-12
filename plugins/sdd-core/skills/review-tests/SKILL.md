@@ -27,6 +27,8 @@ fail if the changed code were wrong?). Format: `../review-harness/FINDINGS.md`.
 2. Mutation: when `mechanical.tests.mutation` is set, run it on the changed files (`{files}`), never
    the whole codebase. Each surviving mutant on changed code is a finding at the mutated line:
    🛑 BLOCKER if it changes a specified outcome, 🔴 MAJOR otherwise; the missing test goes in `Fix`.
+   When the mutant only proves a gap already reported (an untested scenario), attach it as evidence
+   under that finding instead of reporting it twice.
 3. Without mutation tooling, mutate by hand: for the riskiest changed lines (conditions, boundaries,
    arithmetic, early returns), flip one thing in a scratch copy, run the relevant tests, restore.
    Report each survivor the same way and add `no mechanical backing: mutation tooling absent (manual

@@ -21,5 +21,5 @@ to run it on the change and bring its findings into the shared format
 ## Mechanical backing
 
 Run what the project declares under `mechanical.security` in `.sdd/harness.yaml` (dependency audit,
-secret scanner). Search the diff for committed secrets (`git diff <base>...HEAD | grep -nE` on key
+secret scanner). Search the diff for committed secrets (the orchestrator's diff command piped to `grep -nE` on key
 and token patterns) and report the command.

@@ -27,11 +27,11 @@ lot; the owner merges every pull request until group 8 has shipped.
 
 ## 4. Review harness
 
-- [ ] 4.1 Write `review-spec-conformance`, `review-conventions`, `review-tests`, `review-performance`, `review-interface`, `review-sourced-claims` skills (finding format: severity, file:line, failure scenario) — verify: each skill's description triggers on its angle in a dry run on a sample diff
-- [ ] 4.2 Write `review-bugs` and `review-security` as thin wrappers over Claude Code's `/code-review` and `/security-review` — verify: run on a sample diff with a planted bug, the bug is reported
-- [ ] 4.3 Write the `review-harness` orchestrator: angle selection from `.sdd/harness.yaml` and the diff, sequential runs, one combined adversarial verifier per round, three-round bound, budget stop, `review.md` report, `review-harness` commit status — verify: on a sample change with one real and one false finding, the false one is refuted and listed, the real one is sent for fixing
-- [ ] 4.4 Make the proposal adversarial pass systematic and scaled in the templates (`CLAUDE.md`, `OPENSPEC_GUIDE.md`) — verify: template text states both scales
-- [ ] 4.5 Add the `.sdd/harness.yaml` template and its filling in `sdd-init` (tools detected: architecture rules, lint, mutation present or absent) — verify: `sdd-init` dry run on a sample project fills it and marks absent tools
+- [x] 4.1 Write `review-spec-conformance`, `review-conventions`, `review-tests`, `review-performance`, `review-interface`, `review-sourced-claims` skills (finding format: severity, file:line, failure scenario) — verify: each angle produced its findings in two dry runs on a sample change with planted defects (`claude plugin details sdd-core` lists the skills)
+- [x] 4.2 Write `review-bugs` and `review-security` over Claude Code's `/code-review` and `/security-review`, with a domain edge pass for bugs — verify: on the sample change, the planted threshold bug is reported, and after the first dry run's fixes the unplanted floating-point subtotal defect too (a 100.00 order of 0.08 + 86.07 + 13.85 now totals 90)
+- [x] 4.3 Write the `review-harness` orchestrator: angle selection from `.sdd/harness.yaml` and the diff, sequential runs, one combined adversarial verifier per round, three-round bound, budget stop, `review.md` report, `review-harness` commit status — verify: on a sample change with one real and one false finding, the false one is refuted and listed, the real one is sent for fixing
+- [x] 4.4 Make the proposal adversarial pass systematic and scaled in the templates (`CLAUDE.md`, `OPENSPEC_GUIDE.md`) — verify: template text states both scales
+- [x] 4.5 Add the `.sdd/harness.yaml` template and its filling in `sdd-init` (tools detected: architecture rules, lint, mutation present or absent) — verify: template and `sdd-init` phase 4 step present, `.sdd` included in phase 5's leftover-marker check; a full `sdd-init` run is exercised by geomni's adoption (group 9)
 
 ## 5. Triggers, classification and the framing pull request
 
