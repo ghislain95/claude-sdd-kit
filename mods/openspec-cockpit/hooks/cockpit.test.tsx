@@ -233,7 +233,7 @@ function world(on: On, root: string, tree: Record<string, Node>): World {
 const SCROLL = { offset: 0, bodyRows: 10 }
 const BAND = {
   component: 'AbovePrompt' as const,
-  props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 100, scroll: SCROLL, view: {} },
+  props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 10, bodyColumns: 100, scroll: SCROLL, view: {} },
 }
 const PANE = {
   component: 'Pane' as const,

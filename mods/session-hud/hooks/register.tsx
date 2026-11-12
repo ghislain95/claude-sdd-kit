@@ -67,10 +67,14 @@ async function isBackdropOn($: EngineInterface): Promise<boolean> {
   return ((await $.store.get('backdrop').catch(() => undefined)) ?? 'on') !== 'off'
 }
 
-/** Sets or clears the backdrop; says whether a surface draws it (desktop builds without the layer do not). */
+/**
+ * Sets the backdrop as the session's theme, or clears the theme; says whether a surface draws it
+ * (the terminal and desktop builds without the layer do not). A clear wipes whatever theme stands,
+ * so it only follows the person's own /fond, never a start or a reload.
+ */
 async function applyBackdrop($: EngineInterface, isOn: boolean): Promise<boolean> {
-  const result = await $.ui.backdrop(isOn ? { id: BACKDROP_ID } : undefined).catch(() => null)
-  return result !== null && result !== undefined && result.isDrawn === true
+  const result = await (isOn ? $.theme.set({ backdrop: { id: BACKDROP_ID } }) : $.theme.clear()).catch(() => null)
+  return result !== null && result.isDrawn === true
 }
 
 async function openBackground($: EngineInterface): Promise<void> {

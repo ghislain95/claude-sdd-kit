@@ -1,7 +1,7 @@
 // A tool call as one compact row: what it acts on, how it went; a press opens Claude Code's own row under it.
 
 import { atom, memberOf, read, update } from 'claude-code'
-import type { EngineInterface, RenderInput, RenderResult } from 'claude-code'
+import type { EngineInterface, RenderElement, RenderInput } from 'claude-code'
 
 import { toolCard, toolTail, truncate } from './logic'
 
@@ -11,9 +11,9 @@ const isToolOpen = atom({ plugin: 'conversation-cards', key: 'isToolOpen' } as c
 export async function renderToolUse(
   $: EngineInterface,
   e: RenderInput<'ToolUse'>,
-  next: (e: RenderInput<'ToolUse'>) => Promise<RenderResult>,
+  next: (e: RenderInput<'ToolUse'>) => Promise<RenderElement>,
   root: string,
-): Promise<RenderResult> {
+): Promise<RenderElement> {
   const card = toolCard(e.props.tool, (e.props.input ?? {}) as Record<string, unknown>, root)
   if (card === null) return next(e)
   const [timing, isOpen] = await Promise.all([read($, memberOf(toolTimes, e)), read($, memberOf(isToolOpen, e))])

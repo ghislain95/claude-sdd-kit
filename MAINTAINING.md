@@ -33,10 +33,10 @@ The four desktop mods live under `mods/` (folded in from `ghislain95/claude-mods
 `mods/<mod>/.claude-plugin/plugin.json` to ship a change, and check them with
 `claude plugin validate mods/<mod>` and `claude plugin test mods/<mod>`.
 
-Known failures, already present in `claude-mods` before the fold: `claude plugin validate` fails on
-`openspec-cockpit`, `conversation-cards` and `background-tasks` ("$ is passed to … imported from …"),
-and `claude plugin test` fails on every mod (`"ui.notify" is not an event`). Both come from a change
-of the mods API in Claude Code and are tracked as their own fix, outside `dev-factory`.
+The mods API moves with Claude Code, so check them with a `claude` at least as recent as the desktop
+app's engine (`claude --version`; the desktop's own build is under
+`~/Library/Application Support/Claude/claude-code/<version>/`). An older CLI reports errors the engine
+no longer raises, such as "$ is passed to … imported from …" or `"ui.notify" is not an event`.
 
 ## Release triggers
 

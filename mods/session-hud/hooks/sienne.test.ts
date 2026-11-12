@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { NATIVE, backdrop, bar, contrast, dot, pill, pills, ring, ribbon, timeline } from './shared/sienne'
 
-const ids = (svg: string): string[] => [...svg.matchAll(/\bid="([^"]+)"/g)].map(match => match[1])
+const ids = (svg: string): string[] => [...svg.matchAll(/\bid="([^"]+)"/g)].map(match => match[1] ?? '')
 
 describe('the Terre de Sienne palette', () => {
   test('every native colour stays legible on both bases', () => {
@@ -41,7 +41,7 @@ describe('the Terre de Sienne palette', () => {
   })
 
   test('two drawings never share an id', () => {
-    const pairs = [
+    const pairs: [string, string][] = [
       [ribbon(400, { id: 'x1', icon: 'qa', title: 'QA' }), ribbon(400, { id: 'x2', icon: 'qa', title: 'QA' })],
       [ring(0.3, { id: 'x1' }), ring(0.3, { id: 'x2' })],
       [bar(200, 0.3, { id: 'x1', running: true }), bar(200, 0.3, { id: 'x2', running: true })],
@@ -119,7 +119,7 @@ describe('the Terre de Sienne palette', () => {
     const svg = pill(600, 40, { radius: 6 })
     expect(svg).toContain('rx="6"')
     const rect = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/.exec(svg)
-    const [x, y, w, h] = (rect ?? []).slice(1).map(Number)
+    const [x = NaN, y = NaN, w = NaN, h = NaN] = (rect ?? []).slice(1).map(Number)
     expect(y).toBe(40 - (y + h))
     expect(x).toBe(600 - (x + w))
   })
