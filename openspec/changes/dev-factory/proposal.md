@@ -65,7 +65,7 @@ owner with the proposal. It opens zero, one or two human gates:
 
 - With no gate open, the change merges when a single always-running aggregate CI job is green, the
   review harness reports no BLOCKER or MAJOR, `/opsx:verify` passes and the mechanical check agrees.
-  The merge is enforced server-side, never by the agent's client-side hook alone.
+  These conditions are one `merge-conditions` CI check, read from `main`.
 - Merge method per project (geomni: squash).
 - **Serialisation**: at most one change between merge and verified production at a time; the next
   merge waits.
@@ -76,8 +76,9 @@ owner with the proposal. It opens zero, one or two human gates:
 - **Rollback** on failed verification: platform rollback first (deployment profile), then a git revert
   merged under the same server-side conditions, an alert to the owner with a diagnosis, and a fix
   change.
-- The merge is performed by CI, never by the agent: a workflow running the base branch's code checks
-  the triggers and the aggregate gate, then merges; the agent's token has no merge right.
+- The agent merges only through the guardrail's verified route; a gated pull request is merged by the
+  owner, whose click is the go or the passed QA. Every deploy target refuses a commit that did not come
+  from a merged pull request with `merge-conditions` green (deploy guard).
 - The owner receives a final report: what shipped, what the harness found and fixed, what to look at
   in production.
 
@@ -98,8 +99,9 @@ owner with the proposal. It opens zero, one or two human gates:
 
 The kit ships one guardrail that filters commands only: the kit's perl reader (197 cases) extended with
 geomni's cases (REST merge endpoint, branch tracking `main`), with merge method and
-`--force-with-lease` as per-project settings. It is a guard against mistakes, not a security boundary;
-the boundary is server-side.
+`--force-with-lease` as per-project settings, and one merge route allowed only after it has queried
+GitHub for `merge-conditions`. It is a guard against mistakes, not a security boundary; the server-side
+barrier is the deploy guard.
 
 ### Projects consume the kit
 
@@ -125,8 +127,13 @@ environment without disturbing them:
 ## Owner decisions (2026-11-12)
 
 1. **Server-side enforcement** — geomni is a private repository on GitHub Free (no rulesets, no branch
-   protection, no auto-merge): **CI performs the merge**. A workflow running the base branch's code
-   checks the triggers and the aggregate gate, then merges; the agent's token has no merge right.
+   protection, no auto-merge), and the agent acts with the owner's token: any token able to push a
+   change branch can also write `main`, and the owner's approvals cannot be told apart from the
+   agent's. Without GitHub Pro, merge protection is **client-side and guards against mistakes**: a
+   `merge-conditions` check read from `main`, a guardrail that queries it before allowing the agent's
+   merge, gated pull requests merged by the owner's own click. The **server-side barrier is a deploy
+   guard**: no deploy target ships a commit that did not come from a merged pull request with
+   `merge-conditions` green. GitHub Pro with a GitHub App identity for the agent becomes a backlog line.
 2. **Migrations and rollback** — any migration and any stored-format change opens the irreversible gate.
 3. **Intent QA** — locally, before merge (above). A per-PR backend for phone QA becomes a backlog line.
 
@@ -179,6 +186,7 @@ Until lot 3 is in place, merges stay with the owner.
   outward-facing, done with the owner's confirmation.
 - Users of the public `sdd-kit` marketplace must re-add it under its new name.
 - geomni: `.claude/` (agents, hook, settings), `CLAUDE.md` §1, `AGENTS.md` git section, CI (aggregate
-  gate job, merge workflow, trigger check), the Python guardrail and its CI job replaced; merging
-  deploys without the owner when no gate is open.
+  gate job, `merge-conditions` check, deploy guard in `deploy-backend.yml` and Vercel's ignored build
+  step), the Python guardrail and its CI job replaced; merging deploys without the owner when no gate
+  is open.
 - wifisense: same, second; its merge method and guardrail settings move to per-project configuration.
