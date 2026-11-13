@@ -30,6 +30,9 @@
       "Bash(jq *)",
       "Bash(ls *)",
       "Bash(wc *)",
+      "Bash(python3 .sdd/bin/merge_conditions.py validate *)",
+      "Bash(python3 .sdd/bin/merge_conditions.py match *)",
+      "Bash(python3 .sdd/bin/test_merge_conditions.py)",
       "Bash(bash .claude/hooks/block-git-writes.test.sh)"
     ]
   },

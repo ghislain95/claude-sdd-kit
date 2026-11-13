@@ -1,0 +1,70 @@
+# Tooling checks of the claude-toolbox repository. Runs on every pull request (no path filter): it is
+# always part of the aggregate gate that .github/workflows/merge-conditions.yml computes.
+#
+# git-guardrail      the guardrail template every project copies (block-git-writes.test.sh)
+# version-check      the sdd-core session hook that compares a project's marker with the plugin
+# merge-conditions   the matcher's tests, for the toolbox's own copy and the template, which must
+#                    stay identical (sdd-init copies the template verbatim)
+# plugin-manifests   `claude plugin validate` on the catalog and on each plugin
+name: Tooling
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  git-guardrail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git guardrail regression tests
+        run: bash plugins/sdd-core/skills/sdd-init/templates/claude/hooks/block-git-writes.test.sh
+
+  version-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version-check hook tests
+        run: bash plugins/sdd-core/hooks/check-kit-version.test.sh
+
+  merge-conditions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PyYAML
+        run: pip install pyyaml==6.0.2
+      - name: The installed copy is the template
+        run: |
+          cmp .sdd/bin/merge_conditions.py plugins/sdd-core/skills/sdd-init/templates/sdd/bin/merge_conditions.py
+          cmp .sdd/bin/test_merge_conditions.py plugins/sdd-core/skills/sdd-init/templates/sdd/bin/test_merge_conditions.py
+      - name: Matcher and check tests
+        run: python3 .sdd/bin/test_merge_conditions.py
+      - name: The toolbox's triggers file is valid
+        run: python3 .sdd/bin/merge_conditions.py validate .sdd/triggers.yaml
+
+  plugin-manifests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Pinned: bump it on purpose, together with the CLI used locally (MAINTAINING.md).
+      - name: Install the Claude Code CLI (validation needs no login)
+        run: npm install -g @anthropic-ai/claude-code@2.1.292
+      - name: Validate the catalog and every plugin
+        run: |
+          claude plugin validate .
+          for plugin in plugins/*/; do claude plugin validate "$plugin"; done
