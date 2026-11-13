@@ -28,6 +28,8 @@
 # Repository: GITHUB_REPOSITORY, or VERCEL_GIT_REPO_OWNER/VERCEL_GIT_REPO_SLUG. Commit (Vercel):
 # VERCEL_GIT_COMMIT_SHA. Token, read-only (Contents, Pull requests, Actions, Metadata):
 # DEPLOY_GUARD_TOKEN, GH_TOKEN or GITHUB_TOKEN. Verdict as JSON in DEPLOY_GUARD_VERDICT when set.
+# DEPLOY_GUARD_TARGET (a target of the trusted commit's .sdd/deployment.yaml): only the commits that
+# change its trigger paths are judged, so a refused commit elsewhere does not block it.
 # Needs git and python3; without PyYAML, a fresh virtual environment (mktemp -d) gets PyYAML 6.0.2,
 # hash-pinned (CPython 3.9-3.13, Linux or macOS; anything else cannot judge). DEPLOY_GUARD_PYTHON
 # overrides the interpreter. Copied verbatim by sdd-init; tests: .sdd/bin/test_merge_conditions.py
@@ -122,6 +124,7 @@ REQUIREMENTS
     python="$work/venv/bin/python"
   fi
   set -- --repo "$repository" "$@"
+  [ -n "${DEPLOY_GUARD_TARGET:-}" ] && set -- "$@" --target "$DEPLOY_GUARD_TARGET"
   [ -n "${DEPLOY_GUARD_VERDICT:-}" ] && set -- "$@" --verdict-file "$DEPLOY_GUARD_VERDICT"
   "$python" "$work/merge_conditions.py" -C "$top" deploy-guard "$@"
 }

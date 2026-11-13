@@ -63,6 +63,7 @@ lot; the owner merges every pull request until group 8 has shipped.
 
 ## 9. geomni adoption (pilot)
 
+- [ ] 9.0 Before adoption (owner decision 2026-11-13): geomni deploys to Cloud Run through Workload Identity Federation bound to the default branch and the deploy workflow (`assertion.ref == 'refs/heads/main'`, `job_workflow_ref` pinned), then `GCP_SA_KEY` is deleted; the owner runs the IAM commands the agent prepares and pushes the workflow change — verify: a `workflow_dispatch` of `deploy-backend.yml` on a non-default branch is refused by GCP, a deploy from `main` succeeds, the secret is gone
 - [ ] 9.1 In a geomni worktree, run `sdd-init` adoption: mapping table for `CLAUDE.md` §1, `AGENTS.md`, agents, hook, settings, CI — verify: owner approves the table before any write
 - [ ] 9.2 Write geomni's `.sdd/triggers.yaml` (proposal list: any Flyway migration, stored formats incl. browser storage and Redis, edition publication, ETL replay, infra, consumed endpoints, quota; intent paths incl. scoring, ramps, classifier, taxonomy), `.sdd/deployment.yaml` (Cloud Run, Vercel, daily ETL scheduler), `.sdd/harness.yaml` — verify: the matcher test suite run against geomni's last 10 merged PRs classifies them as the owner would (owner checks the table)
 - [ ] 9.3 Wire `merge-conditions.yml`, the deploy guard in `deploy-backend.yml` and `vercel.json`, the alert workflow; remove the Python guardrail and its `pr.yml` job — verify: geomni CI green on the adoption PR

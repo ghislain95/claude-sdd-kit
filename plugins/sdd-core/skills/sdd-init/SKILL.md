@@ -230,7 +230,9 @@ the choices the code cannot settle:
    - each deploy workflow: the guard block of `templates/github/workflows/deploy.yml` (job-level
      `concurrency: { group: deploy-${{ github.workflow }}, cancel-in-progress: false }`,
      `workflow_dispatch`, checkout with `fetch-depth: 0` and `persist-credentials: false`, Python, the
-     "Deploy guard" step that reads the guard from the trusted commit, its values through `env:`)
+     "Deploy guard" step that reads the guard from the trusted commit, its values through `env:` —
+     `DEPLOY_GUARD_TARGET` set to the target's `name` and `DEPLOY_GUARD_RESET` to
+     `${{ vars.DEPLOY_GUARD_RESET_<NAME> }}`, the name upper-cased, every other character `_`)
      merged at the top of the job that deploys, the project's own steps unchanged after it, and the
      three read permissions added; a target without a workflow gets none (it is guarded by its
      platform, below, or reported as unguarded);

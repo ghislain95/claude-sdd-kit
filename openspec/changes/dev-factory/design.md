@@ -236,6 +236,19 @@ merges look the same server-side; the gates stay client-side (the merge route). 
 - *PyYAML*: hash-pinned wheels in a fresh `mktemp -d` environment.
 - *Workflows*: a run whose jobs were all skipped passes; a renamed required workflow stays required.
 
+Amended after the lot 3c-1 re-review: a candidate trusted commit (the last successful run's head,
+the owner's reset, `VERCEL_GIT_PREVIOUS_SHA`) counts only when it is on the pushed commit's
+first-parent line — checked by the entry point before any of its code runs, and again by the guard
+(`--last-deployed` off that line is refused); Vercel's shallow clone is deepened with the read-only
+token first. A deploy job names its target (`DEPLOY_GUARD_TARGET`): only the commits since the
+trusted one that change that target's trigger paths, read from the trusted commit's
+`.sdd/deployment.yaml`, are judged, so a refused commit elsewhere never blocks it. When a target is
+stuck anyway, the owner sets the repository variable `DEPLOY_GUARD_RESET_<TARGET>` to a reviewed
+commit of the default branch (only the owner can: the agent's token has no Variables write).
+Documented limits: a renamed deploy workflow starts from `before` (the owner renames workflows and
+sets the reset); `workflow_dispatch` on an old branch runs that branch's unguarded workflow (fix:
+deploy credentials bound to the default branch and the deploy workflow).
+
 ### D8 — Serialisation and rollback
 
 - After merging, the agent puts the `in-flight` label on the merged PR; the hook refuses any other

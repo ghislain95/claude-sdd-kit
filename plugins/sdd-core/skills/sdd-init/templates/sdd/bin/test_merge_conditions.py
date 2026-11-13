@@ -1212,6 +1212,15 @@ def merged_pull(number, merge_sha, head_sha, branch="feat/add-export", base="mai
             "merge_commit_sha": merge_sha, "base": {"ref": base}, "head": {"sha": head_sha, "ref": branch}}
 
 
+TARGETS = """\
+targets:
+  - { name: api, platform: cloud-run, trigger: { paths: [ 'src/**' ] }, rollback: { command: r }, probes: [ { command: p } ] }
+  - { name: database, platform: cloud-sql, trigger: { paths: [ 'src/**', 'db/**' ] }, rollback: { command: r }, probes: [ { command: p } ] }
+  - { name: web, platform: vercel, trigger: { paths: [ 'web/**' ] }, rollback: { command: r }, probes: [ { command: p } ] }
+  - { name: everything, platform: vercel, trigger: { every_push: true }, rollback: { command: r }, probes: [ { command: p } ] }
+"""
+
+
 class DeployGuardTest(unittest.TestCase):
     def setUp(self):
         self.repo = Repo()
@@ -1618,6 +1627,76 @@ class DeployGuardTest(unittest.TestCase):
         self.assertEqual(code, mc.GUARD_REFUSED)
         self.assertIn("its content was edited during the merge", reason)
 
+    def test_last_deployed_commit_off_the_first_parent_line_is_not_trusted(self):
+        # Review A: a run's head_sha on a merged branch (reachable, but not a commit of main) is no anchor.
+        self.repo.write("openspec/changes/add-export/classification.yaml", classification())
+        self.repo.commit("base")
+        self.repo.branch("feat/add-export")
+        self.repo.write("openspec/changes/add-export/tasks.md", "- [x] 1\n")
+        inner = self.repo.commit("inner commit of the branch")
+        self.repo.write("src/a.py", "1\n")
+        head = self.repo.commit("pull request")
+        self.repo.git("switch", "-q", "main")
+        self.repo.git("merge", "-q", "--no-ff", "-m", "Merge #7", "feat/add-export")
+        merged = self.repo.git("rev-parse", "HEAD")
+        self.assertTrue(mc.is_ancestor(self.repo.path, inner, merged))
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], self.green(head)), merged, None,
+                                  last_deployed=inner)
+        self.assertEqual((code, reason), (mc.GUARD_REFUSED, f"refused {merged[:7]}: the last deployed commit "
+                                                               f"{inner[:7]} is not on its first-parent line (a commit "
+                                                               f"of a merged branch, not of main): it is not trusted"))
+
+    def with_targets(self, profile):
+        self.repo.write(".sdd/deployment.yaml", profile)
+
+    def test_target_judges_only_the_commits_changing_its_paths(self):
+        # Review C(1): a refused commit outside the target's paths does not block that target.
+        self.with_targets(TARGETS)
+        deployed, evil, merged, head = self.direct_push_then_merge()  # evil: db/; the merge: src/
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head))
+        code, reason = self.guard(stub, merged, evil, last_deployed=deployed, target="api")
+        self.assertEqual(code, mc.GUARD_DEPLOY, reason)
+        self.assertTrue(reason.endswith(f"; 1 commit(s) since {deployed[:7]} outside the target's paths, not judged"),
+                        reason)
+        code, reason = self.guard(stub, merged, evil, last_deployed=deployed, target="database")
+        self.assertEqual(code, mc.GUARD_REFUSED)
+        self.assertIn(f"{evil[:7]}, merged since the last deployed", reason)
+        code, reason = self.guard(stub, merged, evil, last_deployed=deployed, target="everything")
+        self.assertEqual(code, mc.GUARD_REFUSED)
+
+    def test_target_with_no_change_since_the_last_deploy_deploys(self):
+        self.with_targets(TARGETS)
+        deployed, evil, merged, head = self.direct_push_then_merge()
+        code, reason = self.guard(GuardStub(), merged, evil, last_deployed=deployed, target="web")
+        self.assertEqual((code, reason), (mc.GUARD_DEPLOY, f"deploy {merged[:7]}: no commit since {deployed[:7]} "
+                                                             f"changes the target's paths; 2 commit(s) since "
+                                                             f"{deployed[:7]} outside the target's paths, not judged"))
+
+    def test_target_is_read_from_the_trusted_commit(self):
+        self.with_targets(TARGETS)
+        self.repo.write("openspec/changes/add-export/classification.yaml", classification())
+        deployed = self.repo.commit("base")
+        self.repo.write("db/migrations/V9__drop.sql", "drop table users;\n")
+        self.repo.write(".sdd/deployment.yaml", TARGETS.replace("'src/**', 'db/**'", "'nothing/**'"))
+        evil = self.repo.commit("direct push narrowing the target")
+        stub = GuardStub()
+        code, reason = self.guard(stub, evil, deployed, last_deployed=deployed, target="database")
+        self.assertEqual(code, mc.GUARD_REFUSED, reason)
+
+    def test_unknown_target_cannot_be_judged(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head))
+        code, reason = self.guard(stub, merged, before, target="api")
+        self.assertEqual((code, reason), (mc.GUARD_CANNOT_JUDGE, f"cannot judge {merged[:7]}: no .sdd/deployment.yaml "
+                                                                    f"at the trusted commit {before[:7]}"))
+        self.with_targets(TARGETS)
+        self.repo.commit("profile")
+        before, merged, head = self.merge({"src/b.py": "2\n"}, base=False, branch="fix/add-export")
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head))
+        self.assertEqual(self.guard(stub, merged, before, target="nope"),
+                         (mc.GUARD_CANNOT_JUDGE, f"cannot judge {merged[:7]}: no target 'nope' in "
+                                                 f".sdd/deployment.yaml at {before[:7]}"))
+
     def test_history_rewritten_since_the_last_deployed_commit_is_refused(self):
         before, merged, head = self.merge({"src/app.py": "print(1)\n"})
         self.repo.git("switch", "-q", "-c", "elsewhere", before)
@@ -1826,6 +1905,10 @@ class DeployGuardScriptTest(unittest.TestCase):
         code, calls, output, _ = self.run_script(self.merged, self.trusted, self.trusted, FAKE_CODE="0")
         self.assertEqual((code, calls), (2, []))
         self.assertIn("repository unknown", output)
+
+    def test_target_is_passed_on(self):
+        code, calls, _, _ = self.actions(0, DEPLOY_GUARD_TARGET="api")
+        self.assertTrue(calls[0].endswith(f"--before {self.trusted} --target api"), calls[0])
 
     def test_verdict_file_is_passed_on(self):
         code, calls, _, _ = self.actions(0, DEPLOY_GUARD_VERDICT="/tmp/verdict.json")

@@ -12,6 +12,13 @@
 # the owner is not stopped (stated in docs/CONTRIBUTING.md, "What is enforced where").
 # A refused commit fails the job (GitHub notifies the owner; deploy-alert.yml opens an issue).
 #
+# Only the commits that change the target's trigger paths (DEPLOY_GUARD_TARGET, read from the trusted
+# commit's .sdd/deployment.yaml) are judged: a refused commit elsewhere does not block this target.
+# When a target is stuck anyway (a refused commit no longer exactly revertible, a guard bug, a renamed
+# workflow), the OWNER sets the repository variable DEPLOY_GUARD_RESET_<TARGET> to a reviewed commit of
+# {{DEFAULT_BRANCH}}: the guard is then read from it and judges only what came after it. Only the owner
+# can set repository variables — the agent's token has no Variables write. See docs/OPENSPEC_GUIDE.md §8.
+#
 # `concurrency: deploy-<workflow>` runs one deploy of this workflow at a time and never cancels a
 # running one. GitHub keeps at most one run WAITING per group: a third push arriving while one
 # deploys and one waits replaces the waiting run — its commit is still judged, as part of the history
@@ -52,20 +59,35 @@ jobs:
           python-version: '3.12'
 
       # Values through the environment, never interpolated into the script. The guard is read from
-      # the trusted commit: the last one this workflow ran successfully on, else `before`.
+      # the trusted commit, never from the pushed one: the owner's reset commit if set, else the last
+      # one this workflow ran successfully on, else `before` — a candidate counts only when it is on the
+      # pushed commit's first-parent line (a commit of {{DEFAULT_BRANCH}}, not of a merged branch).
       - name: Deploy guard
         env:
           GH_TOKEN: ${{ github.token }}
           MERGED_SHA: ${{ github.sha }}
           BEFORE_SHA: ${{ github.event.before }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          # sdd:fill: the target's `name` in .sdd/deployment.yaml, and its reset variable vars.DEPLOY_GUARD_RESET_<NAME> (upper-cased, every other character turned into `_`)
+          DEPLOY_GUARD_TARGET: api
+          DEPLOY_GUARD_RESET: ${{ vars.DEPLOY_GUARD_RESET_API }}
         run: |
           set -euo pipefail
+          on_line() {  # a commit of the pushed commit's first-parent line that carries the guard
+            [ -n "$1" ] && git merge-base --is-ancestor "$1" "$MERGED_SHA" 2>/dev/null \
+              && git rev-list --first-parent "$MERGED_SHA" | grep -x "$1" > /dev/null \
+              && git cat-file -e "$1:.sdd/bin/deploy-guard.sh" 2>/dev/null
+          }
           workflow=${GITHUB_WORKFLOW_REF%@*}
           last=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/${workflow##*/}/runs?branch=$DEFAULT_BRANCH&status=success&per_page=1" \
             --jq '.workflow_runs[0].head_sha // ""')
           trusted=${BEFORE_SHA:-$(git rev-parse "$MERGED_SHA^1")}
-          if [ -n "$last" ] && git cat-file -e "$last:.sdd/bin/deploy-guard.sh" 2>/dev/null; then trusted=$last; fi
+          if on_line "$last"; then trusted=$last; fi
+          # The owner's reset (a repository variable: only the owner can set one) wins until a later
+          # deploy has gone past it.
+          if on_line "$DEPLOY_GUARD_RESET" && ! { on_line "$last" && git merge-base --is-ancestor "$DEPLOY_GUARD_RESET" "$last"; }; then
+            trusted=$DEPLOY_GUARD_RESET
+          fi
           guard="$RUNNER_TEMP/deploy-guard.sh"
           if ! git show "$trusted:.sdd/bin/deploy-guard.sh" > "$guard" 2>/dev/null; then
             echo "deploy-guard: adoption: ${trusted:0:7} has no deploy guard yet: this push deploys nothing"

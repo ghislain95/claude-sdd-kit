@@ -350,9 +350,15 @@ merging gated pull requests. Any gate therefore passes the guard.
 
 `.sdd/bin/deploy-guard.sh` runs first in each deploy job and in `deploy-alert.yml`, and as Vercel's
 `ignoreCommand`; it never reads `merge-conditions`. **Its code is read from a trusted commit, never
-from the pushed one**: the last commit the workflow ran successfully on (Vercel: the last production
-deployment, `VERCEL_GIT_PREVIOUS_SHA`), else the default branch before the push. For each commit of
-that history it recomputes:
+from the pushed one**: the owner's reset commit (below) if set, else the last commit the workflow ran
+successfully on (Vercel: the last production deployment, `VERCEL_GIT_PREVIOUS_SHA`), else the default
+branch before the push — a candidate is trusted only when it is on the pushed commit's
+**first-parent line** (a commit of `{{DEFAULT_BRANCH}}`, not one of a merged branch); otherwise the
+guard falls back to `before` (Vercel: skips). A deploy job names its target (`DEPLOY_GUARD_TARGET`):
+only the commits since the trusted one that change **that target's trigger paths** — read from the
+trusted commit's `.sdd/deployment.yaml` — are judged; the others are reported, not judged, and never
+block it (a target with `every_push`, and `deploy-alert.yml`, judge them all). For each judged commit
+it recomputes:
 
 - the pull request merged **as** that commit (`commits/<sha>/pulls`, merged into
   `{{DEFAULT_BRANCH}}`, its merge commit equal to the sha) — none: a direct push, refused;
@@ -366,7 +372,19 @@ that history it recomputes:
   request deleted is not required, one it renamed is, under its new name.
 
 A refused commit is accepted later only once a following merged commit undoes it **exactly** (a
-pull request that reverts it); until then every deploy is refused. Anything it cannot judge refuses
+pull request that reverts it); until then every deploy of a target whose paths it changes is
+refused.
+
+**Owner reset** — when a target stays refused with no exact revert possible (later merges changed the
+same files, a guard bug refuses its own fix, a target idle for more than 100 merges, a renamed deploy
+workflow): the owner reviews `{{DEFAULT_BRANCH}}` and sets the repository variable
+`DEPLOY_GUARD_RESET_<TARGET>` (the target's name upper-cased, every other character turned into `_`;
+`DEPLOY_GUARD_RESET_DEPLOY_ALERT` for the alert workflow) to a reviewed commit:
+`gh variable set DEPLOY_GUARD_RESET_API --body <sha>`. The deploy step takes it as the trusted commit,
+and so judges only what came after it, as long as it is on the pushed commit's first-parent line
+(otherwise it is ignored) and no later deploy has gone past it. **Only the owner sets repository
+variables**: the agent's token has no Variables write ([`CONTRIBUTING.md`](CONTRIBUTING.md) §2,
+"Access"). For Vercel, the owner's reset is a production redeploy without the Ignored Build Step. Anything it cannot judge refuses
 too. A manual run (`workflow_dispatch`) is judged the same way and only on `{{DEFAULT_BRANCH}}`.
 Exit codes: 0 deploy, 1 refused, 2 cannot judge, 4 the adoption merge (the guard was not installed
 before it: it deploys nothing, as expected).
@@ -384,7 +402,17 @@ after review — also how the first production deployment after the adoption is 
 What is not covered: the workflow files and `vercel.json` run from the pushed commit (GitHub and
 Vercel read them there) — the agent's token has no `workflow` permission and both are gate
 machinery, but a direct push by the owner is not stopped; a deploy made outside these pipelines; the
-gates (above). Follow-ups: an identity of its own for the agent (a GitHub App) with GitHub Pro rulesets
+gates (above). **A renamed deploy workflow** has no successful run under its new name, so its first
+run trusts `before` and commits refused before the rename are not judged again: only the owner can
+rename a workflow (the agent has no `workflow` permission), and sets the reset variable when doing so.
+**A manual run on another branch**: `workflow_dispatch` runs the workflow file of the ref it is
+dispatched on, so an older branch whose deploy workflow predates the guard can deploy unguarded with
+any token that has Actions write; the fix is deploy credentials bound to the default branch and to the
+deploy workflow (Workload Identity Federation with conditions on `assertion.ref` and
+`job_workflow_ref`), or deleting such branches. **Vercel's clone is shallow** (10 commits): the
+`ignoreCommand` deepens it with the read-only token before checking that the last production
+deployment is on the first-parent line; if that fetch fails, production builds are skipped (fail
+closed) — check it on the first production build. Follow-ups: an identity of its own for the agent (a GitHub App) with GitHub Pro rulesets
 on `{{DEFAULT_BRANCH}}`; deploy credentials (Workload Identity Federation) bound to `{{DEFAULT_BRANCH}}`.
 <!-- sdd:endif -->
 

@@ -1417,23 +1417,26 @@ def undone_later(repo: str, commit: str, later) -> bool:
 
 
 def deploy_guard(api, repo: str, slug: str, sha: str, before=None, last_deployed=None, paths=None, ref=None,
-                 fetch: bool = True, token=None, server_url=None, attempts: int = 3, delay: float = 5.0):
+                 fetch: bool = True, token=None, server_url=None, attempts: int = 3, delay: float = 5.0,
+                 target=None):
     """(exit code, reason) of the deploy guard for the commit `sha` of the default branch.
 
     `before`: the default branch before the push (the push event's `before`); `last_deployed`: the
     commit the target last deployed — the guard judges every first-parent commit after it (after
     `before` when None). Neither → `before` is read from the repository activity. `ref`: the ref a
-    manual run was started on (must be the default branch). Any failure to judge refuses.
+    manual run was started on (must be the default branch). `target`: a target of the trusted commit's
+    .sdd/deployment.yaml — only the commits that change its trigger paths are judged (`paths` does the
+    same, and also skips when none changed). Any failure to judge refuses.
     """
     try:
         return _deploy_guard(api, repo, slug, sha, before, last_deployed, paths, ref, fetch, token, server_url,
-                             attempts, delay)
+                             attempts, delay, target)
     except Exception as exc:  # fail closed, with the reason in the deploy log
         return GUARD_CANNOT_JUDGE, f"cannot judge {str(sha)[:7]}: {exc}"
 
 
 def _deploy_guard(api, repo, slug, sha, before, last_deployed, paths, ref, fetch, token, server_url, attempts,
-                  delay):
+                  delay, target):
     if not SHA.match(sha or ""):
         return GUARD_CANNOT_JUDGE, f"cannot judge: {sha!r} is not a full commit sha"
     short = sha[:7]
@@ -1467,17 +1470,32 @@ def _deploy_guard(api, repo, slug, sha, before, last_deployed, paths, ref, fetch
     start = last_deployed or before
     if not is_ancestor(repo, start, sha):
         return GUARD_REFUSED, (f"refused {short}: the last deployed commit {start[:7]} is not in its history "
-                               f"({default_branch} was rewritten); the owner reviews and deploys it by hand")
+                               f"({default_branch} was rewritten); the owner reviews and sets the reset variable")
+    if start not in git(repo, "rev-list", "--first-parent", sha).split():
+        return GUARD_REFUSED, (f"refused {short}: the last deployed commit {start[:7]} is not on its first-parent "
+                               f"line (a commit of a merged branch, not of {default_branch}): it is not trusted")
+    scope = paths
+    if target is not None:
+        scope, problem = target_scope(repo, start, target)
+        if problem:
+            return GUARD_CANNOT_JUDGE, f"cannot judge {short}: {problem}"
     commits = git(repo, "rev-list", "--first-parent", "--reverse", f"{start}..{sha}").split()
     if not commits:
         return GUARD_DEPLOY, f"deploy {short}: it is the last deployed commit"
-    if len(commits) > CHAIN_MAX:
-        return GUARD_REFUSED, (f"refused {short}: {len(commits)} commits since the last deployed {start[:7]}, "
-                               f"more than {CHAIN_MAX}; the owner reviews and deploys by hand")
     if paths is not None:
         changed = [entry.path for entry in diff_entries(repo, start, sha)]
         if not any(filter_includes(paths, path) for path in changed):
             return GUARD_NOTHING, f"skip {short}: nothing changed under {' '.join(paths)} since {start[:7]}"
+    if scope is not None:
+        commits = [commit for commit in commits
+                   if any(filter_includes(scope, entry.path) for entry in diff_entries(repo, f"{commit}^1", commit))]
+    outside = len(git(repo, "rev-list", "--first-parent", f"{start}..{sha}").split()) - len(commits)
+    note = f"; {outside} commit(s) since {start[:7]} outside the target's paths, not judged" if outside else ""
+    if not commits:
+        return GUARD_DEPLOY, f"deploy {short}: no commit since {start[:7]} changes the target's paths{note}"
+    if len(commits) > CHAIN_MAX:
+        return GUARD_REFUSED, (f"refused {short}: {len(commits)} commits since the last deployed {start[:7]}, "
+                               f"more than {CHAIN_MAX}; the owner reviews and sets the reset variable")
     verdicts = [(commit, *judge_commit(api, repo, slug, default_branch, commit, fetcher, attempts, delay))
                 for commit in commits]
     for index, (commit, code, reason) in enumerate(verdicts):
@@ -1487,11 +1505,27 @@ def _deploy_guard(api, repo, slug, sha, before, last_deployed, paths, ref, fetch
             continue
         word = {GUARD_REFUSED: "refused", GUARD_CANNOT_JUDGE: "cannot judge", GUARD_ADOPTION: "adoption"}[code]
         if commit == sha:
-            return code, f"{word} {short}: {reason}"
+            return code, f"{word} {short}: {reason}{note}"
         return code, (f"{word} {short}: {commit[:7]}, merged since the last deployed {start[:7]}, is not "
-                      f"deployable: {reason}")
+                      f"deployable: {reason}{note}")
     return GUARD_DEPLOY, f"deploy {short}: {verdicts[-1][2]}" + (
-        f" (and {len(commits) - 1} earlier commit(s) since {start[:7]})" if len(commits) > 1 else "")
+        f" (and {len(commits) - 1} earlier commit(s) since {start[:7]})" if len(commits) > 1 else "") + note
+
+
+def target_scope(repo: str, trusted: str, name: str):
+    """(trigger paths or None for every push, problem) of a deploy target, read from the TRUSTED
+    commit's .sdd/deployment.yaml (never the pushed one's)."""
+    text = show_file(repo, trusted, f".sdd/{DEPLOYMENT_FILE}")
+    if text is None:
+        return None, f"no .sdd/{DEPLOYMENT_FILE} at the trusted commit {trusted[:7]}"
+    profile, errors, _ = load_deployment(text)
+    if profile is None:
+        return None, f".sdd/{DEPLOYMENT_FILE} at {trusted[:7]} is invalid ({errors[0]})"
+    for item in profile.get("targets") or []:
+        if item["name"] == name:
+            trigger = item["trigger"]
+            return (None if trigger.get("every_push") else list(trigger["paths"])), None
+    return None, f"no target {name!r} in .sdd/{DEPLOYMENT_FILE} at {trusted[:7]}"
 
 
 # --------------------------------------------------------------------------------------------
@@ -1563,6 +1597,8 @@ def main(argv=None) -> int:
     guard_parser.add_argument("--last-deployed",
                               help="the commit the target last deployed: every first-parent commit after it is judged")
     guard_parser.add_argument("--ref", help="the ref a manual run (workflow_dispatch) was started on")
+    guard_parser.add_argument("--target", help="the deploy target (.sdd/deployment.yaml of the trusted commit): only "
+                                               "the commits that change its trigger paths are judged")
     guard_parser.add_argument("--paths", nargs="+",
                               help="deploy only when a path matching these globs changed since the last deployed "
                                    "commit (exit 3 otherwise)")
@@ -1584,7 +1620,7 @@ def main(argv=None) -> int:
         else:
             code, reason = deploy_guard(RestGitHub(token), args.directory, args.repo, args.sha, before=args.before,
                                         last_deployed=args.last_deployed, paths=args.paths, ref=args.ref,
-                                        fetch=not args.no_fetch, token=token)
+                                        fetch=not args.no_fetch, token=token, target=args.target)
         reason = printable(reason)
         if args.verdict_file:
             with open(args.verdict_file, "w", encoding="utf-8") as handle:

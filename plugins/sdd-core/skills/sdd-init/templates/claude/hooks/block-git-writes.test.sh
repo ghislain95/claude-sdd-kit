@@ -532,6 +532,7 @@ tg 0 "$d" "gh pr merge 26 --merge $MH"
 d=$(fx deploy-refused)
 fxset "$d" "$P_REFUSED" '[{"number":40,"state":"open","title":"Deploy refused: abc1234 on main"}]'
 tg 2 "$d" "gh pr merge 26 --merge $MH" 'refused deploy is not resolved (#40'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'revert it exactly through a pull request, or have the owner set the reset variable (OPENSPEC_GUIDE §8)'
 d=$(fx deploy-refused-page-2)
 fxset "$d" "$P_REFUSED" '[]
 [{"number":41,"state":"open"}]'

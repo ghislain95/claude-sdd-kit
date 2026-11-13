@@ -779,7 +779,7 @@ verify_merge() {
   others=$(printf '%s' "$out" | jq -rs \
     'if all(.[]; type == "array") then add // [] | [.[] | "#\(.number)"] | join(" ") else error("not a list") end' 2>/dev/null) \
     || fail_closed "the open deploy refusals"
-  [ -z "$others" ] || block "a refused deploy is not resolved ($others carries the $DEPLOY_REFUSED_LABEL label): the owner reverts or merges properly what was refused and closes the issue; no agent merge until then"
+  [ -z "$others" ] || block "a refused deploy is not resolved ($others carries the $DEPLOY_REFUSED_LABEL label): revert it exactly through a pull request, or have the owner set the reset variable (OPENSPEC_GUIDE §8), then close the issue; no agent merge until then"
 }
 
 # A command that merges a pull request does nothing else that writes: the merge is verified against
