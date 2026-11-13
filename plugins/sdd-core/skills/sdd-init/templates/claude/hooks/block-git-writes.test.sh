@@ -15,19 +15,21 @@ mkdir -p "$TMP/hook"
 cp "$SRC" "$(dirname "$SRC")/block-git-writes.pl" "$TMP/hook/"
 H="$TMP/hook/block-git-writes.sh"
 
-# --- Stub gh: `gh repo view …` answers the file `repo-view`, `gh pr list …` the file `pr-list`,
-# `gh api <path>` the file named after
-# the path ('/', '?', '&', '=' turned into '_'); `<file>.exit` makes that call fail with its code; a
-# missing file is a 404. Every call is logged with its directory in calls.log.
+# --- Stub gh. It accepts exactly the calls the merge route makes, and nothing else:
+# `gh repo view --json nameWithOwner,defaultBranchRef` answers the file `repo-view`; `gh api <path>`
+# and `gh api --paginate <path>` answer the file named after the path ('/', '?', '&', '=' turned
+# into '_'); a list of issues is only answered paginated. `<file>.exit` makes that call fail with its code, `<file>.sleep` delays it (seconds); a
+# missing file is a 404, any other argv an error. Every call is logged with its directory in calls.log.
 mkdir -p "$TMP/gh-stub"
 cat > "$TMP/gh-stub/gh" <<'STUB'
 #!/bin/bash
 d=${GH_FIXTURES:?}
 printf '%s|%s\n' "$PWD" "$*" >> "$d/calls.log"
-if [ "$1 $2" = "repo view" ]; then key=repo-view
-elif [ "$1 $2" = "pr list" ]; then key=pr-list
-elif [ "$1" = api ]; then key=$(printf '%s' "$2" | tr '/?&=' '____')
+if [ "$#" = 4 ] && [ "$*" = "repo view --json nameWithOwner,defaultBranchRef" ]; then key=repo-view
+elif [ "$#" = 2 ] && [ "$1" = api ] && [ "${2#*/issues?}" = "$2" ]; then key=$(printf '%s' "$2" | tr '/?&=' '____')
+elif [ "$#" = 3 ] && [ "$1 $2" = "api --paginate" ]; then key=$(printf '%s' "$3" | tr '/?&=' '____')
 else echo "stub gh: unexpected call: $*" >&2; exit 1; fi
+[ -f "$d/$key.sleep" ] && sleep "$(cat "$d/$key.sleep")"
 if [ -f "$d/$key.exit" ]; then echo "stub gh: simulated failure" >&2; exit "$(cat "$d/$key.exit")"; fi
 [ -f "$d/$key" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
 cat "$d/$key"
@@ -39,21 +41,28 @@ HEAD_SHA=1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a
 OLD_SHA=0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
 BASE_SHA=b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
 NEW_BASE_SHA=e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4
+# The head the agent names, as the merge route requires.
+MH="--match-head-commit $HEAD_SHA"
 P_PR=repos/o/r/pulls/26
-P_STATUS="repos/o/r/commits/$HEAD_SHA/status?per_page=100"
+P_STATUS="repos/o/r/commits/$HEAD_SHA/statuses?per_page=100"
 P_BRANCH=repos/o/r/branches/main
-P_INFLIGHT=pr-list
-# fxset <fixture dir> <path> <answer>; fxfail <fixture dir> <path> [exit code]
+P_INFLIGHT='repos/o/r/issues?labels=in-flight&state=all&per_page=100'
+BOT='github-actions[bot]'
+# fxset <fixture dir> <path> <answer>; fxfail <fixture dir> <path> [exit code]; fxsleep <dir> <path> <s>
 fxset() { printf '%s' "$3" > "$1/$(key "$2")"; }
 fxfail() { printf '%s' "${3:-1}" > "$1/$(key "$2").exit"; }
-# status_json <state> <description> [sha]: the combined status of a commit.
+fxsleep() { printf '%s' "$3" > "$1/$(key "$2").sleep"; }
+# status_json <state> <description> [sha] [creator]: the statuses of a commit, newest first: the
+# merge-conditions one, then an older merge-conditions and a review-harness status.
 status_json() {
-  jq -cn --arg s "$1" --arg d "$2" --arg h "${3:-$HEAD_SHA}" \
-    '{sha:$h, statuses:[{context:"review-harness",state:"success",description:"ok"},{context:"merge-conditions",state:$s,description:$d}]}'
+  jq -cn --arg s "$1" --arg d "$2" --arg h "${3:-$HEAD_SHA}" --arg c "${4:-$BOT}" \
+    '[{context:"merge-conditions",state:$s,description:$d,creator:{login:$c},url:("https://api.github.com/repos/o/r/statuses/"+$h)},
+      {context:"review-harness",state:"success",description:"ok",creator:{login:"owner"},url:("https://api.github.com/repos/o/r/statuses/"+$h)},
+      {context:"merge-conditions",state:"pending",description:"re-judging",creator:{login:"github-actions[bot]"},url:("https://api.github.com/repos/o/r/statuses/"+$h)}]'
 }
 # fx <name>: a fixture directory where pull request #26 of o/r is mergeable by the agent: open, into
-# the default branch main, merge-conditions success with no gate on its head, judged against main's
-# current head, no pull request in flight.
+# the default branch main, merge-conditions success with no gate on its head, posted by the
+# workflow, judged against main's current head, no pull request in flight.
 fx() {
   local d="$TMP/fx/$1"
   mkdir -p "$d"
@@ -75,6 +84,8 @@ git -C "$MAIN" branch feat/other
 git -C "$MAIN" remote add origin https://example.invalid/o/r.git
 git -C "$MAIN" update-ref refs/remotes/origin/feat/rem HEAD
 git -C "$MAIN" update-ref refs/remotes/origin/main HEAD
+git -C "$MAIN" config branch.main.remote origin
+git -C "$MAIN" config branch.main.merge refs/heads/main
 mkdir -p "$MAIN/sub" "$MAIN/sub dir"
 git init -q -b feat/x "$FEAT"
 git -C "$FEAT" remote add origin https://example.invalid/o/r.git
@@ -198,7 +209,7 @@ for c in 'git commit -m x' 'git commit -F msg.txt' 'git commit;' 'x && git commi
          'git merge origin/main' 'git merge main' 'git revert HEAD' 'git cherry-pick abc123' \
          'git pull --ff-only' 'git pull --ff-only origin feat/x' 'git branch -m chore/new-name' \
          'git branch -d x; ls -f' 'git reset HEAD file' 'git reset' 'git reset HEAD -- src/a.ts' \
-         'gh pr merge 26 --merge' 'gh pr merge 26 --merge --delete-branch' 'gh pr view 26' \
+         "gh pr merge 26 --merge $MH" "gh pr merge 26 --merge --delete-branch $MH" 'gh pr view 26' \
          "cd $FEAT && git commit -m x" 'cd sub && git status' \
          'git status' 'git log --oneline' 'git diff' 'grep "git commit" f' 'git checkout -b feat' \
          'git checkout main' 'git restore src/a.ts' 'git stash list' 'git branch -d merged' \
@@ -224,8 +235,8 @@ for c in 'git pull --ff-only' 'git pull --ff-only origin main' 'git switch -c fe
          'git switch feat/other && git commit -m x' "git -C $FEAT commit -m x" "cd $FEAT && git commit -m x" \
          "git -C $FEAT push -u origin HEAD" \
          'git status' 'git fetch origin' 'git branch -d feat/merged' 'git push origin --delete feat/merged' \
-         'git merge --abort' 'git merge-base main HEAD' 'git log --merges' 'gh pr merge 26 --merge --delete-branch' \
-         'gh pr merge 26 --merge --subject "feat(x): y -s --squash (#26)"' 'git switch feat/rem && git commit -m x' \
+         'git merge --abort' 'git merge-base main HEAD' 'git log --merges' "gh pr merge 26 --merge --delete-branch $MH" \
+         "gh pr merge 26 --merge --subject \"feat(x): y -s --squash (#26)\" $MH" 'git switch feat/rem && git commit -m x' \
          "(cd $FEAT && git commit -m x)" 'git reset' 'git reset HEAD' 'git reset HEAD a.txt' 'git reset feat/other -- a.txt' \
          'git switch -c feat/new 2>&1 && git add a.ts && git commit -m x' \
          'git switch -c feat/new &>/dev/null && git commit -m x' 'git switch -c feat/new >/dev/null 2>&1 && git commit -m x'; do
@@ -274,6 +285,84 @@ for c in \
   'git worktree add ../wt feat/other' 'git branch -m feat/z' 'git commit -m "no -n here"'; do
   t 0 "$FEAT" "$c"
 done
+# --- Review of lot 3b: the merge-conditions status is never written by the agent; gh api read on its
+# own span (a GET with fields is a read); refspecs that write main without naming it; hooks skipped
+# through config, HUSKY or an abbreviated option; quoted subcommands; subtree and send-pack.
+for c in \
+  "gh api -X POST repos/o/r/statuses/$HEAD_SHA -f state=success -f context=merge-conditions -f description=\"gates: none; base b2b2b2b\"" \
+  "gh api repos/o/r/statuses/$HEAD_SHA -F context=merge-conditions -f state=success" \
+  "gh api repos/o/r/statuses/$HEAD_SHA --raw-field context=merge-conditions -f state=success" \
+  "gh api \"repos/{owner}/{repo}/statuses/$HEAD_SHA\" --field 'context=merge-conditions' -f state=success" \
+  "gh api repos/o/r/statuses/$HEAD_SHA -f context=\"merge-conditions\" -f state=success" \
+  "gh api -X POST repos/o/r/statuses/$HEAD_SHA --input status.json" \
+  'gh api --method put repos/o/r/git/refs/heads/main' 'gh api -X patch repos/o/r/contents/README.md' \
+  "gh api graphql -f query='mutation { mergeBranch(input: {}) { clientMutationId } }'" \
+  "gh api graphql -f query='mutation { createCommitOnBranch(input: {}) { clientMutationId } }'" \
+  "gh api graphql -f query='mutation { updateRef(input: {}) { clientMutationId } }'" \
+  "gh api graphql -f query='mutation { updateRefs(input: {}) { clientMutationId } }'" \
+  'gh api graphql --input q.json' 'gh api graphql -F query=@q.graphql' \
+  'git push origin "refs/heads/*:refs/heads/*"' "git push origin 'refs/heads/*'" 'git push origin :' \
+  'git push origin feat/x:"$B"' 'git push origin --delete "$B"' 'git push origin "feat/*"' \
+  'git push --forc origin feat/x' 'git push --for origin feat/x' 'git push --f origin feat/x' 'git push --force- origin feat/x' \
+  'git push --force-w origin feat/x' 'git push --mi origin feat/x' 'git push --al origin feat/x' 'git push --pru origin feat/x' \
+  'git -c core.hooksPath=/dev/null commit -m x' 'git -c core.hookspath=x push origin feat/x' \
+  'git --config-env=core.hooksPath=X commit -m x' 'HUSKY=0 git commit -m x' 'export HUSKY=0; git push origin feat/x' \
+  'HUSKY_SKIP_HOOKS=1 git commit -m x' \
+  'git commit --no-verif -m x' 'git commit --no-veri -m x' 'git push --no-verif origin feat/x' \
+  'git commit --amen' 'git commit --am -m x' 'git reset --har HEAD' 'git reset --so HEAD' 'git reset --mixe HEAD' \
+  'git clean --forc' 'git clean --f -d' 'git checkout --forc feat/other' 'git switch --disc feat/other' \
+  'git switch --force-c feat/other' 'git add --al' 'git add --upd' 'git branch --forc x HEAD' \
+  'git "push" origin main' "git 'push' origin main" 'gh pr "merge" 26 --merge' \
+  'git subtree push --prefix=dist origin main' 'git subtree push -P dist origin main' \
+  'git subtree push --prefix dist origin refs/heads/main' 'git subtree push --prefix=dist origin "$B"' \
+  'git send-pack origin HEAD:refs/heads/main' 'git send-pack origin feat/x' \
+  'git switch --track origin/main && git commit -m x' 'git worktree add -B feat/y ../wt origin/main' \
+  'git branch -uorigin/main'; do
+  t 2 "$FEAT" "$c"
+done
+for c in \
+  'gh api repos/o/r/contents/README.md --method GET -f ref=feat/x' 'gh api -X GET repos/o/r/git/refs/heads/main -f x=1' \
+  'gh api --method get repos/o/r/contents/README.md -f ref=feat/x' \
+  'gh api repos/o/r/pulls/12 --jq .title && git commit -m "explain pulls/12/merge"' \
+  "gh api -X POST repos/o/r/statuses/$HEAD_SHA -f state=success -f context=opsx-verify -f description=\"ok\"" \
+  "gh api repos/o/r/commits/$HEAD_SHA/statuses --jq '.[] | select(.context == \"merge-conditions\")'" \
+  'HUSKY=0 git status' 'HUSKY=0 npm test' 'git push --follow-tags origin feat/x' 'git push --fol origin feat/x' \
+  'git push --progress origin feat/x' 'git push --atomic origin feat/x' 'git push origin feat/x:feat/y' \
+  'git -c core.editor=vim commit -m x' 'git -c user.name=x commit -m x' 'git commit -m "--no-verif is gone"' \
+  'git subtree push --prefix=dist origin feat/dist' 'git subtree split --prefix=dist -b feat/dist' \
+  'git subtree add --prefix=vendor origin feat/x' 'git "status"' "git 'log' --oneline" \
+  'GH_REPO=o/r gh pr view 26' 'gh pr checks 26' 'gh pr edit 26 --add-label in-flight'; do
+  t 0 "$FEAT" "$c"
+done
+# Copying a branch copies its upstream: main tracks origin/main here.
+t 2 "$MAIN" 'git branch -c main feat/y'
+t 2 "$MAIN" 'git branch -c feat/y'
+t 2 "$MAIN" 'git branch --copy main feat/y'
+t 0 "$MAIN" 'git branch -c feat/other feat/z'
+t 0 "$MAIN" 'git branch -m feat/other feat/z'
+t 2 "$MAIN" 'git branch --track=inherit feat/y main'
+t 2 "$MAIN" 'git switch -c feat/y --track=inherit main'
+t 0 "$MAIN" 'git branch --track=inherit feat/y feat/other'
+git -C "$MAIN" branch feat/tracks-main
+git -C "$MAIN" config branch.feat/tracks-main.remote origin
+git -C "$MAIN" config branch.feat/tracks-main.merge refs/heads/main
+t 2 "$MAIN" 'git branch --track=inherit feat/y feat/tracks-main'
+t 2 "$MAIN" 'git branch -c feat/tracks-main feat/y'
+t 2 "$MAIN" 'git subtree add --prefix=vendor origin feat/x'
+t 2 "$MAIN" "git 'commit' -m x"
+git init -q -b main "$TMP/simple-autosetup"
+git -C "$TMP/simple-autosetup" remote add origin https://example.invalid/o/r.git
+git -C "$TMP/simple-autosetup" config branch.autoSetupMerge simple
+t 0 "$TMP/simple-autosetup" 'git switch -c feat/y origin/main'
+t 2 "$TMP/simple-autosetup" 'git switch -c feat/y --track origin/main'
+git init -q -b main "$TMP/inherit-autosetup"
+git -C "$TMP/inherit-autosetup" config branch.autoSetupMerge inherit
+git -C "$TMP/inherit-autosetup" config branch.main.remote origin
+git -C "$TMP/inherit-autosetup" config branch.main.merge refs/heads/main
+t 2 "$TMP/inherit-autosetup" 'git switch -c feat/y'
+t 0 "$TMP/inherit-autosetup" 'git switch --orphan feat/y'
+t 0 "$TMP/inherit-autosetup" 'git switch -c feat/y --no-track'
+
 # On main, restoring main's own upstream is not tracking a protected branch from a change branch.
 t 0 "$MAIN" 'git branch -u origin/main'
 t 0 "$MAIN" 'git branch --set-upstream-to=origin/main main'
@@ -289,9 +378,10 @@ git -C "$TMP/always-autosetup" config branch.autoSetupMerge always
 t 2 "$TMP/always-autosetup" 'git switch -c feat/y main'
 t 0 "$TMP/always-autosetup" 'git switch -c feat/y feat/other'
 
-# --- The merge route (dev-factory 7.3): `gh pr merge <n> --<MERGE_METHOD>`, allowed only when GitHub
-# itself reports merge-conditions success with no gate on the head commit, judged against the
-# default branch's current head, with no other pull request in flight. Default method: merge.
+# --- The merge route (dev-factory 7.3): `gh pr merge <n> --<MERGE_METHOD> --match-head-commit <sha>`,
+# allowed only when GitHub itself reports merge-conditions success with no gate on that head commit,
+# posted by its workflow, judged against the default branch's current head, with no other pull
+# request in flight, and the command does nothing else that writes. Default method: merge.
 # tg <expected> <fixture dir> <command> [text the block message must contain] [cwd] [hook]
 tg() {
   local expected="$1" fixtures="$2" cmd="$3" text="${4:-}" dir="${5:-$FEAT}" hook="${6:-$H}" got
@@ -300,112 +390,195 @@ tg() {
     | GH_FIXTURES="$fixtures" "$hook" 2>"$TMP/stderr"
   got=$?
   if [ "$got" != "$expected" ]; then
-    echo "FAIL merge route [${fixtures##*/}] (got $got, want $expected): $cmd"; fail=1
+    echo "FAIL merge route [${fixtures##*/}] (got $got, want $expected): $cmd — $(head -c 300 "$TMP/stderr")"; fail=1
   elif [ -n "$text" ] && ! grep -qF -- "$text" "$TMP/stderr"; then
     echo "FAIL merge route [${fixtures##*/}] (message lacks '$text'): $cmd — $(cat "$TMP/stderr")"; fail=1
   fi
 }
 d=$(fx green)
-tg 0 "$d" 'gh pr merge 26 --merge'
-tg 0 "$d" 'gh pr merge 26 --merge --delete-branch'
-tg 0 "$d" 'gh pr merge 26 -m -d'
-tg 0 "$d" 'gh pr merge 26 --merge --subject "feat(x): y (#26)" --body "z"'
-tg 0 "$d" "gh pr merge 26 --merge --match-head-commit $HEAD_SHA"
-tg 0 "$d" 'gh pr merge 26 --merge && git switch main && git pull --ff-only'
-tg 2 "$d" "gh pr merge 26 --merge --match-head-commit $OLD_SHA" 'head'
-tg 2 "$d" 'gh pr merge 26 --squash' 'gh pr merge <n> --merge'
-tg 2 "$d" 'gh pr merge 26 -s' 'gh pr merge <n> --merge'
-tg 2 "$d" 'gh pr merge 26 --rebase' 'gh pr merge <n> --merge'
-tg 2 "$d" 'gh pr merge 26' 'gh pr merge <n> --merge'
-tg 2 "$d" 'gh pr merge 26 --merge --squash' 'gh pr merge <n> --merge'
-tg 2 "$d" 'gh pr merge 26 --merge --admin' 'never bypass'
-tg 2 "$d" 'gh pr merge 26 --merge --auto' 'never bypass'
-tg 2 "$d" 'gh pr merge --merge' 'number'
-tg 2 "$d" 'gh pr merge https://github.com/o/r/pull/26 --merge' 'number'
-tg 2 "$d" 'gh pr merge 26 27 --merge' 'number'
-tg 2 "$d" 'gh pr merge 26 --merge --repo o/r' 'repo'
-tg 2 "$d" 'gh pr merge 26 --merge -R o/r' 'repo'
-tg 2 "$d" 'GH_REPO=o/x gh pr merge 26 --merge' 'repo'
-tg 2 "$d" 'gh pr merge 26 --merge --body-file=b.md --unknown' 'unknown'
+tg 0 "$d" "gh pr merge 26 --merge $MH"
+tg 0 "$d" "gh pr merge 26 --merge --delete-branch $MH"
+tg 0 "$d" "gh pr merge 26 -m -d $MH"
+tg 0 "$d" "gh pr merge 26 --merge --subject \"feat(x): y (#26)\" --body \"z\" $MH"
+tg 0 "$d" "gh pr merge 26 --merge --match-head-commit=$HEAD_SHA"
+tg 0 "$d" "gh pr 'merge' 26 \"--merge\" $MH"
+tg 0 "$d" "gh pr view 26 --json headRefOid && gh pr merge 26 --merge $MH && gh pr edit 26 --add-label in-flight && git status"
+tg 2 "$d" 'gh pr merge 26 --merge' 'match-head-commit <sha>'
+tg 2 "$d" "gh pr merge 26 --merge --match-head-commit ${HEAD_SHA:0:12}" 'in full'
+tg 2 "$d" 'gh pr merge 26 --merge --match-head-commit "$SHA"' 'match-head-commit <sha>'
+tg 2 "$d" "gh pr merge 26 --merge --match-head-commit $OLD_SHA" 'is not the head'
+tg 2 "$d" "gh pr merge 26 --merge --match-head-commit=$OLD_SHA" 'is not the head'
+tg 2 "$d" "gh pr merge 26 --squash $MH" 'gh pr merge <n> --merge'
+tg 2 "$d" "gh pr merge 26 -s $MH" 'gh pr merge <n> --merge'
+tg 2 "$d" "gh pr merge 26 --rebase $MH" 'gh pr merge <n> --merge'
+tg 2 "$d" "gh pr merge 26 $MH" 'gh pr merge <n> --merge'
+tg 2 "$d" "gh pr merge 26 --merge --squash $MH" 'gh pr merge <n> --merge'
+tg 2 "$d" "gh pr merge 26 --merge --admin $MH" 'never bypass'
+tg 2 "$d" "gh pr merge 26 --merge --auto $MH" 'never bypass'
+tg 2 "$d" "gh pr merge --merge $MH" 'number'
+tg 2 "$d" "gh pr merge https://github.com/o/r/pull/26 --merge $MH" 'number'
+tg 2 "$d" "gh pr merge 26 27 --merge $MH" 'number'
+# The repository flag anywhere, the repository or host from the environment.
+for c in "gh pr merge 26 --merge --repo o/r $MH" "gh pr merge 26 --merge -R o/r $MH" "gh pr merge 26 --merge -Ro/r $MH" \
+         "gh pr merge 26 --merge --repo=o/r $MH" "gh -R o/r pr merge 26 --merge $MH" "gh pr --repo=o/r merge 26 --merge $MH" \
+         "gh pr -R o/r merge 26 --merge $MH"; do
+  tg 2 "$d" "$c" 'without --repo'
+done
+for c in "GH_REPO=o/x gh pr merge 26 --merge $MH" "GH_HOST=x.example gh pr merge 26 --merge $MH" \
+         "export GH_REPO=o/other && gh pr merge 26 --merge $MH" "env GH_HOST=x gh pr merge 26 --merge $MH"; do
+  tg 2 "$d" "$c" 'GH_REPO or GH_HOST'
+done
+tg 2 "$d" "gh -R o/r pr merge 26 --admin --merge $MH"
+tg 2 "$d" "gh pr --admin merge 26 --merge $MH" 'never bypass'
+tg 2 "$d" "gh pr --auto merge 26 --merge $MH" 'never bypass'
+tg 2 "$d" "gh pr --repo=o/r merge 26 --squash --auto $MH"
+tg 2 "$d" "gh pr merge 26 --merge --body-file=b.md --unknown $MH" 'unknown'
 tg 0 "$d" 'gh pr merge 26 --disable-auto'
-tg 2 "$d" 'gh pr merge 26 --disable-auto --merge' 'disable-auto'
-tg 2 "$d" "cd $TMP/nowhere && gh pr merge 26 --merge" 'directory'
+tg 2 "$d" "gh pr merge 26 --disable-auto --merge $MH" 'disable-auto'
+tg 2 "$d" "cd $TMP/nowhere && gh pr merge 26 --merge $MH" 'directory'
+# The merge runs alone: nothing else in the command writes (verified against GitHub before it runs).
+for c in "git add a.ts && git commit -m fix && git push origin feat/x && gh pr merge 26 --merge $MH" \
+         "git push origin feat/x; gh pr merge 26 --merge $MH" "gh pr merge 26 --merge $MH && git push origin feat/x" \
+         "gh pr merge 26 --merge $MH && git switch main && git pull --ff-only" \
+         "gh api -X POST repos/o/r/statuses/$HEAD_SHA -f state=success -f context=opsx-verify && gh pr merge 26 --merge $MH" \
+         "gh pr edit 26 --add-label in-flight && gh pr merge 26 --merge $MH" \
+         "gh pr merge 26 --merge $MH && gh pr edit 25 --add-label in-flight" \
+         "gh pr merge 26 --merge $MH && gh pr edit 26 --remove-label in-flight" \
+         "gh pr merge 26 --merge $MH && gh pr close 25"; do
+  tg 2 "$d" "$c" 'runs alone'
+done
+tg 2 "$d" "gh pr merge 25 --merge $MH && gh pr merge 26 --merge $MH" 'one gh pr merge per command'
+tg 0 "$d" "gh pr merge 26 --merge $MH && gh api repos/o/r/pulls/26 --jq .merged && git log --oneline -1"
 # The queries run in the directory where the command really runs.
 d=$(fx where)
-tg 0 "$d" "cd $MAIN && gh pr merge 26 --merge"
+tg 0 "$d" "cd $MAIN && gh pr merge 26 --merge $MH"
+n=$((n+1))
 if ! grep -qF "$MAIN|repo view" "$d/calls.log"; then echo "FAIL merge route: gh repo view did not run in $MAIN"; fail=1; fi
 # Gates: the owner merges.
 for g in 'gates: intent' 'gates: irreversible' 'gates: intent+irreversible' 'gates: framing' 'gates: unclassified' \
          'gates: invalid'; do
   d=$(fx "gate-${g#gates: }")
   fxset "$d" "$P_STATUS" "$(status_json success "$g; base ${BASE_SHA:0:7}")"
-  tg 2 "$d" 'gh pr merge 26 --merge' 'hand the merge to the owner'
+  tg 2 "$d" "gh pr merge 26 --merge $MH" 'hand the merge to the owner'
 done
 d=$(fx gate-none-reasons)
 fxset "$d" "$P_STATUS" "$(status_json success "gates: none - x; base ${BASE_SHA:0:7}")"
-tg 2 "$d" 'gh pr merge 26 --merge'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'hand the merge to the owner'
+# The status must come from the workflow: one posted with a person's token is not the check.
+d=$(fx forged)
+fxset "$d" "$P_STATUS" "$(status_json success "gates: none; base ${BASE_SHA:0:7}" "$HEAD_SHA" agent-owner)"
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'not by its workflow'
+d=$(fx no-creator)
+fxset "$d" "$P_STATUS" "$(status_json success "gates: none; base ${BASE_SHA:0:7}" | jq -c '.[0] |= del(.creator)')"
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'not by its workflow'
+# The newest merge-conditions status counts, not an older green one.
+d=$(fx newest-pending)
+fxset "$d" "$P_STATUS" "$(status_json success "gates: none; base ${BASE_SHA:0:7}" | jq -c '[.[0] | .state = "pending" | .description = "re-judging"] + .')"
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'pending'
 # Stale verdict: the default branch moved since the check judged.
 d=$(fx stale)
 fxset "$d" "$P_BRANCH" "{\"name\":\"main\",\"commit\":{\"sha\":\"$NEW_BASE_SHA\"}}"
-tg 2 "$d" 'gh pr merge 26 --merge' 'wait for the re-judgement'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'wait for the re-judgement'
 d=$(fx no-base)
 fxset "$d" "$P_STATUS" "$(status_json success 'gates: none')"
-tg 2 "$d" 'gh pr merge 26 --merge' 'base'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'base'
 # A status on an older commit than the head does not count.
 d=$(fx older)
-fxset "$d" "$P_STATUS" "{\"sha\":\"$HEAD_SHA\",\"statuses\":[]}"
-fxset "$d" "repos/o/r/commits/$OLD_SHA/status?per_page=100" "$(status_json success "gates: none; base ${BASE_SHA:0:7}" "$OLD_SHA")"
-tg 2 "$d" 'gh pr merge 26 --merge' 'no merge-conditions status'
+fxset "$d" "$P_STATUS" '[]'
+fxset "$d" "repos/o/r/commits/$OLD_SHA/statuses?per_page=100" "$(status_json success "gates: none; base ${BASE_SHA:0:7}" "$OLD_SHA")"
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'no merge-conditions status'
 d=$(fx no-status)
-fxset "$d" "$P_STATUS" "{\"sha\":\"$HEAD_SHA\",\"statuses\":[{\"context\":\"review-harness\",\"state\":\"success\",\"description\":\"ok\"}]}"
-tg 2 "$d" 'gh pr merge 26 --merge' 'no merge-conditions status'
+fxset "$d" "$P_STATUS" "$(status_json success x | jq -c 'map(select(.context != "merge-conditions"))')"
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'no merge-conditions status'
 d=$(fx status-other-sha)
 fxset "$d" "$P_STATUS" "$(status_json success "gates: none; base ${BASE_SHA:0:7}" "$OLD_SHA")"
-tg 2 "$d" 'gh pr merge 26 --merge'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
 # Not green.
 d=$(fx pending); fxset "$d" "$P_STATUS" "$(status_json pending "gates: none - ci.yml running; base ${BASE_SHA:0:7}")"
-tg 2 "$d" 'gh pr merge 26 --merge' 'wait'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'wait'
 d=$(fx failure); fxset "$d" "$P_STATUS" "$(status_json failure "gates: none - ci.yml failure; base ${BASE_SHA:0:7}")"
-tg 2 "$d" 'gh pr merge 26 --merge' 'failure'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'failure'
 d=$(fx error); fxset "$d" "$P_STATUS" "$(status_json error 'merge-conditions could not judge: x')"
-tg 2 "$d" 'gh pr merge 26 --merge' 'error'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'error'
 # The pull request itself.
 d=$(fx other-base)
 fxset "$d" "$P_PR" "{\"number\":26,\"state\":\"open\",\"head\":{\"sha\":\"$HEAD_SHA\"},\"base\":{\"ref\":\"develop\"}}"
-tg 2 "$d" 'gh pr merge 26 --merge' 'default branch'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'default branch'
 d=$(fx closed)
 fxset "$d" "$P_PR" "{\"number\":26,\"state\":\"closed\",\"head\":{\"sha\":\"$HEAD_SHA\"},\"base\":{\"ref\":\"main\"}}"
-tg 2 "$d" 'gh pr merge 26 --merge' 'not open'
-# In flight: another pull request carries the label, whatever its state.
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'not open'
+# In flight: another pull request carries the label, whatever its state; issues that are not pull
+# requests do not count; every page is read.
 d=$(fx in-flight)
-fxset "$d" "$P_INFLIGHT" '[{"number":12}]'
-tg 2 "$d" 'gh pr merge 26 --merge' 'another change is in flight'
+fxset "$d" "$P_INFLIGHT" '[{"number":12,"state":"closed","pull_request":{"merged_at":"2026-11-13T10:00:00Z"}}]'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'another change is in flight'
 d=$(fx in-flight-open)
-fxset "$d" "$P_INFLIGHT" '[{"number":30},{"number":26}]'
-tg 2 "$d" 'gh pr merge 26 --merge' '#30'
+fxset "$d" "$P_INFLIGHT" '[{"number":30,"state":"open","pull_request":{}},{"number":26,"state":"open","pull_request":{}}]'
+tg 2 "$d" "gh pr merge 26 --merge $MH" '#30'
+d=$(fx in-flight-page-2)
+fxset "$d" "$P_INFLIGHT" '[{"number":5,"state":"open"}]
+[{"number":31,"state":"closed","pull_request":{}}]'
+tg 2 "$d" "gh pr merge 26 --merge $MH" '#31'
 d=$(fx in-flight-self)
-fxset "$d" "$P_INFLIGHT" '[{"number":26}]'
-tg 0 "$d" 'gh pr merge 26 --merge'
+fxset "$d" "$P_INFLIGHT" '[{"number":26,"state":"open","pull_request":{}}]'
+tg 0 "$d" "gh pr merge 26 --merge $MH"
+d=$(fx in-flight-issue)
+fxset "$d" "$P_INFLIGHT" '[{"number":5,"state":"open"}]'
+tg 0 "$d" "gh pr merge 26 --merge $MH"
 # GitHub unreachable or answering garbage: fail closed.
 for p in repo-view "$P_PR" "$P_STATUS" "$P_BRANCH" "$P_INFLIGHT"; do
   d=$(fx "fails-$(key "$p")"); fxfail "$d" "$p"
-  tg 2 "$d" 'gh pr merge 26 --merge' 'fail closed'
+  tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
   d=$(fx "garbage-$(key "$p")"); fxset "$d" "$p" 'not json {'
-  tg 2 "$d" 'gh pr merge 26 --merge' 'fail closed'
+  tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
 done
 d=$(fx empty-pr); fxset "$d" "$P_PR" '{"number":26,"state":"open"}'
-tg 2 "$d" 'gh pr merge 26 --merge' 'fail closed'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
 d=$(fx bad-repo); fxset "$d" repo-view '{"nameWithOwner":"o/r; x","defaultBranchRef":{"name":"main"}}'
-tg 2 "$d" 'gh pr merge 26 --merge' 'fail closed'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
+d=$(fx bad-default); fxset "$d" repo-view '{"nameWithOwner":"o/r","defaultBranchRef":{"name":"main; x"}}'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
+d=$(fx no-default); fxset "$d" repo-view '{"nameWithOwner":"o/r"}'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
 d=$(fx exit-4); fxfail "$d" "$P_STATUS" 4
-tg 2 "$d" 'gh pr merge 26 --merge' 'fail closed'
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed'
+# One deadline for all the queries together, tried on copies of the hook with a short one: a slow
+# answer is killed and the merge blocked; two answers that each fit but not together are blocked too.
+mkdir -p "$TMP/deadline-2" "$TMP/deadline-3"
+for k in 2 3; do
+  sed -E "s/^GH_DEADLINE=[0-9]+\$/GH_DEADLINE=$k/" "$SRC" > "$TMP/deadline-$k/block-git-writes.sh"
+  chmod +x "$TMP/deadline-$k/block-git-writes.sh"
+  cp "$(dirname "$SRC")/block-git-writes.pl" "$TMP/deadline-$k/"
+done
+d=$(fx slow); fxsleep "$d" "$P_PR" 6
+start=$SECONDS
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed' "$FEAT" "$TMP/deadline-2/block-git-writes.sh"
+n=$((n+1))
+[ $((SECONDS - start)) -le 4 ] || { echo "FAIL merge route: a slow GitHub answer was not cut at the deadline ($((SECONDS - start)) s)"; fail=1; }
+d=$(fx slow-sum); fxsleep "$d" "$P_PR" 2; fxsleep "$d" "$P_STATUS" 2
+tg 2 "$d" "gh pr merge 26 --merge $MH" 'fail closed' "$FEAT" "$TMP/deadline-3/block-git-writes.sh"
+d=$(fx slow-one); fxsleep "$d" "$P_PR" 1
+tg 0 "$d" "gh pr merge 26 --merge $MH" '' "$FEAT" "$TMP/deadline-3/block-git-writes.sh"
+# The deadline stays well under the hook's timeout in settings.json: a hook that times out does not
+# block the call.
+n=$((n+1))
+deadline=$(sed -nE 's/^GH_DEADLINE=([0-9]+)$/\1/p' "$SRC")
+settings="$(dirname "$SRC")/../settings.json"
+if [ -f "$settings" ]; then
+  timeout=$(jq -r '[.hooks.PreToolUse[]?.hooks[]? | select(.command | test("block-git-writes")) | .timeout] | first // 60' "$settings")
+  if [ -z "$deadline" ] || [ $((deadline * 2)) -gt "$timeout" ]; then
+    echo "FAIL merge route: GH_DEADLINE ($deadline s) is not well under the hook timeout ($timeout s) in settings.json"; fail=1
+  fi
+elif [ -z "$deadline" ] || [ "$deadline" -gt 40 ]; then
+  echo "FAIL merge route: GH_DEADLINE ($deadline s) above 40 s"; fail=1
+fi
 # gh missing: only the tools the hook needs are on PATH.
 mkdir -p "$TMP/no-gh"
 for b in jq perl git grep sed tr cat dirname cut tail head env; do
   p=$(command -v "$b") && ln -s "$p" "$TMP/no-gh/$b"
 done
 n=$((n+1))
-printf '%s' "$(jq -n --arg c 'gh pr merge 26 --merge' --arg d "$FEAT" '{cwd:$d, tool_input:{command:$c}}')" \
+printf '%s' "$(jq -n --arg c "gh pr merge 26 --merge $MH" --arg d "$FEAT" '{cwd:$d, tool_input:{command:$c}}')" \
   | PATH="$TMP/no-gh" "$H" 2>"$TMP/stderr"
 got=$?
 if [ "$got" != 2 ] || ! grep -qF 'gh not found' "$TMP/stderr"; then echo "FAIL merge route without gh (got $got): $(cat "$TMP/stderr")"; fail=1; fi
@@ -431,22 +604,22 @@ tc 2 'PROTECTED_BRANCHES=main|develop' "$FEAT" 'git switch -c feat/y origin/deve
 tc 2 'ALLOW_PUSH=0' "$FEAT" 'git push -u origin feat/x'
 tc 0 'ALLOW_PUSH=0' "$FEAT" 'git commit -m x'
 tc 0 'ALLOW_PUSH=1' "$FEAT" 'git push -u origin feat/x'
-tc 0 'MERGE_METHOD=squash' "$FEAT" 'gh pr merge 26 --squash'
-tc 0 'MERGE_METHOD=squash' "$FEAT" 'gh pr merge 26 -s --delete-branch'
-tc 2 'MERGE_METHOD=squash' "$FEAT" 'gh pr merge 26 --merge'
-tc 2 'MERGE_METHOD=squash' "$FEAT" 'gh pr merge 26 --rebase'
-tc 0 'MERGE_METHOD=merge' "$FEAT" 'gh pr merge 26 --merge'
-tc 2 'MERGE_METHOD=merge' "$FEAT" 'gh pr merge 26 --squash'
-tc 0 'MERGE_METHOD="squash"  # one commit per change' "$FEAT" 'gh pr merge 26 --squash'
-tc 2 'MERGE_METHOD=rebase' "$FEAT" 'gh pr merge 26 --rebase'
-tc 2 'MERGE_METHOD=rebase' "$FEAT" 'gh pr merge 26 --merge'
-tc 2 'MERGE_METHOD=fast' "$FEAT" 'gh pr merge 26 --merge'
+tc 0 'MERGE_METHOD=squash' "$FEAT" "gh pr merge 26 --squash $MH"
+tc 0 'MERGE_METHOD=squash' "$FEAT" "gh pr merge 26 -s --delete-branch $MH"
+tc 2 'MERGE_METHOD=squash' "$FEAT" "gh pr merge 26 --merge $MH"
+tc 2 'MERGE_METHOD=squash' "$FEAT" "gh pr merge 26 --rebase $MH"
+tc 0 'MERGE_METHOD=merge' "$FEAT" "gh pr merge 26 --merge $MH"
+tc 2 'MERGE_METHOD=merge' "$FEAT" "gh pr merge 26 --squash $MH"
+tc 0 'MERGE_METHOD="squash"  # one commit per change' "$FEAT" "gh pr merge 26 --squash $MH"
+tc 2 'MERGE_METHOD=rebase' "$FEAT" "gh pr merge 26 --rebase $MH"
+tc 2 'MERGE_METHOD=rebase' "$FEAT" "gh pr merge 26 --merge $MH"
+tc 2 'MERGE_METHOD=fast' "$FEAT" "gh pr merge 26 --merge $MH"
 d=$(fx gate-squash)
 fxset "$d" "$P_STATUS" "$(status_json success "gates: intent; base ${BASE_SHA:0:7}")"
-GH_FIXTURES=$d tc 2 'MERGE_METHOD=squash' "$FEAT" 'gh pr merge 26 --squash'
+GH_FIXTURES=$d tc 2 'MERGE_METHOD=squash' "$FEAT" "gh pr merge 26 --squash $MH"
 # A former setting no longer changes anything: the route decides, per pull request.
-tc 0 'ALLOW_PR_MERGE=0' "$FEAT" 'gh pr merge 26 --merge'
-GH_FIXTURES=$d tc 2 'ALLOW_PR_MERGE=1' "$FEAT" 'gh pr merge 26 --merge'
+tc 0 'ALLOW_PR_MERGE=0' "$FEAT" "gh pr merge 26 --merge $MH"
+GH_FIXTURES=$d tc 2 'ALLOW_PR_MERGE=1' "$FEAT" "gh pr merge 26 --merge $MH"
 for lease in 0 1; do
   tc "$((2 - 2 * lease))" "ALLOW_FORCE_WITH_LEASE=$lease" "$FEAT" 'git push --force-with-lease origin feat/x'
   tc "$((2 - 2 * lease))" "ALLOW_FORCE_WITH_LEASE=$lease" "$FEAT" 'git push --force-with-lease=feat/x:abc123 origin feat/x'

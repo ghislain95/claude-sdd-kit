@@ -125,8 +125,8 @@ pushes and opens the PR. The `merge-conditions` check then says which gates the 
 gate (`intent`: your QA, `irreversible`: your go, `framing`: your approval, `unclassified`: a PR
 outside a change), it gives you the link and stops — **your merge is the QA or the go**.
 
-The hook enforces it: `gh pr merge <n> --<MERGE_METHOD>` is the only merge it lets through, and
-only after asking GitHub itself (see §5). Settings in `.claude/hooks/block-git-writes.conf`:
+The hook enforces it: `gh pr merge <n> --<MERGE_METHOD> --match-head-commit <sha>`, alone in its
+command, is the only merge it lets through, and only after asking GitHub itself (see §5). Settings in `.claude/hooks/block-git-writes.conf`:
 `MERGE_METHOD` (`squash` or `merge`), `ALLOW_PUSH` (`0` for a project without a remote the agent may
 push to: then you push and merge), `ALLOW_FORCE_WITH_LEASE`. Projects set up with the former
 `autonomy-*` levels: `--refresh` migrates the file (§6).
@@ -199,16 +199,22 @@ shell reads it, and blocks in particular:
 - history rewriting (`rebase`, `commit --amend`, `reset` to a revision, `update-ref`…);
 - sweeping stages (`git add -A`, `git add .`, `commit -a`) — the agent stages explicit paths;
 - anything that throws work away (`reset --hard`, `clean -f`, `checkout .`, `stash drop`, `branch -D`);
-- `--no-verify`, `commit -n`;
-- merging through `gh api` (REST merge endpoint, `/merges`, ref or contents writes, GraphQL merge
-  and auto-merge mutations), and every `gh pr merge` but the merge route below.
+- skipped hooks: `--no-verify`, `commit -n`, `-c core.hooksPath=…`, `HUSKY=0`; blocked long
+  options are also caught abbreviated (`--no-verif`, `--forc`), quoted subcommands unquoted
+  (`git "push"`); wildcard or `:` refspecs, `subtree push` to main, `send-pack`;
+- through `gh api`, each call read on its own: merging (REST merge endpoint, `/merges`, GraphQL merge
+  and auto-merge mutations), ref or contents writes, posting the `merge-conditions` status; and
+  every `gh pr merge` but the merge route below.
 
-**The merge route.** `gh pr merge <n> --<MERGE_METHOD>` (plus `--delete-branch`, `--subject`,
-`--body`, `--match-head-commit`; never `--admin`, `--auto`, `--repo`) is let through only after the
-hook has asked GitHub, from the directory where the command runs, never trusting the command line:
-the PR is open and targets the default branch; the latest `merge-conditions` status of **its head
-commit** is `success` with `gates: none`; the `base <sha7>` it was judged against is the current
-head of the default branch; no other PR carries the `in-flight` label. Otherwise it says why: an
+**The merge route.** `gh pr merge <n> --<MERGE_METHOD> --match-head-commit <sha>` (plus
+`--delete-branch`, `--subject`, `--body`; never `--admin`, `--auto`, `--repo`, `GH_REPO`), in a call
+of its own — only read-only commands around it, and `gh pr edit <n> --add-label in-flight` after it —
+is let through only after the hook has asked GitHub, from the directory where the command runs,
+never trusting the command line, within one 40-second deadline: the PR is open, targets the default
+branch, and `<sha>` is its head (GitHub refuses the merge if the head moves); the newest
+`merge-conditions` status of **that commit** was posted by its workflow (`github-actions[bot]`) and is
+`success` with `gates: none`; the `base <sha7>` it was judged against is the current head of the
+default branch; no other PR carries the `in-flight` label. Otherwise it says why: an
 open gate → hand the merge to the owner; the default branch moved → wait for the re-judgement;
 pending → wait; another change in flight → wait until it is verified. If `gh` is missing or a query
 fails, the merge is blocked (fail closed). The route is client-side: it stops mistakes, not an agent

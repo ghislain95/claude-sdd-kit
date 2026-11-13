@@ -171,7 +171,8 @@ the choices the code cannot settle:
    `.claude/hooks/` (`chmod +x` the `.sh` files), fill in the `.conf` (protected branch, `ALLOW_PUSH`
    from option `github`, `MERGE_METHOD`, `ALLOW_FORCE_WITH_LEASE=0`). `templates/claude/settings.json` → `.claude/settings.json`: the `PreToolUse` hook plus a
    curated `permissions.allow` of safe commands (read-only git, `openspec`, `gh run`/`gh pr`
-   read-and-create, graphify queries, the hook test suite). **Add the module checks**: one
+   read-and-create, graphify queries, the hook test suite); the hook carries `"timeout": 120`, well
+   above the merge route's 40-second deadline (a hook that times out does not block the call). **Add the module checks**: one
    `Bash(<command>)` entry per command of `{{CHECK_COMMANDS}}` / each `{{MODULE_CHECK}}`, written
    exactly as run (plus a `Bash(<command> *)` form when the command takes arguments, e.g. a test
    filter) — without them, every check run asks for permission and working "all the way" stalls.

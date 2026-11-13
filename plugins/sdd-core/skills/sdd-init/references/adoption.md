@@ -71,9 +71,22 @@ levels above this skill). Markers written before the autonomy levels were remove
    - **`ALLOW_FORCE_WITH_LEASE=0` added** when missing.
    - `ALLOW_PUSH` and `PROTECTED_BRANCHES` keep their values (a former `autonomy-commit` project keeps
      `ALLOW_PUSH=0`: its agent still never pushes).
-   Then the hook's test suite again. A branch that tracks the default branch now blocks
-   `git switch -c <b> origin/<default>`: if the project's docs create branches that way, add
-   `--no-track` where they do (local change, listed in the report).
+   - `.claude/settings.json`: the guardrail's hook entry gets `"timeout": 120` (the suite checks
+     that the merge route's deadline stays well under it).
+   Then the hook's test suite again.
+   **The project's own docs are rewritten too**, as local changes listed in the report and the
+   commit body, wherever they give the agent a command the new hook refuses:
+   - a branch or worktree created from the default branch without `--no-track`
+     (`git switch -c <b> origin/<default>`, `git checkout -b …`, `git worktree add -b <b> <dir>
+     origin/<default>`, often followed by `git branch --unset-upstream`) → the same command with
+     `--no-track`, the `--unset-upstream` step dropped;
+   - an agent merge (`gh pr merge …`) → the merge route, `gh pr merge <n> --<method>
+     --match-head-commit <sha>`, alone in its call; "only the owner merges" rules → per pull
+     request, as in `CONTRIBUTING.md` §2;
+   - a status posted with `--input` → `-f` fields.
+   This applies to `CLAUDE.md`, `AGENTS.md`, `docs/CONTRIBUTING.md` and any doc or skill of the
+   project that carries such a command (search them for `origin/<default>`, `worktree add`,
+   `gh pr merge`).
 5. Never touch: `openspec/specs/`, `openspec/changes/`, the reverse-documentation (`ARCHITECTURE.md`,
    module docs, glossary, ADRs, roadmap) — it belongs to the project.
 6. Phase 5 of `SKILL.md` (checks), then one commit `chore(sdd-init): refresh workflow to <version>`
