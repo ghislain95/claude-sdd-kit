@@ -111,22 +111,25 @@ Open Claude Code **at the root of the repository** (clean git tree preferably), 
 |---|---|---|
 | 0. Pre-flight | Checks the tools, creates the `chore/sdd-init` branch, spots files that already exist | Confirm `superpowers` is installed |
 | 1. Reverse-documentation | One sub-agent per module reads the code: stack, CI commands, real architecture, conventions, vocabulary. Runs the tests (baseline). Writes `docs/ARCHITECTURE.md`, the module docs, the glossary, reverse-documented ADRs, the roadmap | **Gate 1**: read the summary (observed rules, points to confirm) and correct it |
-| 2. Choices | A single round of questions | Git autonomy level, language, options, agent model |
+| 2. Choices | A single round of questions | Language, options, agent model, merge method (when the repo allows both squash and merge) |
 | 3. Rules | `openspec init`, `CLAUDE.md`, `AGENTS.md`, agents (one dev per module), `openspec/config.yaml`, process docs | — |
 | 4. Guardrails | Git hook + its config, `.claude/settings.json`, CI workflows, `.gitignore` | — |
 | 5. Checks | No template marker left, `openspec validate --all`, hook tests, review of the setup by the new `code-reviewer` agent | — |
-| 6. Delivery | Two commits (`docs(sdd-init)`, `chore(sdd-init)`), PR depending on the autonomy level, final report | Read the report, create your `.claude/settings.local.json` |
+| 6. Delivery | Two commits (`docs(sdd-init)`, `chore(sdd-init)`), PR (with a GitHub remote), final report | Read the report, create your `.claude/settings.local.json`, merge the setup PR |
 
-### Git autonomy levels
+### Who merges
 
-| Level | The agent… | For whom |
-|---|---|---|
-| `autonomy-commit` | commits on the change branch; you push and open the PR | getting started, repo without GitHub |
-| `autonomy-pr` | commits, pushes, opens the PR; **a human merges** | teams (recommended to start with) |
-| `autonomy-merge` | also merges, but only with green CI and a review with no BLOCKER/MAJOR | experienced solo developer |
+There is no project-wide autonomy level any more: **each pull request decides**. The agent commits,
+pushes and opens the PR. The `merge-conditions` check then says which gates the PR opens: with
+`gates: none` (and green CI, review harness and verify), the agent merges it itself; with an open
+gate (`intent`: your QA, `irreversible`: your go, `framing`: your approval, `unclassified`: a PR
+outside a change), it gives you the link and stops — **your merge is the QA or the go**.
 
-The level is enforced mechanically by `.claude/hooks/block-git-writes.conf` (`ALLOW_PUSH`,
-`ALLOW_PR_MERGE`) — you can change it at any time by editing that file.
+The hook enforces it: `gh pr merge <n> --<MERGE_METHOD> --match-head-commit <sha>`, alone in its
+command, is the only merge it lets through, and only after asking GitHub itself (see §5). Settings in `.claude/hooks/block-git-writes.conf`:
+`MERGE_METHOD` (`squash` or `merge`), `ALLOW_PUSH` (`0` for a project without a remote the agent may
+push to: then you push and merge), `ALLOW_FORCE_WITH_LEASE`. Projects set up with the former
+`autonomy-*` levels: `--refresh` migrates the file (§6).
 
 ### After the setup
 
@@ -189,17 +192,41 @@ The `PreToolUse` hook reads every Bash command from the agent (sub-agents includ
 shell reads it, and blocks in particular:
 
 - commit / merge / revert / cherry-pick on a protected branch; any push of a protected branch;
-  push without an explicit remote and branch; force-push;
-- history rewriting (`rebase`, `commit --amend`, `reset` to a revision…);
+  push without an explicit remote and branch; force-push (`--force-with-lease` only when
+  `ALLOW_FORCE_WITH_LEASE=1`, never to a protected branch);
+- a branch set to track a protected branch (`branch -u origin/main`, `--track`, or
+  `git switch -c x origin/main` without `--no-track`);
+- history rewriting (`rebase`, `commit --amend`, `reset` to a revision, `update-ref`…);
 - sweeping stages (`git add -A`, `git add .`, `commit -a`) — the agent stages explicit paths;
 - anything that throws work away (`reset --hard`, `clean -f`, `checkout .`, `stash drop`, `branch -D`);
-- `--no-verify`; `gh pr merge` other than `--merge` (and depending on `ALLOW_PR_MERGE`).
+- skipped hooks: `--no-verify`, `commit -n`, `-c core.hooksPath=…`, `HUSKY=0`; blocked long
+  options are also caught abbreviated (`--no-verif`, `--forc`), quoted subcommands unquoted
+  (`git "push"`); wildcard or `:` refspecs, `subtree push` to main, `send-pack`;
+- through `gh api`, each call read on its own: merging (REST merge endpoint, `/merges`, GraphQL merge
+  and auto-merge mutations), ref or contents writes, posting the `merge-conditions` status; and
+  every `gh pr merge` but the merge route below.
+
+**The merge route.** `gh pr merge <n> --<MERGE_METHOD> --match-head-commit <sha>` (plus
+`--delete-branch`, `--subject`, `--body`; never `--admin`, `--auto`, `--repo`, `GH_REPO`), in a call
+of its own — only read-only commands around it, and `gh pr edit <n> --add-label in-flight` after it —
+is let through only after the hook has asked GitHub, from the directory where the command runs,
+never trusting the command line, within one 40-second deadline: the PR is open, targets the default
+branch, and `<sha>` is its head (GitHub refuses the merge if the head moves); the newest
+`merge-conditions` status of **that commit** was posted by its workflow (`github-actions[bot]`) and is
+`success` with `gates: none`; the `base <sha7>` it was judged against is the current head of the
+default branch; no other PR carries the `in-flight` label. Otherwise it says why: an
+open gate → hand the merge to the owner; the default branch moved → wait for the re-judgement;
+pending → wait; another change in flight → wait until it is verified. If `gh` is missing or a query
+fails, the merge is blocked (fail closed). The route is client-side: it stops mistakes, not an agent
+that overwrites the status first; the server-side barrier is the deploy guard (coming), which
+recomputes the verdict instead of reading it.
 
 Known false positives: a `$(…)` that really runs a forbidden git command, even inside a commit
-message → use `git commit -F <file>`; `mkdir x && cd x && git commit` → two calls.
+message → use `git commit -F <file>`; `mkdir x && cd x && git commit` → two calls; a branch created
+from `origin/main` → add `--no-track`.
 
-Tests: `bash .claude/hooks/block-git-writes.test.sh` (also run in CI by `tooling.yml`).
-It is a guard against mistakes, not a sandbox.
+Tests: `bash .claude/hooks/block-git-writes.test.sh` (also run in CI by `tooling.yml`; GitHub is
+stubbed, no token needed). It is a guard against mistakes, not a sandbox.
 
 ---
 

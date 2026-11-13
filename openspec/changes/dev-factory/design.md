@@ -147,6 +147,24 @@ The kit's perl reader is kept (most cases, per-project `.conf`, already in the k
   the repository carries the `in-flight` label (D8).
 - geomni's Python guardrail and its `pr.yml` job are removed by geomni's adoption.
 
+Settled while implementing (group 7, then its review): the merge command names the head it
+checked (`--match-head-commit <sha>`, required, equal to the PR's head on GitHub, so a push racing
+the merge makes GitHub refuse it) and runs alone (one merge per command, only read-only git/gh
+commands around it, `gh pr edit <n> --add-label in-flight` after it). The hook queries, within one
+40-second deadline (the hook's timeout in `settings.json` is 120 s), `gh repo view` (repository and
+default branch, resolved where the command runs), `pulls/<n>` (open, base = default branch, head
+SHA), `commits/<sha>/statuses` (the newest `merge-conditions` entry, which must have been posted by
+`github-actions[bot]`), `branches/<default>` (the `base <sha7>` of the description must be its head)
+and `issues?labels=in-flight&state=all`, paginated (the search API behind `gh pr list` lags; this
+needs Issues read on the token); "in flight" is the label on any other pull request whatever its
+state. The agent can no longer post `merge-conditions` (blocked in `gh api`), and `-R`/`--repo`
+anywhere, `GH_REPO`/`GH_HOST` anywhere in the command are refused so the checked repository is the
+merged one; every unknown option is refused; `gh pr merge <n> --disable-auto` alone stays allowed. Tracking a protected branch includes git's
+implicit tracking (`branch.autoSetupMerge`): `git switch -c x origin/main` needs `--no-track`.
+`gh api` writes to `git/refs/heads/<protected>` and to `contents/`, `/merges`, and the GraphQL
+mutations that merge or write a branch are blocked too. Without a `.conf` line, `MERGE_METHOD`
+defaults to `merge`, the method the former hook enforced.
+
 Alternative rejected: keep the Python version — fewer cases, no `.conf`, not in the kit's CI.
 
 ### D7 — The deploy guard

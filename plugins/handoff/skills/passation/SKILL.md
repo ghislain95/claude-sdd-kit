@@ -78,12 +78,12 @@ Fixed structure. An empty section is written "—"; it is not removed.
   (back end, front end, tests, docs) **without asking for a GO between slices**; only stop for a
   real decision or a design gap.
 - `code-reviewer` review of the uncommitted diff before `/opsx:verify`.
-- Git: per `docs/CONTRIBUTING.md` §2 and the autonomy level in `CLAUDE.md` (commit only, up to the
-  PR, or up to the merge) — `<type>/<change-id>` branch, never on the protected branch, Conventional
-  Commits with subject + body, scope = change id. Order: review → `/opsx:verify` → implementation
-  commit(s) → `/opsx:archive` + post-archive → archive commit → PR → merge (if allowed: green CI +
-  review with no BLOCKER/MAJOR). The `block-git-writes.sh` hook enforces the mechanical part; the
-  merge conditions are down to the agent's discipline.
+- Git: per `docs/CONTRIBUTING.md` §2 and `CLAUDE.md` — `<type>/<change-id>` branch, never on the
+  protected branch, Conventional Commits with subject + body, scope = change id. Order: review →
+  `/opsx:verify` → implementation commit(s) → `/opsx:archive` + post-archive → archive commit → PR →
+  merge: by the agent only through the verified route (`merge-conditions` green with `gates: none`),
+  by the owner when a gate is open. The `block-git-writes.sh` hook enforces the mechanical part,
+  the merge route included (it checks `merge-conditions` on GitHub before letting the merge run).
 - <Environment pitfalls found during the session (runtime version, environment variable,
   port…) — e.g. "the build tool needs a specific runtime version, the default shell has another one".>
 - If `graphify-out/` exists: refresh the graph (`graphify check-update .`) before relying on it.

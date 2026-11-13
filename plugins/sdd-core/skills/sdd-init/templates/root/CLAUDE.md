@@ -50,14 +50,12 @@ review-harness          → every review angle on the commits, adversarially ver
 /opsx:verify            → implementation vs specs check; status opsx-verify
 /opsx:archive           → deltas merged into openspec/specs/
 post-archive            → roadmap + doc impact<!-- sdd:if graphify --> + graph<!-- sdd:endif --> (mandatory), commit chore(<id>)
-<!-- sdd:if autonomy-merge -->
-PR + merge (agent)      → green CI + review with no BLOCKER/MAJOR; otherwise ask
+<!-- sdd:if github -->
+PR (agent)              → pushed and opened by the agent
+merge                   → the agent, only when merge-conditions is green with gates: none (the hook checks it on GitHub); an open gate → the owner merges
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-pr -->
-PR (agent)              → opened by the agent; a human reviews and merges
-<!-- sdd:endif -->
-<!-- sdd:if autonomy-commit -->
-<!-- sdd:if github -->push + PR (human)       → the agent stops at the commit on the branch<!-- sdd:endif --><!-- sdd:if !github -->merge (human)           → the agent stops at the commit on the branch<!-- sdd:endif -->
+<!-- sdd:if !github -->
+merge (human)           → the agent stops at the commit on the branch
 <!-- sdd:endif -->
 ```
 
@@ -123,27 +121,21 @@ PR (agent)              → opened by the agent; a human reviews and merges
 
 - `openspec validate --all` if `openspec/` was touched.
 - Update the docs if the public API changed.
-<!-- sdd:if autonomy-merge -->
-- **Git: the agent commits, pushes, opens and merges the PR itself**, following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
+<!-- sdd:if github -->
+- **Git: the agent commits, pushes and opens the PR; it merges only through the verified route, and a PR with an open gate is merged by the owner**, following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-pr -->
-- **Git: the agent commits, pushes and opens the PR; merging stays human**, following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
+<!-- sdd:if !github -->
+- **Git: the agent commits on the change branch; push and merge stay human** — every `git push` is blocked by the hook (`ALLOW_PUSH=0`) — following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-commit -->
-- **Git: the agent commits on the change branch; push and PR stay human** — the agent never pushes, every `git push` is blocked by the hook — following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
-<!-- sdd:endif -->
-  - branch `<type>/<change-id>` (outside a change: `<type>/<scope>-<desc>`); `{{DEFAULT_BRANCH}}` only moves through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->, hotfixes included;
+  - branch `<type>/<change-id>`, or `<type>/<change-id>/<lot>` when a change ships in several pull requests (outside a change: `<type>/<scope>-<desc>`); `{{DEFAULT_BRANCH}}` only moves through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->, hotfixes included;
   - Conventional Commits in {{CODE_LANG}}, scope = change id (otherwise the module), subject + body, no Claude attribution (no `Co-Authored-By`, no "Generated with Claude Code");
-  - order of a change: framing commit `docs(<id>)` → apply with commit(s) `feat|fix(<id>)` per task group → review harness (fix commits) → verify → archive + post-archive → commit `chore(<id>)`<!-- sdd:if !autonomy-commit --> → push → PR<!-- sdd:endif --><!-- sdd:if autonomy-merge --> → merge<!-- sdd:endif -->;
+  - order of a change: framing commit `docs(<id>)` → apply with commit(s) `feat|fix(<id>)` per task group → review harness (fix commits) → verify → archive + post-archive → commit `chore(<id>)`<!-- sdd:if github --> → push → PR → merge (verified route, or the owner when a gate is open)<!-- sdd:endif -->;
   - `git add` with explicit paths; module tests green before a code commit (the review harness then reviews the commits, before the pull request); never `--amend`, `rebase`, `reset` to a revision or force-push; long message → `git commit -F <file>`;
   - parallel sessions on the same checkout share one working tree: before validating or committing, `git status` to spot files that are not yours and name the paths to commit explicitly; run full test suites in a throwaway clone while other sessions are active; prefer one session per worktree;
-<!-- sdd:if autonomy-merge -->
-  - merge with `gh pr merge <n> --merge` only if CI is green and the review (review harness for a change, `code-reviewer` otherwise) has no open BLOCKER/MAJOR (and, for a change, verify OK + archive done); otherwise stop and ask; branch deleted after merge.
+<!-- sdd:if github -->
+  - merge only with `gh pr merge <n> --<MERGE_METHOD> --match-head-commit <sha>` (the method in `.claude/hooks/block-git-writes.conf`, `<sha>` the full head commit from `gh pr view <n> --json headRefOid`), in a call of its own (read-only commands around it, `gh pr edit <n> --add-label in-flight` after it), and only when `merge-conditions` on the PR's head commit is `success` with `gates: none`, judged against the current head of `{{DEFAULT_BRANCH}}`, and no other PR carries the `in-flight` label — the hook asks GitHub before letting the command run, and accepts the status only from its workflow. Never post `merge-conditions` yourself. `gates: intent`/`irreversible`/`framing`/`unclassified` → give the PR link and stop: the owner merges (their merge is the QA or the go). Never the REST merge endpoint, `--auto` or `--admin`. Branch deleted after merge.
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-pr -->
-  - never `gh pr merge`: the agent gives the PR link and the CI status, then stops.
-<!-- sdd:endif -->
-- The hook `.claude/hooks/block-git-writes.sh` enforces the mechanical part for an agent (sub-agents included), following the real directory of each command (`cd`, `git -C`, an earlier `switch` in the command; unresolved = protected branch): commit/merge on `{{DEFAULT_BRANCH}}`, push of `{{DEFAULT_BRANCH}}` or without an explicit branch, force-push, `pull` without `--ff-only`, history rewriting, mass staging, commands that throw work away, `--no-verify`, `gh pr merge` other than `--merge`<!-- sdd:if !autonomy-merge --> — and here every `gh pr merge` (`ALLOW_PR_MERGE=0`)<!-- sdd:endif --><!-- sdd:if autonomy-commit -->, as well as every `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif -->. Settings: `.claude/hooks/block-git-writes.conf`. Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci --> (also in CI, `tooling.yml`)<!-- sdd:endif -->. Do not work around it.
+- The hook `.claude/hooks/block-git-writes.sh` enforces the mechanical part for an agent (sub-agents included), following the real directory of each command (`cd`, `git -C`, an earlier `switch` in the command; unresolved = protected branch): commit/merge on `{{DEFAULT_BRANCH}}`, push of `{{DEFAULT_BRANCH}}` or without an explicit branch, force-push, `pull` without `--ff-only`, history rewriting, mass staging, commands that throw work away, `--no-verify`, a branch set to track `{{DEFAULT_BRANCH}}`, any merge other than the verified route<!-- sdd:if !github -->, as well as every `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif -->. Settings: `.claude/hooks/block-git-writes.conf`. Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci --> (also in CI, `tooling.yml`)<!-- sdd:endif -->. Do not work around it.
 
 ## 8. Sub-agents — automatic routing
 
@@ -236,7 +228,7 @@ No shared working style is imposed: each developer sets their own (Claude memory
 <!-- sdd:endif -->
 <!-- sdd:if work-style -->
 - **Short, concrete framing**: state the goal first, then **3 questions at most** per round, each with a concrete example (payload, figures, user journey, before/after call) and the recommended answer. What the code or the specs<!-- sdd:if graphify --> (or the graph)<!-- sdd:endif --> can tell is the agent's job: never ask for it.
-- **All the way once the framing is agreed**: chain all the slices (modules, tests, docs) without asking "go?" between them. Adversarial review and honest verification are kept. Stop only for a real decision, a design gap discovered along the way, or a failing merge condition (red CI, open BLOCKER/MAJOR).
+- **All the way once the framing is agreed**: chain all the slices (modules, tests, docs) without asking "go?" between them. Adversarial review and honest verification are kept. Stop only for a real decision, a design gap discovered along the way, or a merge the agent may not make (red CI, open BLOCKER/MAJOR, an open gate: the owner merges).
 - **A single final report** on a large task (full change, several agents), with fixed sections: done / decisions taken / found and fixed / caveats / tests (with figures: N passed, M failed, names) / what I expect from you. No stream of partial messages between agents.
 - **Long agents in the background**: a dev or test agent on a full change → `run_in_background`, announce the agent + reason + approximate duration, move on to something else; never invent its result before the notification. One heavy build/test run at a time on the machine.
 - **Early handoff**: after each merged PR or archived change in a long session, and as soon as the context gets heavy, offer `/handoff:passation <next goal>` rather than chaining. Never start an `/opsx:new` in a loaded context without having offered it.

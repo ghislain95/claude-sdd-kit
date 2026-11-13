@@ -76,8 +76,9 @@ With the agent team (routing: [`CLAUDE.md`](../CLAUDE.md) §8, details: [`AGENTS
    `opsx-verify` on the pushed head, [`CONTRIBUTING.md`](CONTRIBUTING.md) §2).
 5. **Archiving** — implementation commit(s) by the agent on the change branch (Conventional
    Commits, [`CONTRIBUTING.md`](CONTRIBUTING.md) §2), `/opsx:archive`, post-archive (`doc-writer`
-   checks that `docs/` does not contradict the merged specs), commit `chore(<id>)`; finally<!-- sdd:if github --> push, PR and merge<!-- sdd:endif --><!-- sdd:if !github --> a merge by a human<!-- sdd:endif -->
-   according to the autonomy level in [`CONTRIBUTING.md`](CONTRIBUTING.md) §2.
+   checks that `docs/` does not contradict the merged specs), commit `chore(<id>)`; finally<!-- sdd:if github --> push, PR and merge — by the agent through the
+   verified route when `merge-conditions` reports `gates: none`, by the owner when a gate is open<!-- sdd:endif --><!-- sdd:if !github --> a merge by a human<!-- sdd:endif -->
+   ([`CONTRIBUTING.md`](CONTRIBUTING.md) §2).
 
 **Context hygiene**: a fresh context per phase (`/clear`, or `/handoff:passation` then a
 new session) — the artifacts carry the memory.
@@ -214,7 +215,7 @@ classifies a branch the same way:
 | Pull request | Recognised by | Result |
 |---|---|---|
 | framing | only files of `openspec/changes/<id>/`, `classification.yaml` among them | `gates: framing` — the owner's merge approves |
-| change | touches exactly one change folder `openspec/changes/<id>/` (its `tasks.md` at least), from a branch `<type>/<id>`, and `{{DEFAULT_BRANCH}}` holds that change's classification | gates = the classification's open gates + every trigger hit not waived; a hit on a gate declared closed, without a waiver, is **unaccounted** and fails the check; an invalid approved classification gives `gates: invalid` and fails |
+| change | touches exactly one change folder `openspec/changes/<id>/` (its `tasks.md` at least), from a branch `<type>/<id>` (or `<type>/<id>/<lot>` for one pull request of a change delivered in several), and `{{DEFAULT_BRANCH}}` holds that change's classification | gates = the classification's open gates + every trigger hit not waived; a hit on a gate declared closed, without a waiver, is **unaccounted** and fails the check; an invalid approved classification gives `gates: invalid` and fails |
 | archive | moves `openspec/changes/<id>/` into one folder `openspec/changes/archive/YYYY-MM-DD-<id>/` (or `<id>/`) and touches only `openspec/specs/`, `docs/`, `ROADMAP.md`, `BACKLOG.md` | judged on its own diff, normally `gates: none` |
 | unclassified | touches no change folder (hotfix, tooling) — the branch name alone never selects a classification — or its change has no approved classification | `gates: unclassified` — a human merges |
 

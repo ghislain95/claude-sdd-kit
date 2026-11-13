@@ -63,6 +63,8 @@ CLASSIFICATION_TRIGGER = "openspec/changes/**/classification.yaml"
 # An archived change folder: `openspec/changes/archive/YYYY-MM-DD-<change>/` (or `<change>/`).
 ARCHIVE_FOLDER = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
 # Branch suffixes of the framing and archive pull requests: `<type>/<id>-framing[-<n>]`, `<type>/<id>-archive`.
+# A change delivered in several pull requests names each lot `<type>/<id>/<lot>`: the segment after the id
+# is ignored, so it can never be read as another change's id.
 BRANCH_SUFFIX = re.compile(r"-(?:framing(?:-\d+)?|archive)$")
 # Besides the moved change folder, what an archive pull request may touch.
 ARCHIVE_ALLOWED = ("openspec/specs/**", "docs/**", "ROADMAP.md", "BACKLOG.md")
@@ -399,10 +401,11 @@ def _archive_folder_of(path: str, change: str) -> bool:
 
 
 def _branch_candidates(branch):
-    """Change ids a branch `<type>/<id>[-framing[-<n>]|-archive]` may belong to."""
+    """Change ids a branch `<type>/<id>[-framing[-<n>]|-archive][/<lot>]` may belong to."""
     if not branch:
         return []
-    name = branch.split("/", 1)[1] if "/" in branch else branch
+    parts = branch.split("/")
+    name = parts[1] if len(parts) > 1 else parts[0]
     stripped = BRANCH_SUFFIX.sub("", name)
     return [name, stripped] if stripped and stripped != name else [name]
 
