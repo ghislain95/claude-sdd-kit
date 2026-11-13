@@ -226,7 +226,7 @@ classifies a branch the same way:
 | framing | only files of `openspec/changes/<id>/`, `classification.yaml` among them | `gates: framing` — the owner's merge approves |
 | change | touches exactly one change folder `openspec/changes/<id>/` (its `tasks.md` at least), from a branch `<type>/<id>` (or `<type>/<id>/<lot>` for one pull request of a change delivered in several), and `{{DEFAULT_BRANCH}}` holds that change's classification | gates = the classification's open gates + every trigger hit not waived; a hit on a gate declared closed, without a waiver, is **unaccounted** and fails the check; an invalid approved classification gives `gates: invalid` and fails |
 | archive | moves `openspec/changes/<id>/` into one folder `openspec/changes/archive/YYYY-MM-DD-<id>/` (or `<id>/`) and touches only `openspec/specs/`, `docs/`, `ROADMAP.md`, `BACKLOG.md` | judged on its own diff, normally `gates: none` |
-| revert | adds `openspec/changes/<id>/revert.yaml` (§8), from the branch `revert/<id>`, and `{{DEFAULT_BRANCH}}` holds that change's classification | `gates: none` when the diff, `revert.yaml` aside, is the **exact inverse** of the merge commit it names (every file back to the blob and mode it had before, nothing else); `gates: irreversible` when the reverted change had that gate open or the revert touches gate machinery; anything else — a modified, partial or extended revert, another branch, a commit that is not a merge of that change — is an error and fails the check. No `review-harness`/`opsx-verify` needed: the exact inverse is the verification |
+| revert | adds `openspec/changes/<id>/revert.yaml` (§8), from the branch `revert/<id>`, and `{{DEFAULT_BRANCH}}` holds that change's classification | `gates: none` when the merges it lists are merges of the change's own pull requests on `{{DEFAULT_BRANCH}}`'s first-parent line (the newest of them included) and the diff, `revert.yaml` aside, is their **exact inverse** (every file back to the blob and mode it had before the first of them, nothing else); `gates: intent` when the reverted change had that gate open and is not the change in flight (its pull request has no `in-flight` label); `gates: irreversible` when it had that gate open or the revert touches gate machinery; anything else — a modified, partial or extended revert, another branch, a commit off the first-parent line or of another change, an older merge while a newer one exists — is an error and fails the check. No `review-harness`/`opsx-verify` needed: the exact inverse is the verification |
 | unclassified | touches no change folder (hotfix, tooling) — the branch name alone never selects a classification — or its change has no approved classification | `gates: unclassified` — a human merges |
 
 Touching several change folders, or a folder the branch does not name, is an error (the check fails),
@@ -256,13 +256,22 @@ targets:                                   # or, for a project whose merge deplo
       note: "<previous>: gcloud run revisions list --service api --region europe-west1 --limit 2 …"
       unconfirmed: true                    # not proven yet: the owner confirms it
     probes:                                # pass = exit 0 and, when given, `expect` (a regex) found in the output
+      # first: the target serves the merged commit (the image is tagged with the sha it was built from)
+      - command: gcloud run services describe api --region europe-west1 --format 'value(spec.template.spec.containers[0].image)'
+        expect: ':{sha}$'
       - command: curl -fsS https://api.example.com/health
         expect: '"status" *: *"UP"'
   - name: web
     platform: vercel
     trigger: { every_push: true }
-    rollback: { command: "vercel rollback --yes --token $VERCEL_TOKEN" }
-    probes: [ { command: "curl -fsS -o /dev/null https://www.example.com/" } ]
+    rollback:
+      command: vercel rollback --yes --token $VERCEL_TOKEN
+      note: "Rolling back turns off the automatic assignment of the production domain: once a fix is deployed, `vercel promote <its deployment url> --yes` (or `vercel rollback --undo`) turns it back on, then probe the served revision again"
+    probes:
+      # first: production serves the merged commit (the GitHub deployment Vercel reports for the sha)
+      - command: "gh api 'repos/{owner}/{repo}/deployments?sha={sha}&environment=Production' --jq '.[0].id' | xargs -I{} gh api 'repos/{owner}/{repo}/deployments/{}/statuses' --jq '.[0].state'"
+        expect: '^success$'
+      - command: "curl -fsS -o /dev/null https://www.example.com/"
 scheduled_jobs:                            # jobs that run the merged code later
   - name: nightly-etl
     schedule: '0 3 * * * Europe/Paris'
@@ -271,6 +280,9 @@ scheduled_jobs:                            # jobs that run the merged code later
     probe: { command: "gcloud run jobs executions list --job etl --limit 1 --format 'value(status.succeededCount)'", expect: '^1$' }
 ```
 
+- `{sha}` in a probe stands for the merged commit being verified. **The first probe of a target
+  asserts that it serves that commit**: a target that did not deploy the sha (the guard refused it,
+  the build failed, a rollback is still in place) fails the verification like a broken endpoint.
 - Every target has a `trigger`, a `rollback` command and at least one probe; `deploys_nothing: true`
   excludes targets (and so any rollback). `unconfirmed: true` marks a value no file of the repository
   proves (a target, a rollback, a probe, a job): `python3 .sdd/bin/merge_conditions.py validate
@@ -289,10 +301,11 @@ scheduled_jobs:                            # jobs that run the merged code later
 1. **Label** — the agent's merge command ends with `&& gh pr edit <n> --add-label in-flight` (the
    hook allows exactly that, in the same command, after the merge); after an owner merge, or if
    the label edit failed, `gh pr edit <n> --add-label in-flight` alone in the next call. While a pull
-   request carries the label, the hook refuses every other merge, and `concurrency: deploy` keeps two
-   deploys from overlapping.
+   request carries the label, the hook refuses every other merge, and each deploy workflow's
+   `concurrency: deploy-<workflow>` keeps two of its deploys from overlapping.
 2. **Verification window** — for each target whose `trigger` the merged diff hits: wait for its
-   deploy (the guard may refuse it: the deploy-alert issue says why), run its `probes`, then the
+   deploy (the guard may refuse it: the deploy-alert issue says why), run its `probes` — the first
+   one checks that it serves the merged commit —, then the
    change's own post-deploy checks (the last group of `tasks.md`). For each scheduled job whose
    `paths` the diff touches, the window extends until the job's next run has succeeded (its `probe`).
    A target the diff does not hit is not probed.
@@ -302,17 +315,21 @@ scheduled_jobs:                            # jobs that run the merged code later
    `archive`; no label, it deploys no code). Then the final report (below).
 4. **Failed** — in this order:
    1. each affected target's `rollback` command: production goes back to the previous deployment
-      without a rebuild;
+      without a rebuild (then its `note`, if any: Vercel's rollback turns off the automatic
+      production assignment until a deployment is promoted again); probe the served revision;
    2. a revert pull request: `git switch -c revert/<id> --no-track origin/{{DEFAULT_BRANCH}}`,
-      `git revert --no-edit <merge commit>` (`-m 1` for a merge commit), plus
-      `openspec/changes/<id>/revert.yaml`:
+      `git revert --no-edit <merge commit>` (`-m 1` for a merge commit; for a change delivered in
+      several pull requests, each lot's merge, newest first), plus `openspec/changes/<id>/revert.yaml`:
       ```yaml
       revert_of: <id>                                   # the change folder's name
-      merge_commit: <full sha of the merge on {{DEFAULT_BRANCH}}>
+      merge_commits: [ <full sha of each merge of the change on {{DEFAULT_BRANCH}}> ]   # the newest one at least
       reason: "The /api/export probe returns 500 since the merge: the CSV writer needs a column the production view lacks"
       ```
-      `merge-conditions` accepts it with no gate only if its diff, `revert.yaml` aside, is the exact
-      inverse of that merge (§7, "revert"); nothing else goes in it — a fix is a new change;
+      `merge-conditions` accepts it with no gate only if those are merges of the change's own pull
+      requests on `{{DEFAULT_BRANCH}}`'s first-parent line, the newest among them, and its diff,
+      `revert.yaml` aside, is the exact inverse of them together (§7, "revert"); nothing else goes in
+      it — a fix is a new change. Reverting a change that is not the one in flight, when its intent
+      gate was open, opens the intent gate: the owner approved that behaviour;
    3. move the label: `gh pr edit <n> --remove-label in-flight`, then the revert's merge command ends
       with `&& gh pr edit <revert n> --add-label in-flight`; verify the revert's deploy (the same
       probes), then remove that label;
@@ -324,25 +341,51 @@ scheduled_jobs:                            # jobs that run the merged code later
 
 ### Deploy guard — the server-side barrier
 
-Each deploy target refuses a commit of `{{DEFAULT_BRANCH}}` that does not come from a merged pull
-request meeting the merge conditions. `.sdd/bin/deploy-guard.sh` runs first in each deploy job
-(`deploy-guard.sh "$MERGED_SHA" "$BEFORE_SHA"`, from `github.sha` and `github.event.before`) and as
-Vercel's `ignoreCommand` (`deploy-guard.sh --vercel '<globs>'`); it never reads `merge-conditions`. It
-recomputes:
+**What it enforces**: every commit of `{{DEFAULT_BRANCH}}` that reaches production came from a merged
+pull request, with every trigger hit accounted for and the CI the pull request needed green — the
+pushed commit and every first-parent commit since the target's last deployment. **What it does not
+enforce: the owner's gates.** The agent acts with the owner's token, so an owner merge and an agent
+merge look the same server-side; a gate is kept by the merge route (client-side) and by the owner
+merging gated pull requests. Any gate therefore passes the guard.
 
-- the pull request merged **as** the pushed commit (`commits/<sha>/pulls`, merged into
+`.sdd/bin/deploy-guard.sh` runs first in each deploy job and in `deploy-alert.yml`, and as Vercel's
+`ignoreCommand`; it never reads `merge-conditions`. **Its code is read from a trusted commit, never
+from the pushed one**: the last commit the workflow ran successfully on (Vercel: the last production
+deployment, `VERCEL_GIT_PREVIOUS_SHA`), else the default branch before the push. For each commit of
+that history it recomputes:
+
+- the pull request merged **as** that commit (`commits/<sha>/pulls`, merged into
   `{{DEFAULT_BRANCH}}`, its merge commit equal to the sha) — none: a direct push, refused;
-- the pushed commit's first parent is the push's `before` (the push carried the merge only);
-- `merge_conditions.py match` with `before` as base and the pull request's head: an unaccounted hit
-  or an error refuses; any gate passes (an owner merge is the go or the QA);
-- every workflow required by the diff, judged by the definitions **before** the merge (a workflow
-  the pull request deleted is not required), has a successful `pull_request` run on the head.
+- the commit's content is exactly the merge of its first parent and the pull request's head (a
+  commit edited during the merge is refused); the pushed commit's first parent is the push's
+  `before` (a "Rebase and merge" of several commits is refused);
+- `merge_conditions.py match` against that parent: an unaccounted hit, an invalid classification
+  or a file name holding a control character refuses;
+- every workflow required by the diff, judged by the definitions **before** the merge, has a
+  `pull_request` run on the head that succeeded (or whose jobs were all skipped); a workflow the pull
+  request deleted is not required, one it renamed is, under its new name.
 
-Anything it cannot judge refuses too. A refused GitHub Actions deploy fails its job; a refused
-Vercel build is skipped (Vercel: exit 0 = skip); in both cases `deploy-alert.yml` opens an issue. A
-refused commit stays on `{{DEFAULT_BRANCH}}`: the next merge would deploy it with its own content, so
-it is reverted first. The merge that installs `.sdd/triggers.yaml` is always refused (no triggers
-before it): it deploys nothing.
+A refused commit is accepted later only once a following merged commit undoes it **exactly** (a
+pull request that reverts it); until then every deploy is refused. Anything it cannot judge refuses
+too. A manual run (`workflow_dispatch`) is judged the same way and only on `{{DEFAULT_BRANCH}}`.
+Exit codes: 0 deploy, 1 refused, 2 cannot judge, 4 the adoption merge (the guard was not installed
+before it: it deploys nothing, as expected).
+
+A refused GitHub Actions deploy fails its job; a refused Vercel build is skipped (Vercel: exit 0 =
+skip, and anything but the guard's own "build" skips); in both cases `deploy-alert.yml` opens an issue
+labelled `deploy-refused`, and while one is open the merge route refuses every agent merge. The owner
+resolves it — a pull request that reverts the refused commit exactly — and closes the issue.
+**Re-running a skipped Vercel production build**: once the cause is fixed, the next guarded push
+builds; to deploy the current commit at once, Vercel → Deployments → Redeploy, with "Use project's
+Ignore Build Step" ticked (the guard judges it again). Unticking it deploys unguarded: owner only,
+after review — also how the first production deployment after the adoption is made (until then
+`VERCEL_GIT_PREVIOUS_SHA` points at a commit without the guard, so every build is skipped).
+
+What is not covered: the workflow files and `vercel.json` run from the pushed commit (GitHub and
+Vercel read them there) — the agent's token has no `workflow` permission and both are gate
+machinery, but a direct push by the owner is not stopped; a deploy made outside these pipelines; the
+gates (above). Follow-ups: an identity of its own for the agent (a GitHub App) with GitHub Pro rulesets
+on `{{DEFAULT_BRANCH}}`; deploy credentials (Workload Identity Federation) bound to `{{DEFAULT_BRANCH}}`.
 <!-- sdd:endif -->
 
 ### Final report — to the owner, once per change

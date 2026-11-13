@@ -24,7 +24,13 @@ targets:
       command: gcloud run services update-traffic api --region europe-west1 --to-revisions=<previous>=100
       note: "<previous> = the second line of: gcloud run revisions list --service api --region europe-west1 --format 'value(name)' --sort-by '~metadata.creationTimestamp' --limit 2"
       unconfirmed: true                                # no evidence in the repository that this command works
+      # Vercel: `vercel rollback --yes` turns off the automatic production assignment; say in `note`
+      # how it is turned back on (`vercel promote <deployment url> --yes` once a fix is deployed).
     probes:                                            # exit 0, and `expect` (a regex) found in the output when given
+      # The first probe asserts the target serves the merged commit ({sha}): a target that did not
+      # deploy it fails the verification. Vercel: the GitHub deployment status for {sha} (Production).
+      - command: gcloud run services describe api --region europe-west1 --format 'value(spec.template.spec.containers[0].image)'
+        expect: ':{sha}$'
       - command: curl -fsS https://api.example.com/health
         expect: '"status" *: *"UP"'
 # sdd:endif

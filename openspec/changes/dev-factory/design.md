@@ -179,7 +179,8 @@ so the status is an input of the client-side merge rule only, never of the serve
 gates pass (an owner-merged gated PR deploys); an `unaccounted` hit, a red or missing required CI run,
 or a direct push without a PR exit non-zero.
 
-- geomni `deploy-backend.yml`: first step of the job, plus `concurrency: deploy` so two deploys never
+- geomni `deploy-backend.yml`: first step of the job, plus `concurrency: deploy` (amended after the
+  lot 3c-1 review: one group per workflow, `deploy-<workflow>`) so two deploys never
   overlap.
 - Vercel: `ignoreCommand` in `vercel.json` runs the guard (exit 0 = skip) and also skips when the
   commit has no frontend change. It needs a read-only fine-grained token in Vercel's environment
@@ -206,6 +207,35 @@ contributing guide: a deploy that bypasses the pipeline is not guarded; a refuse
 the default branch and ships with the next merge unless reverted; `concurrency` keeps one waiting
 run, so a third push can replace the second's run.
 
+Amended after the lot 3c-1 review: **what the guard enforces** is a merged pull request, every
+trigger hit accounted for, the CI the pull request needed, and a clean history since the target's
+last deployment — **not the owner's gates**. Without another identity for the agent, owner and agent
+merges look the same server-side; the gates stay client-side (the merge route). Fixes:
+- *History*: every first-parent commit since the last deployed commit is judged (GitHub Actions:
+  the head of the last successful run of the same workflow on the default branch; Vercel:
+  `VERCEL_GIT_PREVIOUS_SHA`; none yet: the push alone). A refused commit blocks every later deploy
+  until a later merged commit that passes the guard undoes it exactly; a rewritten history (the last
+  deployed commit no longer an ancestor), a force-push or more than 100 commits are left to the
+  owner. The merge route also refuses an agent merge while an open issue carries `deploy-refused`
+  (the label `deploy-alert.yml` puts on a refusal).
+- *Self-hosting*: the guard's code (`deploy-guard.sh`, then `merge_conditions.py`) is read from that
+  trusted commit (git, else the contents API), never from the pushed one. Residue: the workflow
+  files and `vercel.json` run from the pushed commit (GitHub and Vercel read them there); the agent's
+  token has no `workflow` permission; a direct push by the owner is not stopped. The interface
+  between the entry point and `deploy-guard.sh` (`<merged> <before> <trusted>`, `--vercel [globs]`)
+  is therefore frozen: the trusted copy is older than the entry point that calls it.
+- *Evil merge*: the commit's tree must equal `git merge-tree --write-tree <parent> <pr head>`.
+- *Control characters*: globs match across newlines; a file name with a control character is an
+  error, and every printed name or reason is escaped.
+- *Vercel*: the `ignoreCommand` downloads the trusted guard and builds only on its explicit "build"
+  (`[ $? -ne 1 ]`); the activity lookup is asked again before giving up; probes assert the served
+  revision; after `vercel rollback`, production assignment is turned back on by a promotion.
+- *Manual runs* (`workflow_dispatch`): only on the default branch; the commit's parent stands for
+  `before`, the history check covers the rest. *Concurrency*: one group per deploy workflow.
+- *Adoption*: a distinct outcome (exit 4), alerted as expected, not as a refusal.
+- *PyYAML*: hash-pinned wheels in a fresh `mktemp -d` environment.
+- *Workflows*: a run whose jobs were all skipped passes; a renamed required workflow stays required.
+
 ### D8 — Serialisation and rollback
 
 - After merging, the agent puts the `in-flight` label on the merged PR; the hook refuses any other
@@ -221,7 +251,8 @@ run, so a third push can replace the second's run.
   the exact inverse of the merged change; its harness is limited to that verification.
 
 Settled while implementing (group 8): the revert's marker is a new file
-`openspec/changes/<id>/revert.yaml` (`revert_of`, `merge_commit`, `reason`), not a key of
+`openspec/changes/<id>/revert.yaml` (`revert_of`, `merge_commits` — amended after the lot 3c-1
+review —, `reason`), not a key of
 `classification.yaml` — editing a classification outside a framing PR is gate machinery, and the
 approved classification must stay the one on the default branch; the unused `revert_of` key is
 removed from the classification schema. A pull request that **adds** that file is of kind `revert`:
@@ -233,7 +264,12 @@ owner decides) or the revert touches gate machinery; it needs no `review-harness
 The label moves: removed from the change's PR, put on the revert's PR in its merge command, removed
 once the revert's deploy is verified. The merge command carries the label itself
 (`gh pr merge … && gh pr edit <n> --add-label in-flight`, which the hook allows); after an owner
-merge the agent labels it in its next call.
+merge the agent labels it in its next call. Amended after the lot 3c-1 review: the listed merges
+must be on the base ref's first-parent line, include the newest one that touched the change folder
+and, where the API is at hand (the check, the guard), be merge commits of merged pull requests from
+the change's own branches; several lots are reverted together (their diffs composed). The intent
+gate opens when the reverted change had it open and is not the change in flight (its pull request
+carries no `in-flight` label): undoing behaviour the owner approved is the owner's call.
 
 ### D9 — Review harness as skills
 
@@ -300,3 +336,10 @@ adoption PR; the toolbox keeps the `sdd-kit` compatibility markers.
 - Exact Vercel CLI command to promote the previous deployment from the agent's machine, to be settled
   when writing geomni's `.sdd/deployment.yaml`.
 - Whether the `in-flight` label should also be checked by the deploy guard; decided after the pilot.
+
+## Follow-ups
+
+- An identity of its own for the agent (a GitHub App) and GitHub Pro rulesets on the default branch:
+  the only way for the server side to tell owner merges from agent merges, and so to enforce the gates.
+- Deploy credentials bound to the default branch (Workload Identity Federation with an attribute
+  condition on `refs/heads/main`), so a workflow edited elsewhere cannot deploy.

@@ -228,19 +228,25 @@ the choices the code cannot settle:
    `unconfirmed:` line it prints goes to the report's "to confirm" list. Then, with options
    `github` and `deploys`:
    - each deploy workflow: the guard block of `templates/github/workflows/deploy.yml` (job-level
-     `concurrency: { group: deploy, cancel-in-progress: false }`, checkout with `fetch-depth: 0` and
-     `persist-credentials: false`, Python + PyYAML, the "Deploy guard" step with its values through
-     `env:`) merged at the top of the job that deploys, the project's own steps unchanged after it,
-     and the three read permissions added; a target without a workflow gets none (it is guarded by
-     its platform, below, or reported as unguarded);
+     `concurrency: { group: deploy-${{ github.workflow }}, cancel-in-progress: false }`,
+     `workflow_dispatch`, checkout with `fetch-depth: 0` and `persist-credentials: false`, Python, the
+     "Deploy guard" step that reads the guard from the trusted commit, its values through `env:`)
+     merged at the top of the job that deploys, the project's own steps unchanged after it, and the
+     three read permissions added; a target without a workflow gets none (it is guarded by its
+     platform, below, or reported as unguarded);
    - a Vercel target: `ignoreCommand` of `templates/vercel/vercel.json` added to the project's
      `vercel.json` (in Vercel's root directory; a different existing `ignoreCommand` is shown to the
-     owner, never dropped silently), `{{VERCEL_REPO_ROOT}}` and `{{VERCEL_PATHS}}` filled
-     (VARIABLES §1); the report asks the owner for the read-only `DEPLOY_GUARD_TOKEN` in Vercel
-     (`docs/CONTRIBUTING.md`, "Deploy guard access");
+     owner, never dropped silently), `{{VERCEL_PATHS}}` filled (VARIABLES §1); the report asks the
+     owner for the read-only `DEPLOY_GUARD_TOKEN` in Vercel (`docs/CONTRIBUTING.md`, "Deploy guard
+     access") and, once the adoption is merged, for one production redeploy without the Ignored
+     Build Step (until then the last production deployment has no guard, so every build is skipped);
    - `templates/github/workflows/deploy-alert.yml` → `.github/workflows/deploy-alert.yml`;
    - the `in-flight` label: `gh label create in-flight --description "Merged, not yet verified in
-     production"` (or the report asks the owner when the token cannot create labels).
+     production"` (or the report asks the owner when the token cannot create labels);
+   - rebase merges: when the repository allows them (`gh api repos/{owner}/{repo} --jq
+     .allow_rebase_merge`), the report gives the owner the command that turns them off — the guard
+     refuses every "Rebase and merge" of several commits: `gh api -X PATCH repos/{owner}/{repo} -F
+     allow_rebase_merge=false` (an admin action: the owner runs it).
    Run `actionlint` on every workflow written or changed when it is installed (otherwise say so).
 8. Option `ui`: `templates/claude/launch.json` → `.claude/launch.json`, one configuration per UI
    module, filled from the recon (the module's dev-server script: `runtimeExecutable`,
@@ -288,6 +294,8 @@ of the generated rules with the actual code (an unproven rule = 🔴 MAJOR). Fix
    - **Baseline**: check commands and their result, with numbers.
    - **Expected from you**: create `.claude/settings.local.json` (gh token), re-read §5 of
      `CLAUDE.md`, install the optional plugins chosen; with a Vercel target, the read-only
-     `DEPLOY_GUARD_TOKEN` in Vercel's environment; the `in-flight` label if it could not be created.
+     `DEPLOY_GUARD_TOKEN` in Vercel's environment and the first production redeploy after the adoption;
+     the `in-flight` label if it could not be created; `allow_rebase_merge=false` when rebase merges
+     are allowed.
    - **Next step**: `/opsx:onboard` for a first guided cycle, or the first `baseline-<domain>`
      proposed, or `/opsx:new <id>` on the first ticket of `docs/ROADMAP.md`.

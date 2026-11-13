@@ -27,7 +27,6 @@ unchanged).
 | `{{OPENSPEC_VERSION}}` | Output of `openspec --version` at install time, pinned in CI | `1.16.1` |
 | `{{MIGRATION_PATHS}}` | Globs of the migration folders (option `migrations`), for `migrations.yml` | `migrations/**` |
 | `{{ARCH_STYLE}}` | Architecture style as observed (not wished for: observed) | `modular monolith, api/service/repository layers` |
-| `{{VERCEL_REPO_ROOT}}` | `vercel/vercel.json`: path from Vercel's Root Directory (where Vercel runs `ignoreCommand`) back to the repository root | `..` (root directory `frontend`), `.` |
 | `{{VERCEL_PATHS}}` | `vercel/vercel.json`: the Vercel target's `trigger.paths` from `.sdd/deployment.yaml`, each single-quoted, separated by spaces; empty for `every_push` | `'frontend/**' 'shared/**'` |
 
 ## 2. Sections to write — `<!-- sdd:fill: <instruction> -->`
@@ -108,7 +107,8 @@ Whole files under a condition (flagged by a `sdd:note` at the top): `docs/GRAPHI
 deploy workflow; a new `.github/workflows/deploy-<target>.yml` only for a target with no workflow.
 `github/workflows/deploy-alert.yml` → `github` + `deploys`. `vercel/vercel.json` → a Vercel target:
 its `ignoreCommand` is added to the project's `vercel.json` in Vercel's root directory (JSON, so no
-markers; its two variables are §1's `{{VERCEL_REPO_ROOT}}` and `{{VERCEL_PATHS}}`).
+markers; its variable is §1's `{{VERCEL_PATHS}}`; the command downloads the guard of the last
+production deployment, so it does not depend on Vercel's root directory).
 `root/AGENTS.lean.md` replaces `root/AGENTS.md` (generated under the name `AGENTS.md`) with `lean`;
 `docs/AGENT_TOOLBOX.md` → except with `lean`; `agents/devops.md` → `devops`;
 `agents/full-stack-dev.md` → `multi-module` and one module consumes the other (API + client).
