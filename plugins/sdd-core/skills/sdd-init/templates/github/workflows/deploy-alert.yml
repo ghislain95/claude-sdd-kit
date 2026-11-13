@@ -1,0 +1,82 @@
+# sdd:note: generated with the `github` option when .sdd/deployment.yaml lists at least one target (not with deploys_nothing: true). Copied as is apart from the default branch.
+# Deploy alert — runs the deploy guard on every push to {{DEFAULT_BRANCH}} and opens an issue when it
+# refuses the commit.
+#
+# A platform that deploys outside GitHub Actions (Vercel's ignored build step) only skips a refused
+# build, silently; a GitHub Actions deploy fails its job. This workflow is the one alert for every
+# target: the issue names the commit and the guard's reason. A refused commit stays on
+# {{DEFAULT_BRANCH}} and the next merge would ship it with its own content: revert it first.
+# It never deploys anything and has no path filter, so a direct push of any file is reported.
+name: Deploy alert
+
+on:
+  push:
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: deploy-alert-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: pip install pyyaml==6.0.2
+
+      - name: Deploy guard
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGED_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set +e
+          bash .sdd/bin/deploy-guard.sh "$MERGED_SHA" "$BEFORE_SHA" > guard.log 2>&1
+          code=$?
+          cat guard.log
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue when the guard refuses
+        if: steps.guard.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGED_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          reason=$(grep '^deploy-guard:' guard.log | tail -n 1 || true)
+          {
+            echo "The deploy guard refused \`$MERGED_SHA\`, pushed to \`$DEFAULT_BRANCH\` by @$ACTOR (before: \`$BEFORE_SHA\`)."
+            echo
+            echo '```text'
+            echo "${reason:-deploy-guard: no verdict (see the run)}"
+            echo '```'
+            echo
+            echo "No guarded target deployed it. It is still on \`$DEFAULT_BRANCH\`: the next merge would deploy it"
+            echo "with its own content. Revert it through a pull request (or have it merged properly) before"
+            echo "anything else merges."
+            echo
+            echo "Run: $RUN_URL"
+          } > issue.md
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Deploy refused: ${MERGED_SHA:0:7} on $DEFAULT_BRANCH" --body-file issue.md
+          exit 1

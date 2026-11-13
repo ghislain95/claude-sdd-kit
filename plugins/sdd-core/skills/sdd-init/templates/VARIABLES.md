@@ -27,6 +27,8 @@ unchanged).
 | `{{OPENSPEC_VERSION}}` | Output of `openspec --version` at install time, pinned in CI | `1.16.1` |
 | `{{MIGRATION_PATHS}}` | Globs of the migration folders (option `migrations`), for `migrations.yml` | `migrations/**` |
 | `{{ARCH_STYLE}}` | Architecture style as observed (not wished for: observed) | `modular monolith, api/service/repository layers` |
+| `{{VERCEL_REPO_ROOT}}` | `vercel/vercel.json`: path from Vercel's Root Directory (where Vercel runs `ignoreCommand`) back to the repository root | `..` (root directory `frontend`), `.` |
+| `{{VERCEL_PATHS}}` | `vercel/vercel.json`: the Vercel target's `trigger.paths` from `.sdd/deployment.yaml`, each single-quoted, separated by spaces; empty for `every_push` | `'frontend/**' 'shared/**'` |
 
 ## 2. Sections to write — `<!-- sdd:fill: <instruction> -->`
 
@@ -61,6 +63,7 @@ break a Markdown table or list).
 | `ci` | the kit's workflows are generated: GitHub remote **or** `.github/workflows/` already present |
 | `work-style` | the team adopts the kit's way of working (`CLAUDE.md` §12: short framing, all the way through, structured report, handoff) |
 | `multi-module` | ≥ 2 modules |
+| `deploys` | a push to the default branch deploys something: a deploy workflow or a hosting configuration (Vercel, Netlify, Fly…) found by the recon. Without it, `.sdd/deployment.yaml` says `deploys_nothing: true` |
 | `devops` | Docker / compose, IaC or deployment scripts present (CI alone is not enough) |
 | `lean` | single module **and** fewer than ~5,000 lines of code: reduced file set (no `AGENT_TOOLBOX.md`, `AGENTS.md` reduced to a pointer) |
 
@@ -97,9 +100,15 @@ Whole files under a condition (flagged by a `sdd:note` at the top): `docs/GRAPHI
 `misc/graphifyignore` → option `graphify`; `github/workflows/*` → option `ci`;
 `github/workflows/migrations.yml` → `ci` **and** `migrations`;
 `github/workflows/merge-conditions.yml` → `github` (which implies `ci`).
-`sdd/triggers.yaml` → always, generated as `.sdd/triggers.yaml`. `sdd/bin/merge_conditions.py` and
-`sdd/bin/test_merge_conditions.py` → always, **copied verbatim** into `.sdd/bin/` (no markers: they are
-code, and `--refresh` replaces them).
+`sdd/triggers.yaml` → always, generated as `.sdd/triggers.yaml`. `sdd/bin/merge_conditions.py`,
+`sdd/bin/test_merge_conditions.py` and `sdd/bin/deploy-guard.sh` → always, **copied verbatim** into
+`.sdd/bin/` (no markers: they are code, and `--refresh` replaces them).
+`sdd/deployment.yaml` → always, generated as `.sdd/deployment.yaml` (option `deploys` picks its shape).
+`github/workflows/deploy.yml` → `github` + `deploys`: its guard block is merged into each existing
+deploy workflow; a new `.github/workflows/deploy-<target>.yml` only for a target with no workflow.
+`github/workflows/deploy-alert.yml` → `github` + `deploys`. `vercel/vercel.json` → a Vercel target:
+its `ignoreCommand` is added to the project's `vercel.json` in Vercel's root directory (JSON, so no
+markers; its two variables are §1's `{{VERCEL_REPO_ROOT}}` and `{{VERCEL_PATHS}}`).
 `root/AGENTS.lean.md` replaces `root/AGENTS.md` (generated under the name `AGENTS.md`) with `lean`;
 `docs/AGENT_TOOLBOX.md` → except with `lean`; `agents/devops.md` → `devops`;
 `agents/full-stack-dev.md` → `multi-module` and one module consumes the other (API + client).

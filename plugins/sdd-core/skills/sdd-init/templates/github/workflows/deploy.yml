@@ -1,0 +1,60 @@
+# sdd:note: not generated as a new workflow when the project already deploys from GitHub Actions: its guard (the `concurrency` block, the checkout with full history and no persisted credentials, the Python setup and the "Deploy guard" step) is merged at the top of the deploy job of each workflow listed as a `workflow` in .sdd/deployment.yaml, the project's own steps kept after it. Generated as .github/workflows/deploy-<target>.yml only for a target that has no workflow yet. Option `github`.
+# Deploy <target> — on every push to {{DEFAULT_BRANCH}} under its paths, after the deploy guard.
+#
+# The deploy guard (.sdd/bin/deploy-guard.sh) is the first step of the job that deploys: it lets the
+# job go on only for a commit merged from a pull request that meets the merge conditions, recomputed
+# from the default branch before the push (`github.event.before`) and the pull request's head — never
+# read from the `merge-conditions` status, which anyone with a token can overwrite. A refused commit
+# fails the job (GitHub notifies the owner; .github/workflows/deploy-alert.yml opens an issue).
+#
+# `concurrency: deploy` (shared by every deploy workflow of the repository) runs one deploy at a
+# time and never cancels a running one. GitHub keeps at most one run WAITING per group: a third push
+# arriving while one deploys and one waits replaces the waiting run, whose commit then ships with
+# the third (its tree contains it) without its own guard step — one change in flight at a time
+# (the `in-flight` label) keeps that from happening in normal delivery.
+name: Deploy (<target>)
+
+on:
+  push:
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+    # sdd:fill: the target's `trigger.paths` from .sdd/deployment.yaml (remove `paths` for `every_push`)
+    paths: [ 'api/**' ]
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  # sdd:fill: the permissions the project's deploy steps need on top of these (e.g. id-token: write for OIDC)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      # The whole history (the guard compares the push with the default branch before it), without
+      # the checkout's persisted token: the guard fetches the pull request head with its own.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: pip install pyyaml==6.0.2
+
+      # Values through the environment, never interpolated into the script.
+      - name: Deploy guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGED_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash .sdd/bin/deploy-guard.sh "$MERGED_SHA" "$BEFORE_SHA"
+
+      # sdd:fill: the project's deploy steps, unchanged, after the guard
+      - name: Deploy
+        run: echo "deploy <target> at $GITHUB_SHA"

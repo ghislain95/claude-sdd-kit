@@ -7,31 +7,45 @@ Subcommands
             Exit 0 when the verdict is clean, 1 on an unaccounted trigger hit or any error of judgement
             (invalid classification, missing triggers file, change folder and branch disagreeing),
             2 when it cannot judge (unknown commit, git failure). The deploy guard runs it with the
-            merge commit's first parent as `--base` and the merged pull request's head as `--head`.
+            default branch before the merge (the push event's `before`) as `--base` and the merged
+            pull request's head as `--head`.
   check     (CI) Judge open pull requests and post the `merge-conditions` commit status on their head
             commit: aggregate CI gate, `review-harness` / `opsx-verify` statuses and the matcher's
             result. `--pr N --head-sha S` judges S and posts only while S is still the head of #N;
             `--sha S` judges the open pull requests whose head is S; `--all-open` re-judges every open
             pull request into the default branch (after a push to it), posting `pending` first.
-  validate  Check `triggers.yaml` / `classification.yaml` files against their schema.
+  deploy-guard
+            (deploy pipeline) Decide whether a commit of the default branch may deploy, recomputing
+            the verdict instead of reading the `merge-conditions` status: the pull request merged as
+            that commit, the matcher on its diff against the default branch before the merge, and the
+            required CI runs of its head. Exit 0 = deploy, 1 = refused, 2 = cannot judge (refused
+            too), 3 = nothing under `--paths` changed (skip, no alert). One line on stdout says why.
+            Run through `.sdd/bin/deploy-guard.sh`, which maps the exit code for each platform.
+  validate  Check `triggers.yaml` / `classification.yaml` / `revert.yaml` / `deployment.yaml` files
+            against their schema; prints the values a deployment profile marks `unconfirmed`.
 
 The status description is `gates: <gates>[ - <reasons>]; base <sha7>` — `base` is the default-branch
 commit the verdict was computed against, always last, so the merge rule can compare it with the
 current head of the default branch. `error` and the `pending` posted while re-judging carry no gates.
 
 Never executes code from the pull request head: the head commit is only read as data, through git.
-Requirements: Python 3.9+, git, PyYAML; `check` also needs the `gh` CLI with a token.
+Requirements: Python 3.9+, git, PyYAML; `check` also needs the `gh` CLI with a token; `deploy-guard`
+needs a read-only token (`DEPLOY_GUARD_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN`) and no `gh`.
 Schemas: docs/OPENSPEC_GUIDE.md ("Classification and triggers"). Copied verbatim by sdd-init from the
 sdd-core plugin (templates/sdd/bin/); a local edit is overwritten by `sdd-init --refresh`.
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 
 try:
     import yaml
@@ -45,6 +59,12 @@ CHANGES_DIR = "openspec/changes/"
 ARCHIVE_DIR = "openspec/changes/archive/"
 WORKFLOWS_DIR = ".github/workflows/"
 CLASSIFICATION_FILE = "classification.yaml"
+# Added by a revert pull request into the change folder it reverts (`revert/<id>` branch): names the
+# merged commit whose diff the pull request must exactly invert.
+REVERT_FILE = "revert.yaml"
+REVERT_BRANCH = "revert/"
+DEPLOYMENT_FILE = "deployment.yaml"
+SHA = re.compile(r"^[0-9a-f]{40}$")
 # Gate machinery that is always protected, even when triggers.yaml omits it: everything that changes
 # what CI or this check does.
 DEFAULT_MACHINERY = (
@@ -55,7 +75,7 @@ DEFAULT_MACHINERY = (
     "**/.gitattributes",
     ".gitmodules",
     "openspec/config.yaml",
-    "vercel.json",
+    "**/vercel.json",  # wherever Vercel's root directory puts it: it carries the deploy guard
 )
 # Trigger name reported when a pull request other than a framing one adds, changes or deletes a
 # classification (an identical move into the change's archive folder excepted).
@@ -196,10 +216,11 @@ def ls_tree(repo: str, ref: str, prefix: str) -> dict:
 
 
 class Entry:
-    __slots__ = ("status", "path", "old_blob", "new_blob")
+    __slots__ = ("status", "path", "old_blob", "new_blob", "old_mode", "new_mode")
 
-    def __init__(self, status, path, old_blob, new_blob):
+    def __init__(self, status, path, old_blob, new_blob, old_mode="", new_mode=""):
         self.status, self.path, self.old_blob, self.new_blob = status, path, old_blob, new_blob
+        self.old_mode, self.new_mode = old_mode, new_mode
 
 
 def diff_entries(repo: str, base: str, head: str) -> list:
@@ -213,8 +234,8 @@ def diff_entries(repo: str, base: str, head: str) -> list:
         if not meta.startswith(":"):
             i += 1
             continue
-        _, _, old_blob, new_blob, status = meta[1:].split()
-        entries.append(Entry(status[0], tokens[i + 1], old_blob, new_blob))
+        old_mode, new_mode, old_blob, new_blob, status = meta[1:].split()
+        entries.append(Entry(status[0], tokens[i + 1], old_blob, new_blob, old_mode, new_mode))
         i += 2
     return entries
 
@@ -334,15 +355,13 @@ def load_classification(text, change=None):
     if not isinstance(data, dict):
         return None, ["classification.yaml: expected a mapping at the top level"]
     errors: list = []
-    for key in sorted(set(data) - {"change", "intent", "irreversible", "revert_of"}, key=str):
+    for key in sorted(set(data) - {"change", "intent", "irreversible"}, key=str):
         errors.append(f"classification.yaml: unknown key {key!r}")
     if not isinstance(data.get("change"), str) or not data.get("change"):
         errors.append("classification.yaml: change: expected the change id")
     elif change is not None and data["change"] != change:
         errors.append(f"classification.yaml: change is {data['change']!r}, the folder is {change!r}")
-    if "revert_of" in data and (not isinstance(data["revert_of"], str) or not data["revert_of"]):
-        errors.append("classification.yaml: revert_of: expected a change id")
-    classification = {"change": data.get("change"), "revert_of": data.get("revert_of")}
+    classification = {"change": data.get("change")}
     for gate in GATES:
         section = data.get(gate)
         where = f"classification.yaml: {gate}"
@@ -372,6 +391,171 @@ def load_classification(text, change=None):
     if errors:
         return None, errors
     return classification, errors
+
+
+def _yaml_mapping(text, name: str):
+    """(mapping or None, errors) of a YAML document expected to be a mapping."""
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        return None, [f"{name}: not valid YAML ({str(exc).splitlines()[0]})"]
+    if not isinstance(data, dict):
+        return None, [f"{name}: expected a mapping at the top level"]
+    return data, []
+
+
+def _text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def load_revert(text, change=None):
+    """Parse revert.yaml. Returns (revert or None, errors)."""
+    data, errors = _yaml_mapping(text, REVERT_FILE)
+    if data is None:
+        return None, errors
+    for key in sorted(set(data) - {"revert_of", "merge_commit", "reason"}, key=str):
+        errors.append(f"{REVERT_FILE}: unknown key {key!r}")
+    if not _text(data.get("revert_of")):
+        errors.append(f"{REVERT_FILE}: revert_of: expected the id of the reverted change")
+    elif change is not None and data["revert_of"] != change:
+        errors.append(f"{REVERT_FILE}: revert_of is {data['revert_of']!r}, the folder is {change!r}")
+    if not isinstance(data.get("merge_commit"), str) or not SHA.match(data["merge_commit"]):
+        errors.append(f"{REVERT_FILE}: merge_commit: expected the full sha of the reverted merge")
+    if not _text(data.get("reason")):
+        errors.append(f"{REVERT_FILE}: reason: expected the diagnosis of the failed verification")
+    if errors:
+        return None, errors
+    return {"revert_of": data["revert_of"], "merge_commit": data["merge_commit"], "reason": data["reason"]}, []
+
+
+def _globs(value, where: str, errors: list) -> list:
+    if not isinstance(value, list) or not value:
+        errors.append(f"{where}: expected a non-empty list of globs")
+        return []
+    return _string_list(value, where, errors)
+
+
+def _unconfirmed(item, where: str, errors: list, found: list):
+    value = item.get("unconfirmed", False)
+    if not isinstance(value, bool):
+        errors.append(f"{where}.unconfirmed: expected true or false")
+    elif value:
+        found.append(where)
+
+
+def _command(item, where: str, errors: list, found: list, keys=("command", "expect", "unconfirmed")):
+    """A command with an optional `expect` regex, as a probe or a rollback has."""
+    if not isinstance(item, dict):
+        errors.append(f"{where}: expected a mapping with a command")
+        return
+    for key in sorted(set(item) - set(keys), key=str):
+        errors.append(f"{where}: unknown key {key!r}")
+    if not _text(item.get("command")):
+        errors.append(f"{where}.command: expected the command, as run")
+    if "expect" in item:
+        if not _text(item["expect"]):
+            errors.append(f"{where}.expect: expected a regex the output must match")
+        else:
+            try:
+                re.compile(item["expect"])
+            except re.error as exc:
+                errors.append(f"{where}.expect: invalid regex ({exc})")
+    _unconfirmed(item, where, errors, found)
+
+
+def load_deployment(text):
+    """Parse deployment.yaml. Returns (profile or None, errors, unconfirmed value paths)."""
+    name = DEPLOYMENT_FILE
+    data, errors = _yaml_mapping(text, name)
+    found: list = []
+    if data is None:
+        return None, errors, found
+    for key in sorted(set(data) - {"deploys_nothing", "targets", "scheduled_jobs"}, key=str):
+        errors.append(f"{name}: unknown key {key!r}")
+    nothing = data.get("deploys_nothing", False)
+    if not isinstance(nothing, bool):
+        errors.append(f"{name}: deploys_nothing: expected true or false")
+    targets = data.get("targets")
+    if targets is None:
+        targets = []
+    if not isinstance(targets, list):
+        errors.append(f"{name}: targets: expected a list")
+        targets = []
+    if nothing is True and targets:
+        errors.append(f"{name}: deploys_nothing is true, so no target (and no rollback) can be listed")
+    if nothing is False and not targets:
+        errors.append(f"{name}: no target: list what merging deploys, or set deploys_nothing: true")
+    names = set()
+    for index, target in enumerate(targets):
+        where = f"{name}: targets[{index}]"
+        if not isinstance(target, dict):
+            errors.append(f"{where}: expected a mapping")
+            continue
+        if _text(target.get("name")):
+            where = f"{name}: targets[{target['name']}]"
+            if target["name"] in names:
+                errors.append(f"{where}: duplicate target name")
+            names.add(target["name"])
+        else:
+            errors.append(f"{where}.name: expected the target's name")
+        for key in sorted(set(target) - {"name", "platform", "trigger", "workflow", "rollback", "probes",
+                                         "unconfirmed", "note"}, key=str):
+            errors.append(f"{where}: unknown key {key!r}")
+        if not _text(target.get("platform")):
+            errors.append(f"{where}.platform: expected the platform (cloud-run, vercel, …)")
+        if "workflow" in target and not _text(target["workflow"]):
+            errors.append(f"{where}.workflow: expected the path of the workflow that deploys it")
+        if "note" in target and not _text(target["note"]):
+            errors.append(f"{where}.note: expected text")
+        trigger = target.get("trigger")
+        if not isinstance(trigger, dict) or len(trigger) != 1 or not ({"paths", "every_push"} & set(trigger)):
+            errors.append(f"{where}.trigger: expected either `paths: [globs]` or `every_push: true`")
+        elif "paths" in trigger:
+            _globs(trigger["paths"], f"{where}.trigger.paths", errors)
+        elif trigger["every_push"] is not True:
+            errors.append(f"{where}.trigger.every_push: expected true")
+        if "rollback" not in target:
+            errors.append(f"{where}.rollback: expected the platform command that restores the previous deployment")
+        else:
+            _command(target["rollback"], f"{where}.rollback", errors, found, ("command", "note", "unconfirmed"))
+            if isinstance(target["rollback"], dict) and "note" in target["rollback"] \
+                    and not _text(target["rollback"]["note"]):
+                errors.append(f"{where}.rollback.note: expected text")
+        probes = target.get("probes")
+        if not isinstance(probes, list) or not probes:
+            errors.append(f"{where}.probes: expected at least one probe (command, optional expect)")
+        else:
+            for number, probe in enumerate(probes):
+                _command(probe, f"{where}.probes[{number}]", errors, found)
+        _unconfirmed(target, where, errors, found)
+    jobs = data.get("scheduled_jobs")
+    if jobs is None:
+        jobs = []
+    if not isinstance(jobs, list):
+        errors.append(f"{name}: scheduled_jobs: expected a list")
+        jobs = []
+    for index, job in enumerate(jobs):
+        where = f"{name}: scheduled_jobs[{index}]"
+        if not isinstance(job, dict):
+            errors.append(f"{where}: expected a mapping")
+            continue
+        if _text(job.get("name")):
+            where = f"{name}: scheduled_jobs[{job['name']}]"
+        else:
+            errors.append(f"{where}.name: expected the job's name")
+        for key in sorted(set(job) - {"name", "schedule", "paths", "runs", "probe", "unconfirmed"}, key=str):
+            errors.append(f"{where}: unknown key {key!r}")
+        if not _text(job.get("schedule")):
+            errors.append(f"{where}.schedule: expected the schedule (cron, with its time zone)")
+        _globs(job.get("paths"), f"{where}.paths", errors)
+        if "runs" in job and not _text(job["runs"]):
+            errors.append(f"{where}.runs: expected what runs the job")
+        if "probe" in job:
+            _command(job["probe"], f"{where}.probe", errors, found)
+        _unconfirmed(job, where, errors, found)
+    if errors:
+        return None, errors, found
+    return data, errors, [item[len(name) + 2:] for item in found]
 
 
 # --------------------------------------------------------------------------------------------
@@ -488,6 +672,57 @@ def classification_edits(repo: str, base: str, entries) -> list:
     return sorted(edits)
 
 
+def _transitions(entries, inverse=False) -> set:
+    """{(path, old mode, old blob, new mode, new blob)}; `inverse` swaps old and new."""
+    if inverse:
+        return {(entry.path, entry.new_mode, entry.new_blob, entry.old_mode, entry.old_blob) for entry in entries}
+    return {(entry.path, entry.old_mode, entry.old_blob, entry.new_mode, entry.new_blob) for entry in entries}
+
+
+def revert_errors(repo: str, base_sha: str, change: str, entries, branch, text) -> list:
+    """What keeps a pull request adding `<change>/revert.yaml` from being the revert of that change.
+
+    A revert pull request comes from `revert/<change>`, names in `revert.yaml` a merge commit of the
+    base ref's history that changed `openspec/changes/<change>/`, and its diff — `revert.yaml` aside —
+    is exactly the inverse of that commit's diff against its first parent: the same files, each going
+    back to the very blob and mode it had before the merge, and nothing else.
+    """
+    revert, errors = load_revert(text or "", change)
+    if branch != f"{REVERT_BRANCH}{change}":
+        errors.append(f"a revert of {change} comes from the branch {REVERT_BRANCH}{change}, not {branch or '(none)'}")
+    if revert is None:
+        return errors
+    merged = rev_parse(repo, revert["merge_commit"])
+    short = revert["merge_commit"][:7]
+    if not merged:
+        return errors + [f"revert of {change}: merge commit {short} unknown"]
+    if subprocess.run(["git", "-C", repo, "merge-base", "--is-ancestor", merged, base_sha],
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+        return errors + [f"revert of {change}: {short} is not on the base ref"]
+    parent = rev_parse(repo, f"{merged}^1")
+    if not parent:
+        return errors + [f"revert of {change}: {short} has no parent"]
+    original = diff_entries(repo, parent, merged)
+    if not any(entry.path.startswith(f"{CHANGES_DIR}{change}/") for entry in original):
+        return errors + [f"revert of {change}: {short} did not change {CHANGES_DIR}{change}/"]
+    own = f"{CHANGES_DIR}{change}/{REVERT_FILE}"
+    expected = _transitions(original, inverse=True)
+    actual = _transitions(entry for entry in entries if entry.path != own)
+    differing = sorted({item[0] for item in expected ^ actual})
+    if differing:
+        shown = ", ".join(differing[:3]) + (f" (+{len(differing) - 3})" if len(differing) > 3 else "")
+        errors.append(f"not the exact inverse of {short}: {shown}")
+    return errors
+
+
+def revert_gates(classification, hits) -> list:
+    """An exact revert opens no gate, except the irreversible one when the reverted change had it open
+    (fixed forward, the owner decides) or the revert touches gate machinery (always gated)."""
+    if classification["irreversible"]["open"] or any(hit.get("machinery") for hit in hits):
+        return ["irreversible"]
+    return []
+
+
 def needs_lines(triggers, path: str) -> bool:
     """Whether a content trigger reads `path`."""
     return any(not content["paths"] or any(glob_match(glob, path) for glob in content["paths"])
@@ -568,6 +803,9 @@ def match(repo: str, base: str, head: str, branch=None) -> dict:
     if change_error:
         errors.append(change_error)
     framing = change is not None and is_framing(change, entries)
+    revert_path = f"{CHANGES_DIR}{change}/{REVERT_FILE}"
+    revert = (not framing and change is not None
+              and any(entry.path == revert_path and entry.status == "A" for entry in entries))
     edits = [] if framing else classification_edits(repo, base_sha, entries)
     lines_by_file = {entry.path: added_lines(repo, merge_base, head_sha, entry.path) for entry in entries
                      if entry.status != "D" and needs_lines(triggers, entry.path)}
@@ -590,6 +828,17 @@ def match(repo: str, base: str, head: str, branch=None) -> dict:
         errors = [message for message in errors if not message.startswith("approved ")]
         errors.extend(f"proposed {message}" for message in proposed_errors)
         gates = ["framing"]
+    elif revert:
+        kind = "revert"
+        errors.extend(revert_errors(repo, base_sha, change, entries, branch,
+                                    show_file(repo, head_sha, revert_path)))
+        if classification is None:
+            errors.append(f"revert of {change}: no approved classification on the base ref")
+            gates = ["invalid"]
+        elif classification is False:
+            gates = ["invalid"]
+        else:
+            gates = revert_gates(classification, hits)
     elif classification is False:
         kind = "change"
         gates = ["invalid"]
@@ -739,21 +988,19 @@ def describe(label: str, reasons, base_sha: str) -> str:
     return text + suffix
 
 
-def evaluate(result: dict, required, runs, statuses, problems=None):
-    """(state, description) of `merge-conditions` for one head commit."""
-    problems = problems or {}
-    failures, waiting = list(result["errors"]), []
-    if result["unaccounted"]:
-        failures.append(unaccounted_reason(result["unaccounted"]))
+def run_verdicts(required, runs, head_sha: str, skip=()):
+    """(failures, waiting) of the required workflows: the latest `pull_request` run of each on
+    `head_sha` must have completed with success. Workflows in `skip` are not looked at."""
+    failures, waiting = [], []
     latest = {}
     for run in runs:
-        if run.get("event") != "pull_request" or run.get("head_sha") != result["head"]:
+        if run.get("event") != "pull_request" or run.get("head_sha") != head_sha:
             continue
         path = run.get("path", "").split("@", 1)[0]
         if path not in latest or run.get("id", 0) > latest[path].get("id", 0):
             latest[path] = run
     for path in required:
-        if path in problems:
+        if path in skip:
             continue
         name = _workflow_name(path)
         run = latest.get(path)
@@ -763,6 +1010,17 @@ def evaluate(result: dict, required, runs, statuses, problems=None):
             waiting.append(f"{name} running")
         elif run.get("conclusion") != "success":
             failures.append(f"{name} {run.get('conclusion')}")
+    return failures, waiting
+
+
+def evaluate(result: dict, required, runs, statuses, problems=None):
+    """(state, description) of `merge-conditions` for one head commit."""
+    problems = problems or {}
+    failures, waiting = list(result["errors"]), []
+    if result["unaccounted"]:
+        failures.append(unaccounted_reason(result["unaccounted"]))
+    run_failures, waiting = run_verdicts(required, runs, result["head"], problems)
+    failures.extend(run_failures)
     failures.extend(problems[path] for path in sorted(problems))
     if result["kind"] == "change":
         for context in REVIEW_STATUSES:
@@ -909,11 +1167,158 @@ def check(api, repo: str, slug: str, default_branch: str, pr=None, sha=None, all
 
 
 # --------------------------------------------------------------------------------------------
+# Deploy guard — the server-side barrier: recomputes, never reads the `merge-conditions` status
+# --------------------------------------------------------------------------------------------
+
+GUARD_DEPLOY, GUARD_REFUSED, GUARD_CANNOT_JUDGE, GUARD_NOTHING = 0, 1, 2, 3
+GUARD_REF = "refs/sdd-deploy-guard/"
+TOKEN_VARIABLES = ("DEPLOY_GUARD_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
+
+
+class RestGitHub:
+    """GitHub's REST API over HTTPS with a token: a deploy pipeline (Vercel) may have no `gh`."""
+
+    def __init__(self, token: str, api_url=None, timeout: int = 30):
+        self.token, self.timeout = token, timeout
+        self.api_url = (api_url or os.environ.get("GITHUB_API_URL") or "https://api.github.com").rstrip("/")
+
+    def get(self, path: str):
+        request = urllib.request.Request(f"{self.api_url}/{path}", headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {self.token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "sdd-deploy-guard",
+        })
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return json.loads(response.read() or b"null")
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            raise RuntimeError(f"GET {path.split('?', 1)[0]}: {exc}") from None
+
+
+def guard_token(environment=None):
+    environment = os.environ if environment is None else environment
+    return next((environment[name] for name in TOKEN_VARIABLES if environment.get(name)), None)
+
+
+def before_from_push(api, slug: str, default_branch: str, sha: str):
+    """The `before` of the push that moved the default branch to `sha`, from the repository activity
+    (for a platform that is not given the push event, Vercel). None when it is not found."""
+    activities = api.get(f"repos/{slug}/activity?ref=refs/heads/{default_branch}&per_page={PAGE_SIZE}") or []
+    for activity in activities:
+        if activity.get("after") == sha and activity.get("ref") in (f"refs/heads/{default_branch}", default_branch):
+            return activity.get("before")
+    return None
+
+
+def fetch_for_guard(repo: str, slug: str, default_branch: str, number: int, token: str, server_url=None):
+    """Fetch the default branch (all its history, a shallow clone is deepened) and the merged pull
+    request's head, as data. The token goes in an HTTP header through the environment, never on the
+    command line, after any inherited header is reset."""
+    server_url = (server_url or os.environ.get("GITHUB_SERVER_URL") or "https://github.com").rstrip("/")
+    header = "Authorization: Basic " + base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    environment = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_CONFIG_COUNT="2",
+                       GIT_CONFIG_KEY_0="http.extraHeader", GIT_CONFIG_VALUE_0="",
+                       GIT_CONFIG_KEY_1="http.extraHeader", GIT_CONFIG_VALUE_1=header)
+    arguments = ["fetch", "--no-tags", "--quiet"]
+    if git(repo, "rev-parse", "--is-shallow-repository").strip() == "true":
+        arguments.append("--unshallow")
+    arguments += [f"{server_url}/{slug}.git", f"+refs/heads/{default_branch}:{GUARD_REF}base",
+                  f"+refs/pull/{number}/head:{GUARD_REF}pull"]
+    result = subprocess.run(["git", "-C", repo, *arguments], env=environment,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        raise GitError(f"git fetch {slug}: {result.stderr.decode('utf-8', 'replace').strip()}")
+
+
+def merged_pull_request(api, slug: str, default_branch: str, sha: str, attempts: int, delay: float):
+    """The pull requests merged into the default branch AS `sha` (its merge commit). GitHub may list the
+    association a few seconds after the push, so an empty answer is asked again."""
+    merged = []
+    for attempt in range(attempts):
+        merged = [pull for pull in get_pages(api, f"repos/{slug}/commits/{sha}/pulls")
+                  if pull.get("merged_at") and pull.get("merge_commit_sha") == sha
+                  and (pull.get("base") or {}).get("ref") == default_branch]
+        if merged or attempt == attempts - 1:
+            break
+        time.sleep(delay)
+    return merged
+
+
+def deploy_guard(api, repo: str, slug: str, sha: str, before=None, paths=None, fetch: bool = True,
+                 token=None, server_url=None, attempts: int = 3, delay: float = 5.0):
+    """(exit code, reason) of the deploy guard for the commit `sha` of the default branch.
+
+    `before` is the default branch before the push (the push event's `before`); None → read from the
+    repository activity. Any failure to judge refuses (fail closed).
+    """
+    try:
+        return _deploy_guard(api, repo, slug, sha, before, paths, fetch, token, server_url, attempts, delay)
+    except Exception as exc:  # fail closed, with the reason in the deploy log
+        return GUARD_CANNOT_JUDGE, f"cannot judge {sha[:7]}: {exc}"
+
+
+def _deploy_guard(api, repo, slug, sha, before, paths, fetch, token, server_url, attempts, delay):
+    if not SHA.match(sha or ""):
+        return GUARD_CANNOT_JUDGE, f"cannot judge: {sha!r} is not a full commit sha"
+    short = sha[:7]
+    default_branch = (api.get(f"repos/{slug}") or {}).get("default_branch")
+    if not default_branch:
+        return GUARD_CANNOT_JUDGE, f"cannot judge {short}: the default branch of {slug} is unknown"
+    if before is None:
+        before = before_from_push(api, slug, default_branch, sha)
+        if before is None:
+            return GUARD_CANNOT_JUDGE, (f"cannot judge {short}: no push of {default_branch} to it in the "
+                                        f"repository activity, so the commit before it is unknown")
+    if not SHA.match(before) or before == "0" * 40:
+        return GUARD_REFUSED, f"refused {short}: the push has no previous {default_branch} commit ({before!r})"
+    merged = merged_pull_request(api, slug, default_branch, sha, attempts, delay)
+    if not merged:
+        return GUARD_REFUSED, (f"refused {short}: no pull request was merged into {default_branch} as this "
+                               f"commit (direct push)")
+    if len(merged) > 1:
+        numbers = ", ".join(f"#{pull.get('number')}" for pull in merged)
+        return GUARD_REFUSED, f"refused {short}: several pull requests merged as this commit ({numbers})"
+    pull = merged[0]
+    number, head = pull.get("number"), pull.get("head") or {}
+    head_sha, head_ref = head.get("sha"), head.get("ref")
+    if fetch:
+        fetch_for_guard(repo, slug, default_branch, number, token or "", server_url)
+    for commit in (sha, before, head_sha or ""):
+        if not SHA.match(commit) or rev_parse(repo, commit) != commit:
+            return GUARD_CANNOT_JUDGE, f"cannot judge {short} (#{number}): commit {commit[:12]!r} unavailable"
+    if rev_parse(repo, f"{sha}^1") != before:
+        return GUARD_REFUSED, (f"refused {short} (#{number}): its first parent is not {before[:7]}, the "
+                               f"{default_branch} before the push, so the push carried more than the merge")
+    if paths is not None:
+        changed = [entry.path for entry in diff_entries(repo, before, sha)]
+        if not any(filter_includes(paths, path) for path in changed):
+            return GUARD_NOTHING, f"skip {short} (#{number}): nothing changed under {' '.join(paths)}"
+    result = match(repo, before, head_sha, head_ref)
+    reasons = list(result["errors"])
+    if result["unaccounted"]:
+        reasons.append(unaccounted_reason(result["unaccounted"]))
+    if reasons:
+        return GUARD_REFUSED, f"refused {short} (#{number}, {result['label']}): " + "; ".join(reasons)
+    required = required_workflows(repo, before, result["files"], default_branch)
+    deleted = {entry.path for entry in diff_entries(repo, result["merge_base"], head_sha) if entry.status == "D"}
+    runs = get_pages(api, f"repos/{slug}/actions/runs?head_sha={head_sha}&event=pull_request", "workflow_runs")
+    failures, waiting = run_verdicts(required, runs, head_sha, deleted)
+    if failures or waiting:
+        return GUARD_REFUSED, (f"refused {short} (#{number}): required CI not green on its head "
+                               f"{head_sha[:7]}: " + "; ".join(failures + waiting))
+    return GUARD_DEPLOY, (f"deploy {short}: #{number} ({result['kind']}, {result['label']}), required CI "
+                          f"green on {head_sha[:7]}")
+
+
+# --------------------------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------------------------
 
 
-def validate_files(paths) -> list:
+def validate_files(paths, unconfirmed=None) -> list:
+    """Schema errors of each file; `unconfirmed`, a list, receives `<file>: <value>` for every value a
+    deployment profile marks `unconfirmed: true` (valid, but to be confirmed by the owner)."""
     errors = []
     for path in paths:
         name = os.path.basename(path)
@@ -923,13 +1328,19 @@ def validate_files(paths) -> list:
         except OSError as exc:
             errors.append(f"{path}: {exc}")
             continue
+        folder = os.path.basename(os.path.dirname(os.path.abspath(path)))
         if name == "triggers.yaml":
             _, found = load_triggers(text)
         elif name == CLASSIFICATION_FILE:
-            folder = os.path.basename(os.path.dirname(os.path.abspath(path)))
             _, found = load_classification(text, folder)
+        elif name == REVERT_FILE:
+            _, found = load_revert(text, folder)
+        elif name == DEPLOYMENT_FILE:
+            _, found, values = load_deployment(text)
+            if unconfirmed is not None:
+                unconfirmed.extend(f"{path}: {value}" for value in values)
         else:
-            found = ["not a triggers.yaml or classification.yaml file"]
+            found = [f"not a triggers.yaml, {CLASSIFICATION_FILE}, {REVERT_FILE} or {DEPLOYMENT_FILE} file"]
         errors.extend(f"{path}: {message}" for message in found)
     return errors
 
@@ -956,10 +1367,34 @@ def main(argv=None) -> int:
     check_parser.add_argument("--head-sha", help="with --pr: the head commit the event named")
     check_parser.add_argument("--dry-run", action="store_true", help="print, do not post the status")
 
-    validate_parser = commands.add_parser("validate", help="check triggers.yaml / classification.yaml files")
+    guard_parser = commands.add_parser(
+        "deploy-guard", help="may this commit of the default branch deploy? exit 0 deploy, 1 refused, "
+                             "2 cannot judge, 3 nothing under --paths")
+    guard_parser.add_argument("--repo", required=True, help="owner/name")
+    guard_parser.add_argument("--sha", required=True, help="the pushed commit of the default branch")
+    before = guard_parser.add_mutually_exclusive_group(required=True)
+    before.add_argument("--before", help="the default branch before the push (the push event's `before`)")
+    before.add_argument("--before-from-push", action="store_true",
+                        help="read `before` from the repository activity (a platform without the push event)")
+    guard_parser.add_argument("--paths", nargs="+",
+                              help="deploy only when the push changed a path matching these globs (exit 3 otherwise)")
+    guard_parser.add_argument("--no-fetch", action="store_true",
+                              help="do not fetch the default branch and the pull request head first")
+
+    validate_parser = commands.add_parser(
+        "validate", help="check triggers.yaml / classification.yaml / revert.yaml / deployment.yaml files")
     validate_parser.add_argument("files", nargs="+")
 
     args = parser.parse_args(argv)
+    if args.command == "deploy-guard":
+        token = guard_token()
+        if token is None:
+            code, reason = GUARD_CANNOT_JUDGE, f"cannot judge: no token ({', '.join(TOKEN_VARIABLES)})"
+        else:
+            code, reason = deploy_guard(RestGitHub(token), args.directory, args.repo, args.sha,
+                                        before=args.before, paths=args.paths, fetch=not args.no_fetch, token=token)
+        print(f"deploy-guard: {reason}")
+        return code
     if args.command == "match":
         try:
             result = match(args.directory, args.base, args.head, args.branch)
@@ -969,7 +1404,10 @@ def main(argv=None) -> int:
         print(json.dumps(result, indent=2))
         return 1 if result["errors"] or result["unaccounted"] else 0
     if args.command == "validate":
-        errors = validate_files(args.files)
+        unconfirmed: list = []
+        errors = validate_files(args.files, unconfirmed)
+        for value in unconfirmed:
+            print(f"unconfirmed: {value}")
         for message in errors:
             print(message, file=sys.stderr)
         return 1 if errors else 0

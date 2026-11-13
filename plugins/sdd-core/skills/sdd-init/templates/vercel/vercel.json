@@ -1,0 +1,3 @@
+{
+  "ignoreCommand": "bash {{VERCEL_REPO_ROOT}}/.sdd/bin/deploy-guard.sh --vercel {{VERCEL_PATHS}}"
+}

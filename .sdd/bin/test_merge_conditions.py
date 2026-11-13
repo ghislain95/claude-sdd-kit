@@ -176,7 +176,7 @@ class MatcherTest(unittest.TestCase):
         # None of these is in TRIGGERS: each changes what CI or the check does.
         for path in (".github/actions/test/action.yml", ".github/CODEOWNERS", ".gitattributes",
                      "web/.gitattributes", ".gitmodules", "openspec/config.yaml", ".sdd/harness.yaml",
-                     ".claude/hooks/block.sh", ".claude/settings.json", "vercel.json"):
+                     ".claude/hooks/block.sh", ".claude/settings.json", "vercel.json", "web/vercel.json"):
             with self.subTest(path=path):
                 repo = Repo()
                 self.addCleanup(repo.cleanup)
@@ -197,7 +197,7 @@ class MatcherTest(unittest.TestCase):
         result = self.match()
         self.assertEqual(result["errors"], [".sdd/triggers.yaml missing on the base ref"])
         self.assertEqual(result["gates"], ["irreversible"])
-        self.assertEqual(result["hits"][0]["trigger"], "vercel.json")
+        self.assertEqual(result["hits"][0]["trigger"], "**/vercel.json")
 
     def test_project_gate_machinery_is_added_to_the_defaults(self):
         self.approve(classification(irreversible_waived=[("tools/release.sh", "typo")]))
@@ -887,7 +887,675 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(stub.posted[0][2], "error")
 
 
+def revert_file(merge_commit, change="add-export", reason="the export probe returned 500"):
+    return f"revert_of: {change}\nmerge_commit: {merge_commit}\nreason: {reason}\n"
+
+
+class RevertTest(unittest.TestCase):
+    """A revert pull request: `revert/<id>`, `revert.yaml`, the exact inverse of the merged change."""
+
+    def setUp(self):
+        self.repo = Repo()
+        self.addCleanup(self.repo.cleanup)
+        self.repo.write(".sdd/triggers.yaml", TRIGGERS)
+        self.repo.write("src/app.py", "print(1)\n")
+        self.repo.write("src/tool.sh", "echo tool\n")
+        self.repo.write("openspec/changes/add-export/proposal.md", "# Proposal\n")
+
+    def merged_change(self, files, classification_text=None, removed=(), method="squash", modes=()):
+        """Approve, branch, change, merge into main; returns the merge commit."""
+        self.repo.write("openspec/changes/add-export/classification.yaml", classification_text or classification())
+        self.repo.commit("base")
+        self.repo.branch("feat/add-export")
+        self.repo.write("openspec/changes/add-export/tasks.md", "- [x] 1.1\n")
+        for path, content in files.items():
+            self.repo.write(path, content)
+        for path in removed:
+            self.repo.remove(path)
+        for path in modes:
+            os.chmod(os.path.join(self.repo.path, path), 0o755)
+        self.repo.git("add", "--all")
+        self.repo.git("commit", "-q", "-m", "change")
+        self.repo.git("switch", "-q", "main")
+        if method == "squash":
+            self.repo.git("merge", "-q", "--squash", "feat/add-export")
+            self.repo.git("commit", "-q", "-m", "feat(add-export): squashed (#7)")
+        else:
+            self.repo.git("merge", "-q", "--no-ff", "-m", "Merge pull request #7", "feat/add-export")
+        return self.repo.git("rev-parse", "HEAD")
+
+    def revert(self, merged, branch="revert/add-export", mainline=False, edit=None, text=None):
+        self.repo.git("switch", "-q", "-c", branch, "main")
+        self.repo.git("revert", "--no-edit", *(["-m", "1"] if mainline else []), merged)
+        if edit:
+            edit()
+        self.repo.write("openspec/changes/add-export/revert.yaml", text or revert_file(merged))
+        head = self.repo.commit("revert")
+        return mc.match(self.repo.path, "main", head, branch)
+
+    def test_exact_inverse_of_a_squash_merge_opens_no_gate(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n", "src/new.py": "x = 1\n"}, removed=["src/tool.sh"])
+        result = self.revert(merged)
+        self.assertEqual((result["kind"], result["change"], result["errors"]), ("revert", "add-export", []))
+        self.assertEqual((result["gates"], result["unaccounted"], result["description"]), ([], [], "gates: none"))
+
+    def test_exact_inverse_of_a_merge_commit(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"}, method="merge")
+        result = self.revert(merged, mainline=True)
+        self.assertEqual((result["kind"], result["errors"], result["gates"]), ("revert", [], []))
+
+    def test_modified_revert_is_rejected(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n", "src/new.py": "x = 1\n"})
+        result = self.revert(merged, edit=lambda: self.repo.write("src/app.py", "print(1)  # restored\n"))
+        self.assertEqual(result["kind"], "revert")
+        self.assertEqual(result["errors"], [f"not the exact inverse of {merged[:7]}: src/app.py"])
+        self.assertTrue(result["description"].startswith("gates: none - not the exact inverse"))
+
+    def test_revert_with_an_extra_file_is_rejected(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        result = self.revert(merged, edit=lambda: self.repo.write("src/other.py", "y = 2\n"))
+        self.assertEqual(result["errors"], [f"not the exact inverse of {merged[:7]}: src/other.py"])
+
+    def test_partial_revert_is_rejected(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n", "src/new.py": "x = 1\n"})
+        result = self.revert(merged, edit=lambda: self.repo.write("src/new.py", "x = 1\n"))
+        self.assertEqual(result["errors"], [f"not the exact inverse of {merged[:7]}: src/new.py"])
+
+    def test_mode_left_changed_is_not_an_exact_inverse(self):
+        merged = self.merged_change({}, modes=["src/tool.sh"])
+        self.repo.git("switch", "-q", "-c", "revert/add-export", "main")
+        self.repo.git("revert", "--no-edit", merged)
+        os.chmod(os.path.join(self.repo.path, "src/tool.sh"), 0o755)  # the content goes back, the mode does not
+        self.repo.write("openspec/changes/add-export/revert.yaml", revert_file(merged))
+        head = self.repo.commit("revert")
+        result = mc.match(self.repo.path, "main", head, "revert/add-export")
+        self.assertEqual(result["errors"], [f"not the exact inverse of {merged[:7]}: src/tool.sh"])
+
+    def test_revert_from_another_branch_is_rejected(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        result = self.revert(merged, branch="fix/add-export")
+        self.assertEqual(result["errors"], ["a revert of add-export comes from the branch revert/add-export, not fix/add-export"])
+
+    def test_merge_commit_must_be_on_the_base_ref(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        self.repo.git("switch", "-q", "-c", "elsewhere", "main")
+        self.repo.write("src/app.py", "print(3)\n")
+        elsewhere = self.repo.commit("not on main")
+        self.repo.git("switch", "-q", "main")
+        result = self.revert(merged, text=revert_file(elsewhere))
+        self.assertIn(f"revert of add-export: {elsewhere[:7]} is not on the base ref", result["errors"])
+
+    def test_merge_commit_must_be_a_merge_of_the_change(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        self.repo.write("src/other.py", "z = 3\n")
+        other = self.repo.commit("unrelated commit on main")
+        result = self.revert(merged, text=revert_file(other))
+        self.assertIn(f"revert of add-export: {other[:7]} did not change openspec/changes/add-export/", result["errors"])
+
+    def test_invalid_revert_file_is_rejected(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        result = self.revert(merged, text=f"revert_of: add-export\nmerge_commit: {merged[:7]}\n")
+        self.assertEqual(result["kind"], "revert")
+        self.assertEqual(result["errors"], ["revert.yaml: merge_commit: expected the full sha of the reverted merge",
+                                            "revert.yaml: reason: expected the diagnosis of the failed verification"])
+
+    def test_revert_of_an_irreversible_change_opens_the_irreversible_gate(self):
+        merged = self.merged_change({"db/migrations/V2__a.sql": "alter table t add c int;\n"},
+                                    classification(irreversible=True))
+        result = self.revert(merged)
+        self.assertEqual((result["errors"], result["gates"], result["unaccounted"]), ([], ["irreversible"], []))
+
+    def test_revert_touching_gate_machinery_opens_the_irreversible_gate(self):
+        merged = self.merged_change({"tools/release.sh": "echo release\n"})
+        result = self.revert(merged)
+        self.assertEqual((result["errors"], result["gates"]), ([], ["irreversible"]))
+        self.assertTrue(any(hit.get("machinery") for hit in result["hits"]))
+
+    def test_revert_of_an_intent_change_opens_no_gate(self):
+        merged = self.merged_change({"web/src/page.ts": "x\n"}, classification(intent=True))
+        result = self.revert(merged)
+        self.assertEqual((result["errors"], result["gates"], result["unaccounted"]), ([], [], []))
+
+    def test_revert_needs_the_approved_classification(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        self.repo.git("switch", "-q", "-c", "chore/drop", "main")
+        self.repo.remove("openspec/changes/add-export/classification.yaml")
+        dropped = self.repo.commit("drop the classification")
+        self.repo.git("switch", "-q", "main")
+        self.repo.git("merge", "-q", "--ff-only", dropped)
+        result = self.revert(merged)
+        self.assertEqual(result["gates"], ["invalid"])
+        self.assertIn("revert of add-export: no approved classification on the base ref", result["errors"])
+
+    def test_editing_an_existing_revert_file_is_no_revert(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        self.revert(merged)
+        self.repo.git("switch", "-q", "main")
+        self.repo.git("merge", "-q", "--ff-only", "revert/add-export")
+        self.repo.git("switch", "-q", "-c", "fix/add-export", "main")
+        self.repo.write("openspec/changes/add-export/revert.yaml", revert_file(merged, reason="a better diagnosis"))
+        self.repo.write("src/app.py", "print(4)\n")
+        result = mc.match(self.repo.path, "main", self.repo.commit("fix"), "fix/add-export")
+        self.assertEqual((result["kind"], result["errors"]), ("change", []))
+
+    def test_revert_needs_no_review_status(self):
+        merged = self.merged_change({"src/app.py": "print(2)\n"})
+        result = self.revert(merged)
+        self.assertEqual(mc.evaluate(result, [], [], {})[0], "success")
+
+
+GUARD_WORKFLOWS = {name: WORKFLOWS[name] for name in ("always.yml", "not-docs.yml", "web.yml", "deploy.yml")}
+
+
+class GuardStub:
+    """GitHub's REST API as the deploy guard reads it. A pull request is listed for the commits in
+    its `_commits` (its merge commit by default)."""
+
+    def __init__(self, pulls=(), runs=(), activity=(), default_branch="main", fail=None):
+        self.pulls, self.runs, self.activity = list(pulls), list(runs), list(activity)
+        self.default_branch, self.fail, self.calls = default_branch, fail, []
+
+    def get(self, path):
+        self.calls.append(path)
+        route, _, query = path.partition("?")
+        params = dict(item.split("=", 1) for item in query.split("&") if item)
+        if self.fail and self.fail in route:
+            raise RuntimeError(f"GET {route}: HTTP Error 502")
+        if route == "repos/acme/app":
+            return {"default_branch": self.default_branch}
+        if re.fullmatch(r"repos/acme/app/commits/[0-9a-f]+/pulls", route):
+            sha = route.split("/")[4]
+            listed = [{key: value for key, value in pull.items() if key != "_commits"} for pull in self.pulls
+                      if sha in pull.get("_commits", [pull.get("merge_commit_sha")])]
+            return StubGitHub.page(listed, params)
+        if route == "repos/acme/app/actions/runs":
+            runs = [item for item in self.runs if item["head_sha"] == params.get("head_sha")]
+            return {"total_count": len(runs), "workflow_runs": StubGitHub.page(runs, params)}
+        if route == "repos/acme/app/activity":
+            return self.activity
+        raise AssertionError(f"unexpected API call {path}")
+
+
+def merged_pull(number, merge_sha, head_sha, branch="feat/add-export", base="main", merged=True):
+    return {"number": number, "merged_at": "2026-11-13T10:00:00Z" if merged else None,
+            "merge_commit_sha": merge_sha, "base": {"ref": base}, "head": {"sha": head_sha, "ref": branch}}
+
+
+class DeployGuardTest(unittest.TestCase):
+    def setUp(self):
+        self.repo = Repo()
+        self.addCleanup(self.repo.cleanup)
+        self.repo.write(".sdd/triggers.yaml", TRIGGERS)
+        for name, content in GUARD_WORKFLOWS.items():
+            self.repo.write(f".github/workflows/{name}", content)
+        self.repo.write("README.md", "project\n")
+        self.repo.write("openspec/changes/add-export/proposal.md", "# Proposal\n")
+
+    def merge(self, files, classification_text=None, removed=(), branch="feat/add-export", before_extra=None):
+        """Base, pull request, squash merge. Returns (before, merged, head)."""
+        self.repo.write("openspec/changes/add-export/classification.yaml", classification_text or classification())
+        self.repo.commit("base")
+        self.repo.branch(branch)
+        self.repo.write("openspec/changes/add-export/tasks.md", "- [x] 1.1\n")
+        for path, content in files.items():
+            self.repo.write(path, content)
+        for path in removed:
+            self.repo.remove(path)
+        head = self.repo.commit("pull request")
+        self.repo.git("switch", "-q", "main")
+        before = self.repo.git("rev-parse", "HEAD")
+        if before_extra:
+            self.repo.write(*before_extra)
+            self.repo.commit("direct commit")
+        self.repo.git("merge", "-q", "--squash", branch)
+        self.repo.git("commit", "-q", "-m", "squashed (#7)")
+        return before, self.repo.git("rev-parse", "HEAD"), head
+
+    def green(self, head):
+        return [run("always.yml", head), run("not-docs.yml", head, run_id=2)]
+
+    def guard(self, stub, merged, before, **options):
+        options.setdefault("fetch", False)
+        return mc.deploy_guard(stub, self.repo.path, "acme/app", merged, before, delay=0, **options)
+
+    def test_merged_pull_request_with_green_ci_deploys(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], self.green(head)), merged, before)
+        self.assertEqual(code, mc.GUARD_DEPLOY, reason)
+        self.assertEqual(reason, f"deploy {merged[:7]}: #7 (change, gates: none), required CI green on {head[:7]}")
+
+    def test_direct_push_is_refused_after_asking_again(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([], self.green(head))
+        code, reason = self.guard(stub, merged, before, attempts=3)
+        self.assertEqual((code, reason), (mc.GUARD_REFUSED, f"refused {merged[:7]}: no pull request was merged "
+                                                               f"into main as this commit (direct push)"))
+        self.assertEqual(sum("/pulls" in call for call in stub.calls), 3)
+
+    def test_unmerged_pull_request_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([merged_pull(7, merged, head, merged=False)], self.green(head))
+        self.assertEqual(self.guard(stub, merged, before)[0], mc.GUARD_REFUSED)
+
+    def test_pull_request_merged_into_another_branch_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([merged_pull(7, merged, head, base="release")], self.green(head))
+        self.assertEqual(self.guard(stub, merged, before)[0], mc.GUARD_REFUSED)
+
+    def test_pull_request_merged_as_another_commit_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([dict(merged_pull(7, "e" * 40, head), _commits=[merged])], self.green(head))
+        self.assertEqual(self.guard(stub, merged, before)[0], mc.GUARD_REFUSED)
+
+    def test_several_pull_requests_merged_as_the_commit_are_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([merged_pull(7, merged, head), merged_pull(8, merged, head)], self.green(head))
+        code, reason = self.guard(stub, merged, before)
+        self.assertEqual(code, mc.GUARD_REFUSED)
+        self.assertIn("several pull requests merged as this commit (#7, #8)", reason)
+
+    def test_red_ci_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        runs = [run("always.yml", head, conclusion="failure"), run("not-docs.yml", head, run_id=2)]
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], runs), merged, before)
+        self.assertEqual(code, mc.GUARD_REFUSED)
+        self.assertTrue(reason.endswith(f"required CI not green on its head {head[:7]}: always failure"), reason)
+
+    def test_missing_or_running_ci_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        for runs, expected in (([run("always.yml", head)], "no run of not-docs"),
+                               ([run("always.yml", head), run("not-docs.yml", head, status="in_progress",
+                                                              conclusion=None, run_id=2)], "not-docs running"),
+                               ([run("always.yml", head), run("not-docs.yml", head, event="push", run_id=2)],
+                                "no run of not-docs")):
+            with self.subTest(expected=expected):
+                code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], runs), merged, before)
+                self.assertEqual(code, mc.GUARD_REFUSED)
+                self.assertTrue(reason.endswith(expected), reason)
+
+    def test_path_filtered_workflow_is_required_by_the_diff(self):
+        before, merged, head = self.merge({"web/app.ts": "x\n"}, classification(intent=True))
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head))
+        code, reason = self.guard(stub, merged, before)
+        self.assertEqual((code, reason.rsplit(": ", 1)[-1]), (mc.GUARD_REFUSED, "no run of web"))
+
+    def test_owner_merged_gated_change_deploys(self):
+        before, merged, head = self.merge({"web/app.ts": "x\n"}, classification(intent=True))
+        runs = self.green(head) + [run("web.yml", head, run_id=3)]
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], runs), merged, before)
+        self.assertEqual((code, reason), (mc.GUARD_DEPLOY, f"deploy {merged[:7]}: #7 (change, gates: intent), "
+                                                             f"required CI green on {head[:7]}"))
+
+    def test_unaccounted_trigger_hit_is_refused(self):
+        before, merged, head = self.merge({"db/migrations/V2__a.sql": "alter table t add c int;\n"})
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], self.green(head)), merged, before)
+        self.assertEqual(code, mc.GUARD_REFUSED)
+        self.assertIn("unaccounted irreversible db/migrations/V2__a.sql", reason)
+
+    def test_invalid_classification_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"}, "change: add-export\n")
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], self.green(head)), merged, before)
+        self.assertEqual(code, mc.GUARD_REFUSED)
+        self.assertIn("gates: invalid", reason)
+
+    def test_push_carrying_more_than_the_merge_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"}, before_extra=("src/sneaky.py", "x\n"))
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], self.green(head)), merged, before)
+        self.assertEqual(code, mc.GUARD_REFUSED)
+        self.assertIn(f"its first parent is not {before[:7]}", reason)
+
+    def test_workflow_deleted_by_the_merged_pull_request_is_not_required(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"}, classification(irreversible=True),
+                                          removed=[".github/workflows/not-docs.yml"])
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], [run("always.yml", head)]), merged, before)
+        self.assertEqual(code, mc.GUARD_DEPLOY, reason)
+
+    def test_required_workflows_are_read_from_before_the_merge(self):
+        # The pull request filters not-docs out: the definition before the merge still requires it.
+        before, merged, head = self.merge({"src/app.py": "print(1)\n",
+                                           ".github/workflows/not-docs.yml": "name: NotDocs\non:\n  pull_request:\n"
+                                                                             "    paths: [ 'nothing/**' ]\njobs: {}\n"},
+                                          classification(irreversible=True))
+        code, reason = self.guard(GuardStub([merged_pull(7, merged, head)], [run("always.yml", head)]), merged, before)
+        self.assertEqual((code, reason.rsplit(": ", 1)[-1]), (mc.GUARD_REFUSED, "no run of not-docs"))
+
+    def test_nothing_under_the_paths_skips(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head))
+        code, reason = self.guard(stub, merged, before, paths=["web/**"])
+        self.assertEqual((code, reason), (mc.GUARD_NOTHING, f"skip {merged[:7]} (#7): nothing changed under web/**"))
+        self.assertEqual(self.guard(stub, merged, before, paths=["web/**", "src/**"])[0], mc.GUARD_DEPLOY)
+
+    def test_before_is_read_from_the_repository_activity(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        activity = [{"ref": "refs/heads/main", "before": "1" * 40, "after": "2" * 40, "activity_type": "push"},
+                    {"ref": "refs/heads/main", "before": before, "after": merged, "activity_type": "pr_merge"}]
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head), activity)
+        self.assertEqual(self.guard(stub, merged, None)[0], mc.GUARD_DEPLOY)
+        self.assertIn("repos/acme/app/activity?ref=refs/heads/main&per_page=100", stub.calls)
+
+    def test_before_missing_from_the_activity_cannot_be_judged(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        activity = [{"ref": "refs/heads/other", "before": before, "after": merged}]
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head), activity)
+        self.assertEqual(self.guard(stub, merged, None),
+                         (mc.GUARD_CANNOT_JUDGE, f"cannot judge {merged[:7]}: no push of main to it in the repository "
+                                                 f"activity, so the commit before it is unknown"))
+
+    def test_branch_creation_is_refused(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head))
+        self.assertEqual(self.guard(stub, merged, "0" * 40)[0], mc.GUARD_REFUSED)
+
+    def test_failures_to_judge_refuse(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        pulls = [merged_pull(7, merged, head)]
+        for name, stub, sha, previous, expected in (
+                ("API down", GuardStub(pulls, self.green(head), fail="actions/runs"), merged, before, "HTTP Error 502"),
+                ("no default branch", GuardStub(pulls, self.green(head), default_branch=None), merged, before,
+                 "the default branch of acme/app is unknown"),
+                ("unknown before", GuardStub(pulls, self.green(head)), merged, "3" * 40, f"commit {'3' * 12!r} unavailable"),
+                ("unknown head", GuardStub([merged_pull(7, merged, "4" * 40)], self.green(head)), merged, before,
+                 f"commit {'4' * 12!r} unavailable"),
+                ("not a sha", GuardStub(pulls, self.green(head)), "main", before, "'main' is not a full commit sha")):
+            with self.subTest(name=name):
+                code, reason = self.guard(stub, sha, previous)
+                self.assertEqual(code, mc.GUARD_CANNOT_JUDGE)
+                self.assertIn(expected, reason)
+
+    def test_merged_revert_deploys(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        self.repo.git("switch", "-q", "-c", "revert/add-export", "main")
+        self.repo.git("revert", "--no-edit", merged)
+        self.repo.write("openspec/changes/add-export/revert.yaml", revert_file(merged))
+        revert_head = self.repo.commit("revert")
+        self.repo.git("switch", "-q", "main")
+        self.repo.git("merge", "-q", "--squash", "revert/add-export")
+        self.repo.git("commit", "-q", "-m", "revert (#8)")
+        reverted = self.repo.git("rev-parse", "HEAD")
+        stub = GuardStub([merged_pull(8, reverted, revert_head, branch="revert/add-export")], self.green(revert_head))
+        code, reason = self.guard(stub, reverted, merged)
+        self.assertEqual((code, reason.split(": ", 1)[1].split(",")[0]), (mc.GUARD_DEPLOY, "#8 (revert"))
+
+    def test_fetches_the_pull_request_head_into_a_shallow_clone(self):
+        before, merged, head = self.merge({"src/app.py": "print(1)\n"})
+        server = tempfile.mkdtemp(prefix="merge-conditions-server-")
+        self.addCleanup(shutil.rmtree, server, True)
+        bare = os.path.join(server, "acme", "app.git")
+        subprocess.run(["git", "clone", "-q", "--bare", self.repo.path, bare], env=GIT_ENV, check=True)
+        subprocess.run(["git", "-C", bare, "update-ref", "refs/pull/7/head", head], env=GIT_ENV, check=True)
+        subprocess.run(["git", "-C", bare, "branch", "-q", "-D", "feat/add-export"], env=GIT_ENV, check=True)
+        work = os.path.join(server, "work")
+        subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{bare}", work], env=GIT_ENV, check=True)
+        self.assertEqual(mc.rev_parse(work, head), "")
+        stub = GuardStub([merged_pull(7, merged, head)], self.green(head))
+        code, reason = mc.deploy_guard(stub, work, "acme/app", merged, before, token="t",
+                                       server_url=f"file://{server}", delay=0)
+        self.assertEqual(code, mc.GUARD_DEPLOY, reason)
+
+
+class DeployGuardCommandTest(unittest.TestCase):
+    def test_no_token_cannot_judge(self):
+        environment = {name: os.environ.pop(name) for name in mc.TOKEN_VARIABLES if name in os.environ}
+        self.addCleanup(os.environ.update, environment)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = mc.main(["deploy-guard", "--repo", "acme/app", "--sha", "a" * 40, "--before", "b" * 40])
+        self.assertEqual((code, output.getvalue().strip()), (2, "deploy-guard: cannot judge: no token "
+                                                                 "(DEPLOY_GUARD_TOKEN, GH_TOKEN, GITHUB_TOKEN)"))
+
+    def test_token_order(self):
+        self.assertEqual(mc.guard_token({"GITHUB_TOKEN": "c", "GH_TOKEN": "b", "DEPLOY_GUARD_TOKEN": "a"}), "a")
+        self.assertEqual(mc.guard_token({"GITHUB_TOKEN": "c", "GH_TOKEN": ""}), "c")
+        self.assertIsNone(mc.guard_token({}))
+
+
+SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deploy-guard.sh")
+FAKE_PYTHON = """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$FAKE_LOG"
+case "$1" in
+  -c) exit "${FAKE_YAML:-0}" ;;
+  -m) exit "${FAKE_VENV:-1}" ;;
+esac
+echo "deploy-guard: fake verdict"
+exit "${FAKE_CODE:-0}"
+"""
+
+
+class DeployGuardScriptTest(unittest.TestCase):
+    """deploy-guard.sh: arguments per platform and the exit-code mapping (Vercel's is inverted)."""
+
+    def setUp(self):
+        self.folder = tempfile.mkdtemp(prefix="deploy-guard-script-")
+        self.addCleanup(shutil.rmtree, self.folder, True)
+        self.python = os.path.join(self.folder, "python")
+        with open(self.python, "w") as handle:
+            handle.write(FAKE_PYTHON)
+        os.chmod(self.python, 0o755)
+        self.log = os.path.join(self.folder, "log")
+
+    def run_script(self, *arguments, **environment):
+        base = {key: value for key, value in os.environ.items()
+                if not key.startswith(("GITHUB_", "VERCEL_", "FAKE_")) and key not in mc.TOKEN_VARIABLES}
+        base.update(DEPLOY_GUARD_PYTHON=self.python, FAKE_LOG=self.log, TMPDIR=self.folder)
+        base.update(environment)
+        if os.path.exists(self.log):
+            os.remove(self.log)
+        result = subprocess.run(["bash", SCRIPT, *arguments], env=base, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        calls = []
+        if os.path.exists(self.log):
+            with open(self.log) as handle:
+                calls = handle.read().splitlines()
+        return result.returncode, [call for call in calls if "merge_conditions.py" in call], result.stdout.decode()
+
+    def actions(self, code, **environment):
+        environment.setdefault("GITHUB_REPOSITORY", "acme/app")
+        return self.run_script("a" * 40, "b" * 40, FAKE_CODE=str(code), **environment)
+
+    def vercel(self, code, *globs, **environment):
+        environment.setdefault("VERCEL_ENV", "production")
+        environment.setdefault("VERCEL_GIT_REPO_OWNER", "acme")
+        environment.setdefault("VERCEL_GIT_REPO_SLUG", "app")
+        environment.setdefault("VERCEL_GIT_COMMIT_SHA", "c" * 40)
+        return self.run_script("--vercel", *globs, FAKE_CODE=str(code), **environment)
+
+    def test_actions_exit_code_is_the_guard_verdict(self):
+        for guard_code, expected in ((0, 0), (1, 1), (2, 2), (3, 1), (139, 139)):
+            with self.subTest(guard=guard_code):
+                code, calls, _ = self.actions(guard_code)
+                self.assertEqual(code, expected)
+                self.assertEqual(len(calls), 1)
+                self.assertTrue(calls[0].endswith(f"deploy-guard --repo acme/app --sha {'a' * 40} --before {'b' * 40}"),
+                                calls[0])
+
+    def test_actions_usage(self):
+        for arguments in ((), ("a" * 40,), ("a" * 40, ""), ("a" * 40, "b" * 40, "c")):
+            with self.subTest(arguments=arguments):
+                code, calls, _ = self.run_script(*arguments, GITHUB_REPOSITORY="acme/app")
+                self.assertEqual((code, calls), (2, []))
+
+    def test_actions_without_repository_cannot_judge(self):
+        code, calls, output = self.run_script("a" * 40, "b" * 40, FAKE_CODE="0")
+        self.assertEqual((code, calls), (2, []))
+        self.assertIn("repository unknown", output)
+
+    def test_vercel_builds_only_when_the_guard_says_deploy(self):
+        for guard_code, expected in ((0, 1), (1, 0), (2, 0), (3, 0), (127, 0)):
+            with self.subTest(guard=guard_code):
+                code, calls, _ = self.vercel(guard_code, "frontend/**", "shared/**")
+                self.assertEqual(code, expected)
+                self.assertTrue(calls[0].endswith(f"deploy-guard --repo acme/app --sha {'c' * 40} --before-from-push "
+                                                  f"--paths frontend/** shared/**"), calls[0])
+
+    def test_vercel_without_globs_passes_no_paths(self):
+        code, calls, _ = self.vercel(0)
+        self.assertEqual(code, 1)
+        self.assertTrue(calls[0].endswith("--before-from-push"), calls[0])
+
+    def test_vercel_without_environment_is_guarded_not_a_preview(self):
+        for guard_code, expected in ((0, 1), (1, 0)):
+            with self.subTest(guard=guard_code):
+                code, calls, _ = self.vercel(guard_code, VERCEL_ENV="")
+                self.assertEqual((code, len(calls)), (expected, 1))
+
+    def test_vercel_preview_builds_unguarded(self):
+        code, calls, _ = self.vercel(1, VERCEL_ENV="preview")
+        self.assertEqual((code, calls), (1, []))
+
+    def test_vercel_without_commit_or_repository_skips(self):
+        for environment in ({"VERCEL_GIT_COMMIT_SHA": ""}, {"VERCEL_GIT_REPO_OWNER": ""}):
+            with self.subTest(environment=environment):
+                code, calls, _ = self.vercel(0, **environment)
+                self.assertEqual((code, calls), (0, []))
+
+    def test_missing_pyyaml_that_cannot_be_installed_refuses(self):
+        self.assertEqual(self.actions(0, FAKE_YAML="1")[:2], (2, []))
+        self.assertEqual(self.vercel(0, FAKE_YAML="1")[:2], (0, []))
+
+    def test_missing_interpreter_refuses(self):
+        missing = os.path.join(self.folder, "no-python")
+        self.assertEqual(self.actions(0, DEPLOY_GUARD_PYTHON=missing)[0], 2)
+        self.assertEqual(self.vercel(0, DEPLOY_GUARD_PYTHON=missing)[0], 0)
+
+
+class TemplateCopyTest(unittest.TestCase):
+    """In the toolbox, `.sdd/bin/` is the installed copy of the sdd-init template: byte-identical."""
+
+    def test_installed_copy_is_the_template(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        template = os.path.join(here, "..", "..", "plugins", "sdd-core", "skills", "sdd-init", "templates", "sdd", "bin")
+        if not os.path.isdir(template) or os.path.samefile(template, here):
+            self.skipTest("not the toolbox's installed copy")
+        names = sorted(name for name in os.listdir(here) if not name.startswith((".", "__")))
+        self.assertEqual(names, sorted(name for name in os.listdir(template) if not name.startswith((".", "__"))))
+        for name in names:
+            with self.subTest(name=name), open(os.path.join(here, name), "rb") as mine, \
+                    open(os.path.join(template, name), "rb") as theirs:
+                self.assertEqual(mine.read(), theirs.read(), f"{name} differs from its template")
+                self.assertEqual(os.stat(os.path.join(here, name)).st_mode & 0o111,
+                                 os.stat(os.path.join(template, name)).st_mode & 0o111)
+
+
+DEPLOYMENT = """\
+targets:
+  - name: backend
+    platform: cloud-run
+    trigger: { paths: [ 'backend/**' ] }
+    workflow: .github/workflows/deploy-backend.yml
+    rollback:
+      command: gcloud run services update-traffic api --region europe-west1 --to-revisions=PREVIOUS=100
+      unconfirmed: true
+    probes:
+      - command: curl -fsS https://api.example.com/health
+        expect: '"status":"UP"'
+  - name: frontend
+    platform: vercel
+    trigger: { every_push: true }
+    rollback:
+      command: vercel rollback --yes
+    probes:
+      - command: curl -fsS -o /dev/null https://www.example.com/
+        unconfirmed: true
+scheduled_jobs:
+  - name: daily-etl
+    schedule: '0 3 * * * Europe/Paris'
+    paths: [ 'backend/src/main/java/**/etl/**' ]
+    runs: Cloud Scheduler, Cloud Run job etl
+    probe:
+      command: gcloud run jobs executions list --job etl --limit 1 --format 'value(status.succeededCount)'
+      expect: '^1$'
+"""
+
+
+class DeploymentSchemaTest(unittest.TestCase):
+    def test_valid_profile_lists_its_unconfirmed_values(self):
+        profile, errors, unconfirmed = mc.load_deployment(DEPLOYMENT)
+        self.assertEqual(errors, [])
+        self.assertEqual([target["name"] for target in profile["targets"]], ["backend", "frontend"])
+        self.assertEqual(unconfirmed, ["targets[backend].rollback", "targets[frontend].probes[0]"])
+
+    def test_project_that_deploys_nothing(self):
+        self.assertEqual(mc.load_deployment("deploys_nothing: true\n")[1], [])
+        self.assertEqual(mc.load_deployment("deploys_nothing: true\nscheduled_jobs: []\n")[1], [])
+
+    def test_errors(self):
+        cases = {
+            "deploys_nothing: true\ntargets: [ { name: a } ]\n":
+                "deployment.yaml: deploys_nothing is true, so no target (and no rollback) can be listed",
+            "targets: []\n": "deployment.yaml: no target: list what merging deploys, or set deploys_nothing: true",
+            "{}\n": "deployment.yaml: no target: list what merging deploys, or set deploys_nothing: true",
+            "deploys_nothing: yes please\n": "deployment.yaml: deploys_nothing: expected true or false",
+            "deploys_nothing: true\nextra: 1\n": "deployment.yaml: unknown key 'extra'",
+            "deploys_nothing: true\nscheduled_jobs: [ { name: etl, schedule: daily } ]\n":
+                "deployment.yaml: scheduled_jobs[etl].paths: expected a non-empty list of globs",
+            "deploys_nothing: true\nscheduled_jobs: [ { name: etl, paths: [ 'a/**' ] } ]\n":
+                "deployment.yaml: scheduled_jobs[etl].schedule: expected the schedule (cron, with its time zone)",
+            "deploys_nothing: true\nscheduled_jobs: [ { name: etl, schedule: d, paths: [ 'a/**' ], "
+            "probe: { expect: x } } ]\n": "deployment.yaml: scheduled_jobs[etl].probe.command: expected the command, as run",
+            "deploys_nothing: true\nscheduled_jobs: [ { schedule: d, paths: [ 'a/**' ] } ]\n":
+                "deployment.yaml: scheduled_jobs[0].name: expected the job's name",
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                self.assertIn(expected, mc.load_deployment(text)[1])
+
+    def test_target_errors(self):
+        def target(**fields):
+            base = {"name": "api", "platform": "cloud-run", "trigger": {"every_push": True},
+                    "rollback": {"command": "rollback"}, "probes": [{"command": "curl x"}]}
+            base.update(fields)
+            for key in [key for key, value in base.items() if value is None]:
+                del base[key]
+            return mc.load_deployment(mc.yaml.safe_dump({"targets": [base]}))[1]
+
+        self.assertEqual(target(), [])
+        cases = [
+            (dict(rollback=None), "rollback: expected the platform command that restores the previous deployment"),
+            (dict(rollback={"note": "by hand"}), "rollback.command: expected the command, as run"),
+            (dict(trigger={"paths": ["a/**"], "every_push": True}), "trigger: expected either"),
+            (dict(trigger={}), "trigger: expected either"),
+            (dict(trigger={"every_push": False}), "trigger.every_push: expected true"),
+            (dict(trigger={"paths": []}), "trigger.paths: expected a non-empty list of globs"),
+            (dict(probes=[]), "probes: expected at least one probe"),
+            (dict(probes=[{"expect": "UP"}]), "probes[0].command: expected the command, as run"),
+            (dict(probes=[{"command": "curl", "expect": "("}]), "probes[0].expect: invalid regex"),
+            (dict(probes=[{"command": "curl", "unconfirmed": "maybe"}]), "probes[0].unconfirmed: expected true or false"),
+            (dict(platform=None), "platform: expected the platform"),
+            (dict(name=None), "targets[0].name: expected the target's name"),
+            (dict(color="red"), "unknown key 'color'"),
+        ]
+        for fields, expected in cases:
+            with self.subTest(fields=fields):
+                errors = target(**fields)
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_duplicate_target_names(self):
+        profile = mc.yaml.safe_load(DEPLOYMENT)
+        profile["targets"][1]["name"] = "backend"
+        self.assertIn("deployment.yaml: targets[backend]: duplicate target name",
+                      mc.load_deployment(mc.yaml.safe_dump(profile))[1])
+
+
 class ValidateCommandTest(unittest.TestCase):
+    def test_validate_prints_unconfirmed_values_and_checks_revert_files(self):
+        folder = tempfile.mkdtemp(prefix="merge-conditions-validate-")
+        self.addCleanup(shutil.rmtree, folder, True)
+        deployment = os.path.join(folder, "deployment.yaml")
+        revert = os.path.join(folder, "add-export", "revert.yaml")
+        os.makedirs(os.path.dirname(revert))
+        with open(deployment, "w") as handle:
+            handle.write(DEPLOYMENT)
+        with open(revert, "w") as handle:
+            handle.write(revert_file("a" * 40, change="other"))
+        output, errors = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            code = mc.main(["validate", deployment, revert])
+        self.assertEqual(code, 1)
+        self.assertEqual(output.getvalue().splitlines(), [f"unconfirmed: {deployment}: targets[backend].rollback",
+                                                          f"unconfirmed: {deployment}: targets[frontend].probes[0]"])
+        self.assertEqual(errors.getvalue().splitlines(),
+                         [f"{revert}: revert.yaml: revert_of is 'other', the folder is 'add-export'"])
+
     def test_validate_reports_each_invalid_file(self):
         folder = tempfile.mkdtemp(prefix="merge-conditions-validate-")
         self.addCleanup(shutil.rmtree, folder, True)

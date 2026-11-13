@@ -74,7 +74,7 @@ One versioned folder per project, read by the hook, the CI and the skills:
 | File | Content |
 |---|---|
 | `.sdd/triggers.yaml` | intent and irreversible triggers (path globs, content regexes), plus the non-waivable gate-machinery list |
-| `.sdd/deployment.yaml` | deploy targets (trigger, rollback command, probes), scheduled jobs (schedule, code paths) |
+| `.sdd/deployment.yaml` | deploy targets (trigger, rollback command, probes), scheduled jobs (schedule, code paths), or `deploys_nothing: true`; schema in the template `OPENSPEC_GUIDE.md` §8, checked by `merge_conditions.py validate` |
 | `.sdd/harness.yaml` | angles per risk, mechanical tools available, budget (minutes, tokens), effort |
 | `.claude/hooks/block-git-writes.conf` | guardrail settings (stays next to the hook it configures) |
 
@@ -187,6 +187,25 @@ or a direct push without a PR exit non-zero.
 - A refused deploy alerts the owner: failed workflow notification for the backend; for Vercel, the
   skipped build plus a GitHub issue opened by a `push` workflow that runs the same guard.
 
+Settled while implementing (group 8): the logic is a `deploy-guard` subcommand of
+`merge_conditions.py` (it reuses `match`, the required-workflow computation and the run verdicts
+in-process, and its tests join the matcher's suite, which the toolbox's CI already runs), and
+`.sdd/bin/deploy-guard.sh` is the per-platform entry point: `deploy-guard.sh <merged-sha>
+<before-sha>` in a GitHub Actions job (exit 0 = deploy), `deploy-guard.sh --vercel [<globs>]` as
+`ignoreCommand` (exit 1 = build only when the guard says deploy and the push changed a path under
+the globs; every other outcome, a crash included, skips; an explicit preview builds unguarded).
+Vercel is not given the push event, so `before` is read from the repository activity
+(`GET /repos/{o}/{r}/activity`, the entry whose `after` is the commit) — never `<merge>^1`. Added
+rules: the pushed commit's first parent must be `before` (the push carried the merge and nothing
+else), and the guard fetches the default branch and `refs/pull/<n>/head` itself, with the token in
+an HTTP header, deepening a shallow clone. The guard reads GitHub through HTTPS with a token
+(`DEPLOY_GUARD_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN`), no `gh`. The `review-harness`/`opsx-verify`
+statuses are not part of the guard (honour-based, D5). `vercel.json` is gate machinery wherever it
+lives (`**/vercel.json`): geomni's is `frontend/vercel.json`. Known limits, stated in the
+contributing guide: a deploy that bypasses the pipeline is not guarded; a refused commit stays on
+the default branch and ships with the next merge unless reverted; `concurrency` keeps one waiting
+run, so a third push can replace the second's run.
+
 ### D8 — Serialisation and rollback
 
 - After merging, the agent puts the `in-flight` label on the merged PR; the hook refuses any other
@@ -200,6 +219,21 @@ or a direct push without a PR exit non-zero.
   production deployment), then `git revert` on a `revert/<id>` branch. The revert PR carries a
   classification `revert-of: <id>` with both gates closed, which the check accepts only if the diff is
   the exact inverse of the merged change; its harness is limited to that verification.
+
+Settled while implementing (group 8): the revert's marker is a new file
+`openspec/changes/<id>/revert.yaml` (`revert_of`, `merge_commit`, `reason`), not a key of
+`classification.yaml` — editing a classification outside a framing PR is gate machinery, and the
+approved classification must stay the one on the default branch; the unused `revert_of` key is
+removed from the classification schema. A pull request that **adds** that file is of kind `revert`:
+from `revert/<id>` only, its merge commit on the base ref's history and touching
+`openspec/changes/<id>/`, and its diff, `revert.yaml` aside, exactly the inverse of that commit's
+diff against its first parent (path, blob and mode of every file); anything else is an error. Its
+gates: none, except irreversible when the reverted change had that gate open (fixed forward: the
+owner decides) or the revert touches gate machinery; it needs no `review-harness`/`opsx-verify`.
+The label moves: removed from the change's PR, put on the revert's PR in its merge command, removed
+once the revert's deploy is verified. The merge command carries the label itself
+(`gh pr merge … && gh pr edit <n> --add-label in-flight`, which the hook allows); after an owner
+merge the agent labels it in its next call.
 
 ### D9 — Review harness as skills
 
