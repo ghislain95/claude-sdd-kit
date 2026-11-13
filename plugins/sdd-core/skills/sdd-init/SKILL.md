@@ -53,6 +53,7 @@ This folder (the "base directory" given when the skill is invoked) contains:
    | OpenSpec CLI | `openspec --version` | `npm install -g @fission-ai/openspec@latest` | yes |
    | jq | `jq --version` | `brew install jq` / `apt install jq` | yes (without jq, the hook blocks every `git`/`gh`) |
    | perl | `perl -v` | ships with macOS/Linux | yes (the hook's shell reader) |
+   | Python 3.9+ with PyYAML | `python3 -c "import yaml"` | `python3 -m pip install --user pyyaml` | yes (`.sdd/bin/merge_conditions.py`: classification checks, `merge-conditions`) |
    | gh | `gh auth status` | `brew install gh` | with option `github` |
    | uv + graphify | `graphify --version` | `uv tool install "graphifyy[sql]"` | with option `graphify` |
 
@@ -178,7 +179,11 @@ the choices the code cannot settle:
    `checks.yml` → one `checks-<module>.yml` per module; `migrations.yml` with option `migrations` (no
    already-merged migration modified, deleted or renamed). CI already present → only add
    `openspec.yml`, `tooling.yml` (and `migrations.yml`), and check that the existing CI runs the same
-   commands as `{{CHECK_COMMANDS}}` (otherwise, report the gap).
+   commands as `{{CHECK_COMMANDS}}` (otherwise, report the gap). Option `github` (it implies `ci`):
+   `templates/github/workflows/merge-conditions.yml` → `.github/workflows/merge-conditions.yml`, with
+   `workflow_run.workflows` listing the `name:` of **every** workflow that runs on `pull_request`,
+   the project's existing ones included (a workflow left out is still required by the check, but its
+   completion no longer re-triggers it, so the status stays `pending` until the next event).
 3. **Misc files**: `templates/misc/gitignore-additions` → appended to `.gitignore` (no duplicates);
    `templates/misc/worktreeinclude` → `.worktreeinclude`. Option `graphify`:
    `templates/misc/graphifyignore` → `.graphifyignore`, then `graphify update .` and
@@ -194,7 +199,18 @@ the choices the code cannot settle:
    module tests, dependency audit, measured budgets). Mutation tooling: if the project has one
    (PIT, Stryker, mutmut, cargo-mutants…), its command scoped to `{files}`; otherwise `null`, and say
    in the report that test strength is judged without mutation evidence until one is added.
-6. Option `ui`: `templates/claude/launch.json` → `.claude/launch.json`, one configuration per UI
+6. **Triggers and the matcher**: `templates/sdd/triggers.yaml` → `.sdd/triggers.yaml`, filled per
+   project from the recon, every glob pointing at a folder that exists: **irreversible** — the
+   migration folders (option `migrations`), stored formats (cache keys, serialised payloads, browser
+   storage, published files: content patterns where paths cannot isolate them), infrastructure (IaC,
+   production compose files, Dockerfiles, deploy scripts), public endpoints others consume (OpenAPI
+   files, public controllers), scheduled jobs and rollout scripts, paid quota; **intent** — the UI
+   modules' sources, user-facing texts, and the backend code that decides what users see (scoring,
+   ranking, classification rules). What could not be proven goes to the report as "to confirm".
+   `templates/sdd/bin/merge_conditions.py` and `test_merge_conditions.py` → `.sdd/bin/`, **copied
+   verbatim** (`chmod +x` both); with option `ci`, the generated `tooling.yml` runs the matcher's
+   tests on every change to `.sdd/`.
+7. Option `ui`: `templates/claude/launch.json` → `.claude/launch.json`, one configuration per UI
    module, filled from the recon (the module's dev-server script: `runtimeExecutable`,
    `runtimeArgs`, `port`). It lets Claude's preview tools start and check the UI. Keep `autoPort:
    true` unless a backend's CORS configuration expects a fixed port (then a fixed port, and say why
@@ -208,6 +224,8 @@ Everything must pass; otherwise fix it before delivering:
 grep -rnE '(^|[^$])\{\{[A-Z_]+\}\}|sdd:(fill|if|endif|each|endeach|note)' CLAUDE.md AGENTS.md .claude/agents .claude/hooks .claude/settings.json docs openspec/config.yaml .sdd .github .gitignore .worktreeinclude .graphifyignore 2>/dev/null   # empty
 openspec validate --all
 bash .claude/hooks/block-git-writes.test.sh                      # ALL n CASES OK, whatever the autonomy level
+python3 .sdd/bin/test_merge_conditions.py                       # OK: the matcher works on this machine
+python3 .sdd/bin/merge_conditions.py validate .sdd/triggers.yaml # no output, exit 0
 python3 -c "import json; json.load(open('.claude/settings.json'))"
 # YAML: the first tool available
 for f in openspec/config.yaml .sdd/*.yaml .github/workflows/*.yml; do ruby -ryaml -e "YAML.load_file('$f')" 2>/dev/null || python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" || echo "YAML KO: $f"; done

@@ -99,7 +99,11 @@ looks for it explicitly.
 
 Whole files under a condition (flagged by a `sdd:note` at the top): `docs/GRAPHIFY.md` and
 `misc/graphifyignore` → option `graphify`; `github/workflows/*` → option `ci`;
-`github/workflows/migrations.yml` → `ci` **and** `migrations`.
+`github/workflows/migrations.yml` → `ci` **and** `migrations`;
+`github/workflows/merge-conditions.yml` → `github` (which implies `ci`).
+`sdd/triggers.yaml` → always, generated as `.sdd/triggers.yaml`. `sdd/bin/merge_conditions.py` and
+`sdd/bin/test_merge_conditions.py` → always, **copied verbatim** into `.sdd/bin/` (no markers: they are
+code, and `--refresh` replaces them).
 `root/AGENTS.lean.md` replaces `root/AGENTS.md` (generated under the name `AGENTS.md`) with `lean`;
 `docs/AGENT_TOOLBOX.md` → except with `lean`; `agents/devops.md` → `devops`;
 `agents/full-stack-dev.md` → `multi-module` and one module consumes the other (API + client).

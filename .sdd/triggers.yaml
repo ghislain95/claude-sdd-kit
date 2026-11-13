@@ -1,12 +1,15 @@
 # Triggers of the claude-toolbox repository itself (change-risk-classification).
-# A pull request whose diff matches a path below opens the gate it is listed under.
-# First version, written in lot 1 of the dev-factory change; the schema is fixed in group 5.
+# Read by .sdd/bin/merge_conditions.py from `main`, never from a pull request; schema in
+# plugins/sdd-core/skills/sdd-init/templates/docs/OPENSPEC_GUIDE.md, "Classification and triggers".
+# A pull request whose diff touches a path below opens the gate it is listed under; a hit on a gate
+# the approved classification declared closed, without a waiver, fails `merge-conditions`.
 
 # What users see and do: skill behaviour, mod display.
 intent:
   paths:
     - plugins/*/skills/**
     - mods/*/hooks/**
+  content: []
 
 # Reaches users' machines or projects as soon as it is merged (auto-update), and a revert does not
 # undo what a refresh or an install already wrote into their projects.
@@ -17,11 +20,14 @@ irreversible:
     - .claude-plugin/marketplace.json
     - plugins/*/.claude-plugin/plugin.json
     - mods/*/.claude-plugin/plugin.json
+  content: []
 
-# The gate machinery itself: never waivable.
+# The gate machinery itself: never waivable. `.sdd/**`, `.claude/hooks/**`, `.claude/settings.json`,
+# `.github/workflows/**` and `vercel.json` are always applied by the matcher; listed for the reader.
 gate_machinery:
   paths:
     - .sdd/**
     - .claude/hooks/**
     - .claude/settings.json
     - .github/workflows/**
+    - vercel.json

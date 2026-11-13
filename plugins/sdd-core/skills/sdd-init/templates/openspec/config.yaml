@@ -27,12 +27,16 @@ rules:
     - Always include a "Non-goals" section
     - If the change comes from the roadmap (docs/ROADMAP.md), reference the epic (e.g. EPIC 3)
     - "Flag any impact on {{DOMAIN_RISKS}} explicitly"
+    - "The proposal is not finished without openspec/changes/<id>/classification.yaml next to it (schema and example: docs/OPENSPEC_GUIDE.md §7): for the intent gate and the irreversible gate, `open` and the evidence for the answer; every trigger of .sdd/triggers.yaml the change will hit on a gate it keeps closed, as a waiver with its reason. Check it with `python3 .sdd/bin/merge_conditions.py validate openspec/changes/<id>/classification.yaml`"
+    - "After the adversarial pass, the change folder alone (proposal, classification) goes to {{DEFAULT_BRANCH}} through a framing branch docs/<id>-framing; its merge by the owner is the approval. Never edit an approved classification in the change branch: reclassify through a new framing branch"
   specs:
+    - &approved-classification "STOP before writing this artifact unless the change's classification is approved, that is present on {{DEFAULT_BRANCH}}: `git fetch` when there is a remote, then `git cat-file -e origin/{{DEFAULT_BRANCH}}:openspec/changes/<id>/classification.yaml` (`{{DEFAULT_BRANCH}}:…` without a remote). If it fails, write nothing and tell the user why: the classification is missing, or its framing merge has not happened yet"
     - Use Given/When/Then scenarios, written so they can be translated 1:1 into automated tests (one scenario = one test)
     - Start every requirement with SHALL or MUST on its first line
     - Describe observable behavior only — endpoints, events, commands, exchanged formats, error codes; no class names
     - Cover error and edge cases (invalid input, duplicate, unauthorized role, unknown resource, limit reached), not just the happy path
   design:
+    - *approved-classification
     - State which existing module and root package(s) the change belongs to — never create a new root package
     # sdd:if migrations
     - State explicitly whether a schema migration is required, and in which migration folder
@@ -41,6 +45,7 @@ rules:
     # sdd:fill: one rule per multi-module concern if relevant (e.g. "For frontend work, state what goes into the shared package vs each app") — or remove this line
     - Any decision relying on a library's behaviour cites its source at the version pinned in the module's dependency file (official doc URL for that version, or the installed type/source file:line); without a source, mark it "unverified"
   tasks:
+    - *approved-classification
     - "Every implementation group MUST end with test tasks (# sdd:fill: test kinds per module, e.g. pytest integration for business rules, unit tests for pure logic)"
     - Keep tasks small enough to complete in one session
     # sdd:if graphify
@@ -56,3 +61,9 @@ rules:
     - After the implementation groups, a task runs /sdd-core:review-harness on the change (report in review.md; its interface angle uses the sdd-ui skills when UI files change)
     # sdd:endif
     - "Final task: run {{CHECK_COMMANDS}}, the same checks as CI, and report results"
+
+operations:
+  apply:
+    guidance:
+      - *approved-classification
+      - "If the implementation hits a trigger of .sdd/triggers.yaml the approved classification did not foresee (a gate declared closed, no waiver), stop and reclassify through a new framing branch before going on: merge-conditions reports such a hit as unaccounted and fails"

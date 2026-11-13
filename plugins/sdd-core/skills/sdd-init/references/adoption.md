@@ -13,7 +13,7 @@ Rule: **what exists was written for a reason.** Merge, don't overwrite.
 | `.claude/hooks/*` from another git guardrail | Show both to the user, recommend keeping only one (two contradictory hooks = baffling blocks). |
 | `openspec/` already initialised | No `openspec init`. `openspec update` to refresh the commands. `config.yaml`: merge `context` and `rules` (add the template rules that are missing). Existing specs are **not** touched. |
 | `docs/*.md` with the same name | Merge section by section; whatever contradicts the observed code is flagged in the report (not silently fixed). |
-| Existing CI | Only add `openspec.yml` and `tooling.yml`; don't touch the existing workflows. |
+| Existing CI | Only add `openspec.yml`, `tooling.yml` and (option `github`) `merge-conditions.yml`, whose `workflow_run.workflows` lists the existing pull-request workflows by `name:`; don't touch the existing workflows. |
 
 Show the diff of every merged file at validation gate 1 (summary: sections added / kept / in
 conflict).
@@ -38,17 +38,20 @@ levels above this skill).
 3. For every file generated from a template (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/*`,
    `docs/{CONTRIBUTING,OPENSPEC_GUIDE,AGENT_TOOLBOX,GRAPHIFY}.md`, `openspec/config.yaml`,
    `.claude/hooks/*`, `.claude/settings.json` (union of the `allow` lists and hooks, nothing removed),
-   `.claude/settings.local.example.json`, `.claude/launch.json` (option `ui`), the kit's CI workflows).
-   `.sdd/harness.yaml` is the project's own settings: created from phase 4 step 5 of `SKILL.md` when
-   absent, never rewritten when present (new keys of the template are listed in the report). For the
-   template-generated files:
+   `.claude/settings.local.example.json`, `.claude/launch.json` (option `ui`), the kit's CI workflows,
+   `merge-conditions.yml` included (option `github`; its `workflow_run.workflows` list is read back
+   from the current file and completed with any pull-request workflow it misses)).
+   `.sdd/harness.yaml` and `.sdd/triggers.yaml` are the project's own settings: created from phase 4
+   steps 5 and 6 of `SKILL.md` when absent, never rewritten when present (new keys of the template
+   are listed in the report). For the template-generated files:
    - fill the **new** template with the project's values (read back from the current files, not
      deduced again);
    - compare with the current file: what differs comes either from the kit (to apply) or from a local
      change (to keep). When in doubt about where a difference comes from, keep the local version and
      list it.
-4. Files copied verbatim (hook `.sh`/`.pl`/`.test.sh`): replaced, then
-   `bash .claude/hooks/block-git-writes.test.sh`; the local `.conf` is kept.
+4. Files copied verbatim (hook `.sh`/`.pl`/`.test.sh`, `.sdd/bin/merge_conditions.py` and
+   `.sdd/bin/test_merge_conditions.py`): replaced, then `bash .claude/hooks/block-git-writes.test.sh`
+   and `python3 .sdd/bin/test_merge_conditions.py`; the local `.conf` is kept.
 5. Never touch: `openspec/specs/`, `openspec/changes/`, the reverse-documentation (`ARCHITECTURE.md`,
    module docs, glossary, ADRs, roadmap) — it belongs to the project.
 6. Phase 5 of `SKILL.md` (checks), then one commit `chore(sdd-init): refresh workflow to <version>`

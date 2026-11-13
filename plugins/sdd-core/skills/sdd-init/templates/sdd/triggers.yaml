@@ -1,0 +1,42 @@
+# sdd:note: generated as .sdd/triggers.yaml, always. Every glob comes from the recon (real folders, cited in the report); a category the project does not have is left out, not invented. Values that could not be proven are listed as "to confirm" in the final report.
+# Triggers of {{PROJECT_NAME}} — which diffs open which human gate.
+#
+# Read by .sdd/bin/merge_conditions.py from the BASE branch, never from a pull request, and matched
+# against every pull request's diff. Schema and examples: docs/OPENSPEC_GUIDE.md, "Classification and
+# triggers".
+#   paths    GitHub path-filter globs (`*` stops at `/`, `**` crosses it). A file the pull request
+#            adds, modifies or deletes opens the gate.
+#   content  `pattern` is a Python regex searched in the lines the pull request ADDS to the files
+#            matching `paths` (every file when `paths` is omitted). Removed lines never match.
+# A hit on a gate the approved classification declared closed, without a waiver naming the trigger
+# exactly as written here, blocks the merge until a framing pull request reclassifies the change.
+# This file is gate machinery: a pull request that edits it opens the irreversible gate.
+
+# What the user sees and does — a screen, a business gesture, what the product shows or how it feels,
+# whatever the layer (a backend scoring rule that changes what is displayed counts).
+intent:
+  paths:
+    # sdd:fill: UI sources ({{MODULE_PATH}} of each UI module, e.g. web/src/**), user-facing texts and translations, and the backend code that decides what users see (scoring, ranking, classification, pricing rules), each glob proven by the recon
+  content: []
+
+# What a revert cannot undo: migrations, stored formats, post-merge rollout steps, infrastructure,
+# public endpoints others consume, paid quota or capacity.
+irreversible:
+  paths:
+    # sdd:if migrations
+    # sdd:fill: one glob per migration folder ({{MIGRATION_PATHS}})
+    # sdd:endif
+    # sdd:fill: stored formats (cache key builders, serialized DTOs, browser storage helpers, published files), infrastructure (IaC, docker-compose used in production, Dockerfiles, deploy scripts), public API contracts consumed by others (OpenAPI files, public controllers), scheduled jobs and rollout scripts, anything that spends paid quota
+  content:
+    # sdd:fill: replace the `[]` below with patterns for what paths cannot isolate, e.g. `- { paths: [ 'web/src/**' ], pattern: 'localStorage\.setItem|sessionStorage\.setItem' }`, or keep it
+    []
+
+# The gate machinery: never waivable. The five entries below are always applied, even if removed
+# here; add the project's own (release scripts, deploy configuration).
+gate_machinery:
+  paths:
+    - .sdd/**
+    - .claude/hooks/**
+    - .claude/settings.json
+    - .github/workflows/**
+    - vercel.json
