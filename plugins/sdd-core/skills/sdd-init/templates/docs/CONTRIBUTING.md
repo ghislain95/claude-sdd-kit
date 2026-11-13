@@ -13,14 +13,11 @@ Cross-cutting conventions for contributing to {{PROJECT_NAME}}.
 ## 2. Git
 
 Rules shared by humans and agents.
-<!-- sdd:if autonomy-merge -->
-Agents (sub-agents included) commit, push, open and merge PRs **themselves**, following this section; the hook described below enforces the mechanical part.
+<!-- sdd:if github -->
+Agents (sub-agents included) commit, push and open PRs **themselves**. An agent merges a PR only through the verified route (below: `merge-conditions` green with `gates: none`, checked on GitHub by the hook at merge time); a PR with an open gate is merged by the owner, whose merge stands for the go or the passed QA. The hook described below enforces the mechanical part.
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-pr -->
-Agents (sub-agents included) commit, push and open PRs **themselves**; merging stays human. The hook described below enforces the mechanical part.
-<!-- sdd:endif -->
-<!-- sdd:if autonomy-commit -->
-Agents (sub-agents included) commit on the change branch; push, PR and merge stay human: **the agent never pushes**, every `git push` is blocked by the hook (`ALLOW_PUSH=0`). The hook described below enforces the mechanical part.
+<!-- sdd:if !github -->
+Agents (sub-agents included) commit on the change branch; push and merge stay human: **the agent never pushes**, every `git push` is blocked by the hook (`ALLOW_PUSH=0`). The hook described below enforces the mechanical part.
 <!-- sdd:endif -->
 
 ### Branches
@@ -63,36 +60,38 @@ Then on the `<type>/<change-id>` branch, cut from `{{DEFAULT_BRANCH}}` after the
 1. `docs(<id>): …` — deltas, design, tasks (`/opsx:ff`, refused while the classification is not on `{{DEFAULT_BRANCH}}`).
 2. `/opsx:apply` with `feat|fix|…(<id>): …`, one commit per coherent implementation slice → `/sdd-core:review-harness <id>` (its fixes as further commits, its report as `docs(<id>): review report`) → `/opsx:verify` OK.
 3. `/opsx:archive` + post-archive → `chore(<id>): archive change, sync specs, post-archive`.
-<!-- sdd:if autonomy-merge -->
-4. Push the branch, PR, merge (below).
+<!-- sdd:if github -->
+4. Push the branch, PR, then the merge (below): by the agent through the verified route when `merge-conditions` reports `gates: none`, by the owner otherwise.
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-pr -->
-4. Push the branch, PR (below); human merge.
-<!-- sdd:endif -->
-<!-- sdd:if autonomy-commit -->
-4. The agent stops at the last commit; a human pushes, opens the PR if there is a remote, and merges.
+<!-- sdd:if !github -->
+4. The agent stops at the last commit; a human pushes and merges.
 <!-- sdd:endif -->
 
-Outside a change (hotfix, tooling, docs): same path, shorter — branch `<type>/<scope>-<desc>`, `code-reviewer` review if code changes, commit(s)<!-- sdd:if !autonomy-commit -->, PR<!-- sdd:endif --><!-- sdd:if autonomy-merge -->, merge<!-- sdd:endif -->.
+Outside a change (hotfix, tooling, docs): same path, shorter — branch `<type>/<scope>-<desc>`, `code-reviewer` review if code changes, commit(s)<!-- sdd:if github -->, PR; `merge-conditions` reports such a PR `gates: unclassified`, so the owner merges it<!-- sdd:endif -->.
 
 ### What the hook enforces
 The hook [`.claude/hooks/block-git-writes.sh`](../.claude/hooks/block-git-writes.sh) (registered in [`.claude/settings.json`](../.claude/settings.json)) blocks, for an agent (sub-agents included):
 - `commit`, `merge`, `revert`, `cherry-pick` on a protected branch. The branch is the one of the directory where the command really runs: the `cwd`, then each `cd`/`pushd`/`popd` and `git -C <dir>` (a subshell gives the directory back when it exits), and a `git switch|checkout <branch>` placed earlier in the same command — to a protected branch, counted immediately; to another branch, only if the next command is chained with `&&` (a failed switch stops the chain). A directory or branch that cannot be resolved (`$VAR`, `$(…)`, `cd -`, nonexistent directory) counts as protected: write literal paths, and run `git worktree add <dir>` in a separate call from the `cd <dir>` that follows;
-- any push of a protected branch (including through `HEAD`, `@` or a `$…` reference while on it), a push without an explicit remote **and** branch (`git push -u origin <branch>`), force-push (`--force*`, `-f`, `+refspec`, `--mirror`, `--all`)<!-- sdd:if autonomy-commit --> — and here **every** `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif -->;
+- any push of a protected branch (including through `HEAD`, `@` or a `$…` reference while on it), a push without an explicit remote **and** branch (`git push -u origin <branch>`), force-push (`--force*`, `-f`, `+refspec`, `--mirror`, `--all`; `--force-with-lease` only with `ALLOW_FORCE_WITH_LEASE=1`, never to a protected branch)<!-- sdd:if !github --> — and here **every** `git push` (`ALLOW_PUSH=0`)<!-- sdd:endif -->;
+- a branch set to track a protected branch: `branch -u`/`--set-upstream-to`, `--track`, or a branch created from `origin/{{DEFAULT_BRANCH}}` without `--no-track` (`git switch -c <branch> --no-track origin/{{DEFAULT_BRANCH}}`, `git worktree add --no-track -b <branch> <dir> origin/{{DEFAULT_BRANCH}}`; git's `branch.autoSetupMerge` decides when a start point is tracked);
 - `pull` without `--ff-only`, with rebase, or, on a protected branch, of a branch other than itself;
-- history rewriting: `rebase`, `commit --amend`, `reset` to a revision, `branch -f`, `am`, `commit-tree`, `filter-branch`;
+- history rewriting: `rebase`, `commit --amend`, `reset` to a revision, `branch -f`, `update-ref`, `am`, `commit-tree`, `filter-branch`;
 - mass staging: `add -A` / `.` / `./` / `..` / `*` / `-u`, `commit -a`;
 - what throws work away: `reset --hard`, `clean -f/--force`, `checkout .`/`-f`, `switch --discard-changes`, `restore .`, `stash drop/clear`, `branch -D`/`-M`;
-- `--no-verify`;
-- `gh pr merge` other than `--merge` (no `--squash`, `--rebase`, `--admin`, `--auto`)<!-- sdd:if !autonomy-merge -->, and here **every** `gh pr merge` (`ALLOW_PR_MERGE=0`)<!-- sdd:endif -->.
+- `--no-verify`, `commit -n`;
+- merging, auto-merging or writing a branch through `gh api`: the REST merge endpoint (`…/pulls/<n>/merge`), `…/merges`, writes to `git/refs/heads/<protected>` or `contents/`, the GraphQL mutations `enablePullRequestAutoMerge`, `mergePullRequest`, `enqueuePullRequest`, `mergeBranch`, `createCommitOnBranch`, `updateRef(s)`;
+- every `gh pr merge` except **the single merge route**: `gh pr merge <n> --<MERGE_METHOD>` (optionally `--delete-branch`, `--subject`, `--body`, `--match-head-commit`; never `--admin`, `--auto`, `--repo`, another method). Before letting it run, the hook asks GitHub itself — never the command line — from the directory where the command runs: the PR is open and targets the default branch; the latest `merge-conditions` status **of its head commit** is `success` with a description starting `gates: none;`; the `base <sha7>` it names is the current head of the default branch; no other PR carries the `in-flight` label, whatever its state. Otherwise it blocks with the reason: an open gate → hand the merge to the owner; a stale base → wait for the re-judgement; `pending` → wait; another change in flight → wait until it is verified. A failed query, an unreadable answer or no `gh` blocks the merge (fail closed). `gh pr merge <n> --disable-auto` alone, which only cancels an automatic merge, stays allowed.
 
 **Settings** — [`.claude/hooks/block-git-writes.conf`](../.claude/hooks/block-git-writes.conf) (committed, read by the hook if present):
 
 | Key | Default | Effect |
 |---|---|---|
 | `PROTECTED_BRANCHES` | `main\|master` | Protected branches, separated by `\|` (here `{{DEFAULT_BRANCH}}`) |
-| `ALLOW_PUSH` | `1` | `1`: the agent pushes its branch (never a protected branch); `0`: every `git push` blocked (a human pushes) |
-| `ALLOW_PR_MERGE` | `1` | `1`: `gh pr merge --merge` allowed for the agent; `0`: every `gh pr merge` blocked (human merge) |
+| `ALLOW_PUSH` | `1` | `1`: the agent pushes its branch (never a protected branch); `0`: every `git push` blocked (a human pushes — a project with no remote the agent may push to) |
+| `MERGE_METHOD` | `merge` | `squash` or `merge`, one the repository allows: the method of the merge route (here `{{MERGE_METHOD}}`). `rebase` is refused — the deploy guard needs the default branch before the merge as one commit, which a rebase merge does not leave — and any other value blocks every agent merge |
+| `ALLOW_FORCE_WITH_LEASE` | `0` | `1`: `git push --force-with-lease` (with or without `--force-if-includes`) allowed to a non-protected branch; `0`: blocked like any force-push |
+
+Whether the agent may merge is decided per pull request by `merge-conditions`, not per project: there is no setting for it.
 
 Before the checks, the command is read the way the shell reads it: escapes, `#` comments and quoted heredoc bodies are set aside, and quoted strings containing spaces (messages, PR bodies) are neutralised — their text is never read as an option or a command. What the shell executes (`$(…)`, backticks, including inside double quotes or an unquoted heredoc) is still checked.
 
@@ -113,9 +112,9 @@ Three statuses on a pull request's head commit decide whether it may merge (one 
 <!-- sdd:endif -->
 
 ### What is enforced where
-- **Client-side, on the agent's machine — guards against mistakes**: the git hook above (commands only; a deliberate `sh -c`, `eval` or raw API call gets past it)<!-- sdd:if github -->; the `review-harness` and `opsx-verify` statuses, **honour-based**: the agent posts them itself, so they prevent forgetting a step, not lying about it — `review.md` and the verify report in the pull request are what make them auditable<!-- sdd:endif -->; the OpenSpec rules that stop `/opsx:ff` and apply without an approved classification.
+- **Client-side, on the agent's machine — guards against mistakes**: the git hook above (commands only; a deliberate `sh -c`, `eval` or raw API call gets past it)<!-- sdd:if github -->; the merge route, which is part of that hook: it reads `merge-conditions` from GitHub at merge time, so it stops an agent that merges too early, with a gate open or on a stale verdict, not one that overwrites the status first; the `in-flight` label, which the merge route reads to keep one change at a time between merge and verified production — the hook refuses a merge while another pull request carries it, while putting the label on the pull request the agent merged and removing it once production is verified or rolled back are delivery steps (dev-factory, coming), so until they ship nothing sets the label and the hook's check has nothing to find; the `review-harness` and `opsx-verify` statuses, **honour-based**: the agent posts them itself, so they prevent forgetting a step, not lying about it — `review.md` and the verify report in the pull request are what make them auditable<!-- sdd:endif -->; the OpenSpec rules that stop `/opsx:ff` and apply without an approved classification.
 <!-- sdd:if github -->
-- **Server-side, on GitHub**: `merge-conditions`, computed by a workflow that runs the definition, the triggers, the classifications and the path filters of `{{DEFAULT_BRANCH}}`, never those of the pull request, and never executes the pull request's code. A pull request cannot edit that definition, but it can overwrite the result: a workflow it adds posts statuses as the same `github-actions[bot]`, and the agent's token can post any status. So `merge-conditions` protects against mistakes only — it is the input of the client-side merge rule, and it says whether a merge is allowed, it does not prevent one. The deploy guard (dev-factory, coming) is the server-side barrier: it never trusts the status, it recomputes the verdict inside the deploy pipeline (`merge_conditions.py match` with the merge commit's first parent as base and the merged pull request's head, plus the required CI runs of that head) and refuses a commit of `{{DEFAULT_BRANCH}}` that did not come from a merged pull request; until it is in place nothing server-side stops a bad commit from deploying.
+- **Server-side, on GitHub**: `merge-conditions`, computed by a workflow that runs the definition, the triggers, the classifications and the path filters of `{{DEFAULT_BRANCH}}`, never those of the pull request, and never executes the pull request's code. A pull request cannot edit that definition, but it can overwrite the result: a workflow it adds posts statuses as the same `github-actions[bot]`, and the agent's token can post any status. So `merge-conditions` protects against mistakes only — it is the input of the client-side merge rule, and it says whether a merge is allowed, it does not prevent one. The deploy guard (dev-factory, coming) is the server-side barrier: it never trusts the status, it recomputes the verdict inside the deploy pipeline (`merge_conditions.py match` with the default branch before the merge — the push event's `before` — as base and the merged pull request's head, plus the required CI runs of that head) and refuses a commit of `{{DEFAULT_BRANCH}}` that did not come from a merged pull request; until it is in place nothing server-side stops a bad commit from deploying.
 - **Not enforced**: an agent deliberately working around the hook; on a private repository of GitHub Free there is no branch protection and no ruleset, so anyone holding a token that can push a branch can also push `{{DEFAULT_BRANCH}}` or merge a red pull request, and the agent acting with the owner's token cannot be told apart from the owner on GitHub (statuses, approvals, merges). A public repository, or GitHub Pro, can add a ruleset requiring `merge-conditions`.
 <!-- sdd:endif -->
 <!-- sdd:if !github -->
@@ -135,16 +134,10 @@ Three statuses on a pull request's head commit decide whether it may merge (one 
 - Review: the review of the diff is mandatory (review harness for a change, `code-reviewer` otherwise); it counts as the approval when the developer is alone on the repository.
 - Waiting for CI with a fine-grained token: `gh pr checks` may fail (it needs permissions such tokens often lack). Use `gh run list --branch <branch>` to find the runs, then a single `gh run watch <run-id> --exit-status` in the background — no polling loop.
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-merge -->
-- **An agent merges by itself** only if: green CI, review (harness for a change, `code-reviewer` otherwise) with no open BLOCKER or MAJOR, and — for an OpenSpec change — `/opsx:verify` OK and change archived on the branch. Otherwise it stops and asks the user.
-- Merge as a **merge commit** (neither squash nor rebase), title `<subject> (#N)`: `gh pr merge <n> --merge --subject "<subject> (#<n>)"`.
-- After the merge, in the main checkout: `git switch {{DEFAULT_BRANCH}} && git pull --ff-only`, then delete the branch (`git branch -d <branch>`, `git push origin --delete <branch>`). From a worktree, `{{DEFAULT_BRANCH}}` is already checked out elsewhere: only delete the remote branch; the local branch and the worktree are cleaned up from the main checkout (`git worktree remove` then `git branch -d`).
-<!-- sdd:endif -->
-<!-- sdd:if autonomy-pr -->
-- The agent opens the PR, gives its link and the CI status, then stops: **a human merges**, as a merge commit.
-<!-- sdd:endif -->
 <!-- sdd:if github -->
-- Access: `gh` must see the repository. On the agent side, a token limited to the repository can be set as `GH_TOKEN` in `.claude/settings.local.json` (gitignored, copied into worktrees by [`.worktreeinclude`](../.worktreeinclude)). **Never in `settings.json`, which is committed.** Fine-grained token, limited to this repository, with exactly: Contents read/write, Pull requests read/write, Actions read, Commit statuses read/write (the agent posts `review-harness` and `opsx-verify`), Metadata read (template: [`.claude/settings.local.example.json`](../.claude/settings.local.example.json)). Tokens expire: a sudden 404 or 403 from `gh` on a repository that worked yesterday usually means an expired token. Such a token cannot create repositories — that needs a different token or the web UI. Without access,<!-- sdd:if !autonomy-commit --> the agent pushes the branch and gives the user the link to open the PR<!-- sdd:endif --><!-- sdd:if autonomy-commit --> the user pushes the branch and opens the PR themselves<!-- sdd:endif -->.
+- **Who merges** is decided per pull request, by `merge-conditions` on its head commit: `success` with `gates: none` → **the agent merges**, through the single route, `gh pr merge <n> --{{MERGE_METHOD}} --subject "<subject> (#<n>)"`, which the hook lets through only after checking that status, its base and the `in-flight` label on GitHub (§2, "What the hook enforces"); any open gate (`intent`, `irreversible`, `framing`, `unclassified`, `invalid`) → the agent gives the PR link and the status, then stops: **the owner merges**, and that merge stands for the QA or the go. A refused merge is never worked around (no REST call, no `--admin`, no `--auto`): wait (pending, stale base, a change in flight) or hand it to the owner.
+- After the merge, in the main checkout: `git switch {{DEFAULT_BRANCH}} && git pull --ff-only`, then delete the branch (`git branch -d <branch>`, `git push origin --delete <branch>`). From a worktree, `{{DEFAULT_BRANCH}}` is already checked out elsewhere: only delete the remote branch; the local branch and the worktree are cleaned up from the main checkout (`git worktree remove` then `git branch -d`).
+- Access: `gh` must see the repository. On the agent side, a token limited to the repository can be set as `GH_TOKEN` in `.claude/settings.local.json` (gitignored, copied into worktrees by [`.worktreeinclude`](../.worktreeinclude)). **Never in `settings.json`, which is committed.** Fine-grained token, limited to this repository, with exactly: Contents read/write, Pull requests read/write, Actions read, Commit statuses read/write (the agent posts `review-harness` and `opsx-verify`), Metadata read (template: [`.claude/settings.local.example.json`](../.claude/settings.local.example.json)). Tokens expire: a sudden 404 or 403 from `gh` on a repository that worked yesterday usually means an expired token. Such a token cannot create repositories — that needs a different token or the web UI. Without access, the agent pushes the branch and gives the user the link to open the PR — and it cannot merge: the merge route needs `gh` to read the status (fail closed).
 <!-- sdd:endif -->
 
 ## 3. Code style

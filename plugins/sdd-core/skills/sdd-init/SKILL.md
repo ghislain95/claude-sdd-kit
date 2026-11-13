@@ -93,6 +93,7 @@ Follow [`references/recon.md`](references/recon.md). Summary:
 6. **Options deduced, not asked**: `multi-module` (≥ 2 modules), `devops` (Docker, IaC or deployment
    scripts — CI alone is not enough), `migrations` (VARIABLES §3), `github`, `ci`, `lean` (single
    module and < ~5,000 lines of code: `wc -l` on source files, tests and dependencies excluded).
+   With `github`, also read the repository's merge settings for `{{MERGE_METHOD}}` (VARIABLES §1).
    Announce them at gate 1; the user can challenge them.
 
 ## Phase 2 — Choices (a single round of questions)
@@ -100,10 +101,14 @@ Follow [`references/recon.md`](references/recon.md). Summary:
 Ask **in one go** (question tool, ≤ 4 questions, each option explained, your recommendation first)
 the choices the code cannot settle:
 
-1. **Git autonomy level** — `autonomy-merge` (the agent commits, pushes, opens and merges the PR with
-   green CI + a review with no BLOCKER/MAJOR) · `autonomy-pr` (a human merges) · `autonomy-commit`
-   (the agent doesn't push). Recommend `autonomy-pr` for a team discovering the workflow,
-   `autonomy-merge` for an experienced solo developer. Without a GitHub remote: `autonomy-commit`.
+1. **Merge method** — only when the repository allows both squash and merge commits (otherwise
+   deduced, VARIABLES `{{MERGE_METHOD}}`): `squash` (recommended: one commit per change on the
+   default branch, reverted as one) · `merge`. Rebase is never offered: the deploy guard needs the
+   default branch before the merge as one commit. There is no question on who merges: the agent
+   pushes and opens PRs, merges only through the verified route (`merge-conditions` green with
+   `gates: none`, checked by the hook on GitHub), and a PR with an open gate is merged by the owner.
+   Without a GitHub remote the agent does not push (`ALLOW_PUSH=0`): say so at gate 1, and set
+   `ALLOW_PUSH=1` by hand only if the owner wants the agent to push to another remote.
 2. **Language** of the docs and replies (English, French, or another one). The templates are written
    in English: with another language, translate the prose as you fill them. Code, commits and
    OpenSpec artifacts stay in English unless explicitly chosen otherwise.
@@ -112,7 +117,7 @@ the choices the code cannot settle:
    `graphify`, offered ticked with it: `graphify hook install` puts local git hooks — post-commit,
    post-checkout — that rebuild the graph incrementally; per developer, nothing committed), `ui` (offered ticked if the project has
    a web interface: `sdd-ui` plugin), `work-style` (offered ticked: the kit's way of working in
-   `CLAUDE.md` §12 — short framing with examples, autonomy all the way once framing is agreed,
+   `CLAUDE.md` §12 — short framing with examples, working all the way through once framing is agreed,
    structured final report, handoff), `caveman` / `cockpit` (display preferences installed at user
    level; `cockpit` = the desktop mods `openspec-cockpit` + `conversation-cards` from the claude-toolbox
    marketplace are installed — offered ticked if `claude plugin list` shows them).
@@ -163,13 +168,13 @@ the choices the code cannot settle:
 ## Phase 4 — Guardrails
 
 1. **Git hook**: copy `templates/claude/hooks/block-git-writes.{sh,pl,test.sh,conf}` into
-   `.claude/hooks/` (`chmod +x` the `.sh` files), fill in the `.conf` (protected branch, autonomy
-   level). `templates/claude/settings.json` → `.claude/settings.json`: the `PreToolUse` hook plus a
+   `.claude/hooks/` (`chmod +x` the `.sh` files), fill in the `.conf` (protected branch, `ALLOW_PUSH`
+   from option `github`, `MERGE_METHOD`, `ALLOW_FORCE_WITH_LEASE=0`). `templates/claude/settings.json` → `.claude/settings.json`: the `PreToolUse` hook plus a
    curated `permissions.allow` of safe commands (read-only git, `openspec`, `gh run`/`gh pr`
    read-and-create, graphify queries, the hook test suite). **Add the module checks**: one
    `Bash(<command>)` entry per command of `{{CHECK_COMMANDS}}` / each `{{MODULE_CHECK}}`, written
    exactly as run (plus a `Bash(<command> *)` form when the command takes arguments, e.g. a test
-   filter) — without them, every check run asks for permission and "all the way" autonomy stalls.
+   filter) — without them, every check run asks for permission and working "all the way" stalls.
    Existing `settings.json` → merge: union of the `allow` lists and of the hooks, nothing removed or
    reordered. Run `bash .claude/hooks/block-git-writes.test.sh` → it must end
    with `ALL n CASES OK`.
@@ -223,7 +228,7 @@ Everything must pass; otherwise fix it before delivering:
 ```bash
 grep -rnE '(^|[^$])\{\{[A-Z_]+\}\}|sdd:(fill|if|endif|each|endeach|note)' CLAUDE.md AGENTS.md .claude/agents .claude/hooks .claude/settings.json docs openspec/config.yaml .sdd .github .gitignore .worktreeinclude .graphifyignore 2>/dev/null   # empty
 openspec validate --all
-bash .claude/hooks/block-git-writes.test.sh                      # ALL n CASES OK, whatever the autonomy level
+bash .claude/hooks/block-git-writes.test.sh                      # ALL n CASES OK, whatever the settings (gh is stubbed)
 python3 .sdd/bin/test_merge_conditions.py                       # OK: the matcher works on this machine
 python3 .sdd/bin/merge_conditions.py validate .sdd/triggers.yaml # no output, exit 0
 python3 -c "import json; json.load(open('.claude/settings.json'))"
@@ -244,8 +249,9 @@ of the generated rules with the actual code (an unproven rule = 🔴 MAJOR). Fix
    - `docs(sdd-init): reverse-document architecture, modules and conventions` (phase 1);
    - `chore(sdd-init): install spec-driven workflow, agents and git guardrails` (phases 3-4).
    Body: what was observed vs decided, test baseline.
-2. Depending on autonomy: `autonomy-commit` → stop there; otherwise `git push -u origin chore/sdd-init`
-   and `gh pr create`; `autonomy-merge` → merge only with green CI (the hook enforces `--merge`).
+2. Option `github`: `git push -u origin chore/sdd-init` and `gh pr create`, then stop: **the owner
+   merges it** (it is gate machinery, and `merge-conditions` is not on the default branch yet, so the
+   hook would refuse the agent's merge anyway). Without `github`: stop at the commits.
 3. **Final report** (structured):
    - **Done**: generated files, by phase.
    - **Decisions**: phase 2 choices.

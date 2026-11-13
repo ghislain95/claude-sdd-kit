@@ -76,8 +76,9 @@ With the agent team (routing: [`CLAUDE.md`](../CLAUDE.md) §8, details: [`AGENTS
    `opsx-verify` on the pushed head, [`CONTRIBUTING.md`](CONTRIBUTING.md) §2).
 5. **Archiving** — implementation commit(s) by the agent on the change branch (Conventional
    Commits, [`CONTRIBUTING.md`](CONTRIBUTING.md) §2), `/opsx:archive`, post-archive (`doc-writer`
-   checks that `docs/` does not contradict the merged specs), commit `chore(<id>)`; finally<!-- sdd:if github --> push, PR and merge<!-- sdd:endif --><!-- sdd:if !github --> a merge by a human<!-- sdd:endif -->
-   according to the autonomy level in [`CONTRIBUTING.md`](CONTRIBUTING.md) §2.
+   checks that `docs/` does not contradict the merged specs), commit `chore(<id>)`; finally<!-- sdd:if github --> push, PR and merge — by the agent through the
+   verified route when `merge-conditions` reports `gates: none`, by the owner when a gate is open<!-- sdd:endif --><!-- sdd:if !github --> a merge by a human<!-- sdd:endif -->
+   ([`CONTRIBUTING.md`](CONTRIBUTING.md) §2).
 
 **Context hygiene**: a fresh context per phase (`/clear`, or `/handoff:passation` then a
 new session) — the artifacts carry the memory.

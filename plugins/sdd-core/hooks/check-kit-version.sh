@@ -5,7 +5,8 @@
 # Silent and exit 0 in every other case: no CLAUDE.md, no install marker, same or newer version,
 # unreadable files. Never blocks a session. No dependency beyond bash, grep, sed and sort.
 # Marker written by sdd-init as the last line of CLAUDE.md (references/adoption.md §2):
-#   <!-- claude-toolbox: installed 0.3.0 on 2026-11-12 — options: … — autonomy: … -->
+#   <!-- claude-toolbox: installed 0.4.0 on 2026-11-13 — options: … -->
+# Older markers end with `— autonomy: …` (the autonomy levels are gone); only the version is read.
 # Projects set up before the catalog was renamed carry the former marker, still recognised:
 #   <!-- sdd-kit: installed 0.2.0 on 2026-11-07 — options: … — autonomy: … -->
 

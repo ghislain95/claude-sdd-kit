@@ -23,17 +23,19 @@ conflict).
 Last line of the generated `CLAUDE.md`:
 
 ```markdown
-<!-- claude-toolbox: installed <sdd-core plugin version> on <YYYY-MM-DD> — options: <list> — autonomy: <level> -->
+<!-- claude-toolbox: installed <sdd-core plugin version> on <YYYY-MM-DD> — options: <list> -->
 ```
 
 It is what `--refresh` relies on. Read the version in the plugin's `.claude-plugin/plugin.json` (two
-levels above this skill).
+levels above this skill). Markers written before the autonomy levels were removed end with
+`— autonomy: <level>`: still read (§3), never written again.
 
 ## 3. `/sdd-init --refresh` — resync with a newer version of the kit
 
 1. Read the marker (`claude-toolbox: installed …`, or `sdd-kit: installed …` for a project set up before
-   the catalog was renamed — rewrite it to the new form): installed version, options, autonomy. Missing → this project was not set up by
-   the kit: offer a full install in adoption mode (§1).
+   the catalog was renamed — rewrite it to the new form): installed version, options, and the former
+   `autonomy` level if the marker still has one (it only feeds step 4's report; the new marker drops
+   it). Missing → this project was not set up by the kit: offer a full install in adoption mode (§1).
 2. Branch `chore/sdd-init-refresh-<version>`.
 3. For every file generated from a template (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/*`,
    `docs/{CONTRIBUTING,OPENSPEC_GUIDE,AGENT_TOOLBOX,GRAPHIFY}.md`, `openspec/config.yaml`,
@@ -51,7 +53,27 @@ levels above this skill).
      list it.
 4. Files copied verbatim (hook `.sh`/`.pl`/`.test.sh`, `.sdd/bin/merge_conditions.py` and
    `.sdd/bin/test_merge_conditions.py`): replaced, then `bash .claude/hooks/block-git-writes.test.sh`
-   and `python3 .sdd/bin/test_merge_conditions.py`; the local `.conf` is kept.
+   and `python3 .sdd/bin/test_merge_conditions.py`. The local `.conf` is kept, its values unchanged,
+   except for the settings the kit removed or added:
+   - **`ALLOW_PR_MERGE` removed** (with the `autonomy-*` levels): delete the line. Who merges is now
+     decided per pull request — the agent merges only through the verified route (`merge-conditions`
+     green with `gates: none` on the head commit, judged against the current default-branch head, no
+     other PR `in-flight`), the owner merges every PR with an open gate. **BREAKING**: a project that
+     had `ALLOW_PR_MERGE=0` (`autonomy-pr`) now lets the agent merge its ungated PRs; one that had
+     `ALLOW_PR_MERGE=1` (`autonomy-merge`) loses the agent's merge of gated PRs and of any PR when
+     `merge-conditions` is absent (no option `github`). Say which case applies, in the report and in
+     the commit body, and ask the owner before committing when it is the first.
+   - **`MERGE_METHOD` added** when missing, from the repository's settings
+     (`gh api repos/{owner}/{repo} --jq '[.allow_squash_merge, .allow_merge_commit]'`, VARIABLES
+     `{{MERGE_METHOD}}`): only one allowed → that one; both → `merge`, the method the former hook
+     enforced, unless the owner picks `squash`; neither (rebase only) → `squash`, and the report asks
+     the owner to allow it; no GitHub remote → `merge`. Never `rebase`.
+   - **`ALLOW_FORCE_WITH_LEASE=0` added** when missing.
+   - `ALLOW_PUSH` and `PROTECTED_BRANCHES` keep their values (a former `autonomy-commit` project keeps
+     `ALLOW_PUSH=0`: its agent still never pushes).
+   Then the hook's test suite again. A branch that tracks the default branch now blocks
+   `git switch -c <b> origin/<default>`: if the project's docs create branches that way, add
+   `--no-track` where they do (local change, listed in the report).
 5. Never touch: `openspec/specs/`, `openspec/changes/`, the reverse-documentation (`ARCHITECTURE.md`,
    module docs, glossary, ADRs, roadmap) — it belongs to the project.
 6. Phase 5 of `SKILL.md` (checks), then one commit `chore(sdd-init): refresh workflow to <version>`

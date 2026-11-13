@@ -61,14 +61,13 @@ contract handed from one agent to the next.
                        glossary) or "no doc impact", `## Purpose` of the touched specs
                        (fixed by the session that archives)<!-- sdd:if graphify -->, graph refresh<!-- sdd:endif -->;
                        commit chore(<id>)
-<!-- sdd:if autonomy-merge -->
-10. PR + merge       ← the agent: green CI + review with no BLOCKER/MAJOR, otherwise it asks
+<!-- sdd:if github -->
+10. PR + merge       ← the agent opens the PR; it merges only through the verified route
+                       (merge-conditions success, gates: none, checked by the hook on GitHub);
+                       an open gate → the owner merges
 <!-- sdd:endif -->
-<!-- sdd:if autonomy-pr -->
-10. PR               ← the agent opens the PR; a human merges
-<!-- sdd:endif -->
-<!-- sdd:if autonomy-commit -->
-10. push + PR        ← a human (the agent never pushes)
+<!-- sdd:if !github -->
+10. push + merge     ← a human (the agent never pushes)
 <!-- sdd:endif -->
 ```
 

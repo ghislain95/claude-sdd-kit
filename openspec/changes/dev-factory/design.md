@@ -147,6 +147,18 @@ The kit's perl reader is kept (most cases, per-project `.conf`, already in the k
   the repository carries the `in-flight` label (D8).
 - geomni's Python guardrail and its `pr.yml` job are removed by geomni's adoption.
 
+Settled while implementing (group 7): the hook queries `gh repo view` (repository and default branch,
+resolved where the command runs), `pulls/<n>` (open, base = default branch, head SHA), the combined
+status of the head SHA, `branches/<default>` (the `base <sha7>` of the description must be its head)
+and `gh pr list --label in-flight --state all` (only Pull requests read, no Issues permission); "in
+flight" is the label on any other pull request whatever its state. `gh pr merge <n> --disable-auto`
+alone stays allowed (it merges nothing); `--repo`/`GH_REPO` are refused so the checked repository
+is the merged one; every unknown option is refused. Tracking a protected branch includes git's
+implicit tracking (`branch.autoSetupMerge`): `git switch -c x origin/main` needs `--no-track`.
+`gh api` writes to `git/refs/heads/<protected>` and to `contents/`, `/merges`, and the GraphQL
+mutations that merge or write a branch are blocked too. Without a `.conf` line, `MERGE_METHOD`
+defaults to `merge`, the method the former hook enforced.
+
 Alternative rejected: keep the Python version — fewer cases, no `.conf`, not in the kit's CI.
 
 ### D7 — The deploy guard

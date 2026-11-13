@@ -35,7 +35,8 @@ vocabulary), and only generates rules and agents from what it has proven.
 
 ```
 /opsx:new → adversarial pass → /opsx:ff → /opsx:apply → review-harness → /opsx:verify
-         → commit → /opsx:archive → post-archive → PR (+ merge, depending on the autonomy level)
+         → commit → /opsx:archive → post-archive → PR → merge (the agent when merge-conditions reports
+           no open gate, checked by the hook on GitHub; the owner otherwise)
 ```
 
 ## Set up a project with a single prompt
@@ -45,7 +46,7 @@ vocabulary), and only generates rules and agents from what it has proven.
 3. Claude installs the tools and plugins, reverse-documents the code, generates the rules, the
    agents, the git guardrail and the CI, then commits everything on a `chore/sdd-init` branch. It
    only stops you at three points: before installing a tool on your machine, to validate what it
-   understood of the code, and for one round of choices (git autonomy, language, options).
+   understood of the code, and for one round of choices (language, options, merge method).
 4. When it is done, restart Claude Code: the agents, the hook and the `/opsx:*` commands are loaded.
 
 Allow 30 to 90 minutes depending on the size of the project. The same prompt, run again on a project
