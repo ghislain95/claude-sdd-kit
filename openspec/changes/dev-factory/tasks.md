@@ -35,20 +35,20 @@ lot; the owner merges every pull request until group 8 has shipped.
 
 ## 5. Triggers, classification and the framing pull request
 
-- [ ] 5.1 Add `.sdd/triggers.yaml` template (intent, irreversible, non-waivable gate machinery) and `classification.yaml` template — verify: schema documented in `OPENSPEC_GUIDE.md`, examples validate against it
-- [ ] 5.2 Proposal step writes `classification.yaml` with evidence; the workflow refuses to generate design artifacts without it — verify: `/opsx:ff` on a change without classification stops with the reason
-- [ ] 5.3 Framing pull request: after the adversarial pass the agent opens a PR with the proposal and classification only; the owner's merge is the approval; reclassification goes through a new framing PR — verify: documented in the templates and exercised on a sample repository
+- [x] 5.1 Add `.sdd/triggers.yaml` template (intent, irreversible, non-waivable gate machinery) and the `classification.yaml` schema (its template is the example in `OPENSPEC_GUIDE.md` §7, checked by `merge_conditions.py validate`) — verify: schema documented in `OPENSPEC_GUIDE.md`, its two examples, the raw and an instantiated `triggers.yaml` template and the toolbox's own `.sdd/triggers.yaml` pass `merge_conditions.py validate`
+- [x] 5.2 Proposal step writes `classification.yaml` with evidence; the workflow refuses to generate design artifacts without it — verify: in a scratch project with the template `openspec/config.yaml` (OpenSpec 1.14.0), `openspec instructions specs|design|tasks|apply` carry the stop rule and its check fails on a change with no classification on `main`; a live `/opsx:ff` run could not be made (headless `claude -p` login expired) and is observed in the geomni pilot (10.2)
+- [x] 5.3 Framing pull request: after the adversarial pass the agent opens a PR with the proposal and classification only; the owner's merge is the approval; reclassification goes through a new framing PR — verify: documented in `CLAUDE.md`, `CONTRIBUTING.md`, `OPENSPEC_GUIDE.md` and the OpenSpec rules; exercised by the matcher tests on throwaway repositories (framing, reclassification, framing with code, classification edited in a change branch); the first framing PR on GitHub is part of the geomni pilot (10.2)
 
 ## 6. merge-conditions check
 
-- [ ] 6.1 Write the trigger matcher (path globs and content regexes, reading `triggers.yaml` and the approved classification from the base branch) with its own test suite — verify: tests cover undeclared migration, waived intent path, gate-machinery edit, classification edited in the PR
-- [ ] 6.2 Write `merge-conditions.yml` (`pull_request_target` + `workflow_run`, never executes PR code; aggregate gate from path filters; `review-harness` and `opsx-verify` statuses; commit status with `gates:` description) — verify: on a sample repository, a PR touching no filtered path is still judged, and a PR editing the workflow is judged by `main`'s version
-- [ ] 6.3 Contributing guide section "what is enforced where" (client-side, server-side, honour-based) — verify: section present in the template
+- [x] 6.1 Write the trigger matcher (path globs and content regexes, reading `triggers.yaml` and the approved classification from the base branch) with its own test suite — verify: tests cover undeclared migration, waived intent path, gate-machinery edit, classification edited in the PR; also archive, unclassified, added-lines-only content patterns, base `triggers.yaml` used when the PR edits it; 31 mutants of the rules (one rule removed or inverted each) all fail the suite
+- [x] 6.2 Write `merge-conditions.yml` (`pull_request_target` + `workflow_run`, never executes PR code; aggregate gate from path filters; `review-harness` and `opsx-verify` statuses; commit status with `gates:` description) — verify: tests on throwaway repositories with a stubbed `gh` show a PR touching no filtered path still judged and a PR editing a workflow's filter judged by `main`'s version (plus pending vs failure, missing `review-harness`, 140-character description); `actionlint` clean on the toolbox's workflow and an instantiated template; the first live run is the toolbox's first pull request after this one is merged (`pull_request_target` runs `main`'s definition)
+- [x] 6.3 Contributing guide section "what is enforced where" (client-side, server-side, honour-based) — verify: section present in the template
 
 ## 7. Guardrail with the verified merge route
 
 - [ ] 7.1 Port geomni's Python guardrail cases into `block-git-writes.test.sh` (REST merge, `--auto`, tracking a protected branch, force-with-lease) — verify: the new cases fail against the current hook
-- [ ] 7.2 Add `MERGE_METHOD` and `ALLOW_FORCE_WITH_LEASE` to the `.conf`, remove `ALLOW_PR_MERGE` and the autonomy levels from templates and `sdd-init` — verify: tests pass for both settings values
+- [ ] 7.2 Add `MERGE_METHOD` (`squash` or `merge`; `rebase` refused) and `ALLOW_FORCE_WITH_LEASE` to the `.conf`, remove `ALLOW_PR_MERGE` and the autonomy levels from templates and `sdd-init` — verify: tests pass for both settings values
 - [ ] 7.3 Implement the merge route: query head SHA and `merge-conditions` status, allow only `success` + `gates: none`, fail closed, refuse while an `in-flight` PR exists — verify: tests with a stubbed `gh` cover green/no gate, gate open, stale commit, GitHub unreachable, in-flight present; the suite still fails against allow-all and block-all hooks
 
 ## 8. Deploy guard, serialisation, rollback, report, local QA

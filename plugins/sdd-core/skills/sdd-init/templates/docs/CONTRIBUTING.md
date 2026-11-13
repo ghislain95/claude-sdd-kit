@@ -26,6 +26,7 @@ Agents (sub-agents included) commit on the change branch; push, PR and merge sta
 ### Branches
 - `{{DEFAULT_BRANCH}}`: stable branch. It only moves **through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->**: never a direct commit or push, hotfixes included.
 - OpenSpec change: `<type>/<change-id>` — e.g. `feat/user-invitations`, `fix/refresh-token-rotation`.
+- Framing of a change: `docs/<change-id>-framing` (a reclassification: `docs/<change-id>-framing-2`, `-3`…) — the change folder only, merged before the change branch is cut.
 - Outside a change: `<type>/<scope>-<desc>` — e.g. `fix/api-input-validation`, `docs/roadmap-resync`, `chore/tooling-hook-update`.
 
 `<type>` = the branch's main Conventional Commits type; `<scope>` ∈ { <!-- sdd:fill: short module names ({{MODULE_NAME}}), plus `docs`, `tooling`, `ci` --> }; `<desc>` in kebab-case {{CODE_LANG}}.
@@ -55,8 +56,11 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`
 - A long message, or one that quotes commands (`--amend`, `` `git pull` ``…): write it to a file and use `git commit -F <file>` (`gh pr create --body-file <file>`), rather than `-m`.
 
 ### Sequence of an OpenSpec change
-The same order as the cycle in [`CLAUDE.md`](../CLAUDE.md) §3, on the `<type>/<change-id>` branch:
-1. `docs(<id>): …` — framing: proposal, then deltas, design, tasks (one or two commits).
+The same order as the cycle in [`CLAUDE.md`](../CLAUDE.md) §3:
+0. **Framing**, on `docs/<id>-framing`: `docs(<id>): frame the change` — `proposal.md` and `classification.yaml` ([`OPENSPEC_GUIDE.md`](OPENSPEC_GUIDE.md) §7), checked with `python3 .sdd/bin/merge_conditions.py validate openspec/changes/<id>/classification.yaml`, after the adversarial pass. That branch carries nothing outside `openspec/changes/<id>/`<!-- sdd:if github -->; it is pushed and opened as a pull request titled `docs(<id>): frame the change`, which `merge-conditions` reports as `gates: framing`<!-- sdd:endif -->. **The owner merges it: that merge is the approval** of the proposal and of its classification — the only copy any check reads. Reclassifying later = a new framing branch `docs/<id>-framing-2` amending `classification.yaml` (and the proposal if its scope moved); the change branch waits for its merge, then merges `{{DEFAULT_BRANCH}}` in (`git merge origin/{{DEFAULT_BRANCH}}`, never a rebase).
+
+Then on the `<type>/<change-id>` branch, cut from `{{DEFAULT_BRANCH}}` after the framing merge:
+1. `docs(<id>): …` — deltas, design, tasks (`/opsx:ff`, refused while the classification is not on `{{DEFAULT_BRANCH}}`).
 2. `/opsx:apply` with `feat|fix|…(<id>): …`, one commit per coherent implementation slice → `/sdd-core:review-harness <id>` (its fixes as further commits, its report as `docs(<id>): review report`) → `/opsx:verify` OK.
 3. `/opsx:archive` + post-archive → `chore(<id>): archive change, sync specs, post-archive`.
 <!-- sdd:if autonomy-merge -->
@@ -96,6 +100,28 @@ Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci -->, also run
 
 **Left to the user**, outside git: framing decisions, any spending commitment, any irreversible action on production or on data.
 
+<!-- sdd:if github -->
+### Commit statuses
+Three statuses on a pull request's head commit decide whether it may merge (one per commit: a new push needs them again):
+- `review-harness` — posted by `/sdd-core:review-harness` when its last pass ends (success: zero open BLOCKER/MAJOR and every selected angle ran).
+- `opsx-verify` — posted by the agent when `/opsx:verify` passes on the pushed head (`failure` when it reports a CRITICAL issue):
+  ```bash
+  gh api "repos/{owner}/{repo}/statuses/$(git rev-parse HEAD)" \
+    -f state=success -f context=opsx-verify -f description="<n> requirements verified, 0 critical"
+  ```
+- `merge-conditions` — posted by CI only, never by hand: required workflows green, `review-harness` and `opsx-verify` green (change pull requests), every trigger hit accounted for by the approved classification. Its description reads `gates: <gates>[ - <reason>]; base <sha7>`: the gates (`none`, `intent`, `irreversible`, `intent+irreversible`, `framing`, `unclassified`, `invalid`), when not green the reason, and the commit of `{{DEFAULT_BRANCH}}` the verdict was computed against. A verdict whose `base` is not the current head of `{{DEFAULT_BRANCH}}` is stale: every push to `{{DEFAULT_BRANCH}}` re-judges the open pull requests (`pending`, `re-judging: …`, first). Framing, archive and unclassified pull requests need no `review-harness`/`opsx-verify`.
+<!-- sdd:endif -->
+
+### What is enforced where
+- **Client-side, on the agent's machine — guards against mistakes**: the git hook above (commands only; a deliberate `sh -c`, `eval` or raw API call gets past it)<!-- sdd:if github -->; the `review-harness` and `opsx-verify` statuses, **honour-based**: the agent posts them itself, so they prevent forgetting a step, not lying about it — `review.md` and the verify report in the pull request are what make them auditable<!-- sdd:endif -->; the OpenSpec rules that stop `/opsx:ff` and apply without an approved classification.
+<!-- sdd:if github -->
+- **Server-side, on GitHub**: `merge-conditions`, computed by a workflow that runs the definition, the triggers, the classifications and the path filters of `{{DEFAULT_BRANCH}}`, never those of the pull request, and never executes the pull request's code. A pull request cannot edit that definition, but it can overwrite the result: a workflow it adds posts statuses as the same `github-actions[bot]`, and the agent's token can post any status. So `merge-conditions` protects against mistakes only — it is the input of the client-side merge rule, and it says whether a merge is allowed, it does not prevent one. The deploy guard (dev-factory, coming) is the server-side barrier: it never trusts the status, it recomputes the verdict inside the deploy pipeline (`merge_conditions.py match` with the merge commit's first parent as base and the merged pull request's head, plus the required CI runs of that head) and refuses a commit of `{{DEFAULT_BRANCH}}` that did not come from a merged pull request; until it is in place nothing server-side stops a bad commit from deploying.
+- **Not enforced**: an agent deliberately working around the hook; on a private repository of GitHub Free there is no branch protection and no ruleset, so anyone holding a token that can push a branch can also push `{{DEFAULT_BRANCH}}` or merge a red pull request, and the agent acting with the owner's token cannot be told apart from the owner on GitHub (statuses, approvals, merges). A public repository, or GitHub Pro, can add a ruleset requiring `merge-conditions`.
+<!-- sdd:endif -->
+<!-- sdd:if !github -->
+- **Not enforced**: with no GitHub remote there is no server-side check at all; the merge is a human's act, made after the review, the verify and the gates of the classification (intent QA, irreversible go).
+<!-- sdd:endif -->
+
 <!-- sdd:if !github -->
 ### Merge
 - No GitHub remote: the branch is reviewed (review harness, or `code-reviewer` outside a change, with no open BLOCKER or MAJOR; for a change, `/opsx:verify` OK and change archived), then **a human** merges it into `{{DEFAULT_BRANCH}}` as a merge commit (`git merge --no-ff <branch>`).
@@ -105,9 +131,9 @@ Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci -->, also run
 - Title = subject of the main commit.
 - Description in {{DOC_LANG}}: context, technical choices, impact, tests run<!-- sdd:if ui -->, screenshots<!-- sdd:endif -->. No Claude attribution.
 - 1 PR = 1 topic (one OpenSpec change, or one fix). Outside a change, no mixing of modules without a reason.
-- Green CI required: the workflows in [`.github/workflows/`](../.github/workflows/). They are path-filtered: a PR none of them concerns (docs only, for example) triggers no check — the condition is then met, provided the local checks have run.
+- Green CI required, as one status: `merge-conditions` ([`.github/workflows/merge-conditions.yml`](../.github/workflows/merge-conditions.yml)). The other workflows in [`.github/workflows/`](../.github/workflows/) are path-filtered, so their absence proves nothing; `merge-conditions` recomputes, from the filters on `{{DEFAULT_BRANCH}}`, which of them the diff requires and waits for each to succeed on the head commit. A PR none of them concerns is still judged (gates, statuses, trigger hits). A PR that deletes, renames or filters out a required workflow, or adds one, fails with that reason (it is gate machinery: the owner merges it).
 - Review: the review of the diff is mandatory (review harness for a change, `code-reviewer` otherwise); it counts as the approval when the developer is alone on the repository.
-- Waiting for CI with a fine-grained token: `gh pr checks` may fail (it needs permissions such tokens often lack). Use `gh run list --branch <branch>` to find the runs, then a single `gh run watch <run-id> --exit-status` in the background — no polling loop. A path-filtered PR that triggers no check at all meets the CI condition, provided the local checks have run.
+- Waiting for CI with a fine-grained token: `gh pr checks` may fail (it needs permissions such tokens often lack). Use `gh run list --branch <branch>` to find the runs, then a single `gh run watch <run-id> --exit-status` in the background — no polling loop.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-merge -->
 - **An agent merges by itself** only if: green CI, review (harness for a change, `code-reviewer` otherwise) with no open BLOCKER or MAJOR, and — for an OpenSpec change — `/opsx:verify` OK and change archived on the branch. Otherwise it stops and asks the user.
@@ -118,7 +144,7 @@ Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci -->, also run
 - The agent opens the PR, gives its link and the CI status, then stops: **a human merges**, as a merge commit.
 <!-- sdd:endif -->
 <!-- sdd:if github -->
-- Access: `gh` must see the repository. On the agent side, a token limited to the repository can be set as `GH_TOKEN` in `.claude/settings.local.json` (gitignored, copied into worktrees by [`.worktreeinclude`](../.worktreeinclude)). **Never in `settings.json`, which is committed.** Fine-grained token, limited to this repository, with exactly: Contents read/write, Pull requests read/write, Actions read, Commit statuses read, Metadata read (template: [`.claude/settings.local.example.json`](../.claude/settings.local.example.json)). Tokens expire: a sudden 404 or 403 from `gh` on a repository that worked yesterday usually means an expired token. Such a token cannot create repositories — that needs a different token or the web UI. Without access,<!-- sdd:if !autonomy-commit --> the agent pushes the branch and gives the user the link to open the PR<!-- sdd:endif --><!-- sdd:if autonomy-commit --> the user pushes the branch and opens the PR themselves<!-- sdd:endif -->.
+- Access: `gh` must see the repository. On the agent side, a token limited to the repository can be set as `GH_TOKEN` in `.claude/settings.local.json` (gitignored, copied into worktrees by [`.worktreeinclude`](../.worktreeinclude)). **Never in `settings.json`, which is committed.** Fine-grained token, limited to this repository, with exactly: Contents read/write, Pull requests read/write, Actions read, Commit statuses read/write (the agent posts `review-harness` and `opsx-verify`), Metadata read (template: [`.claude/settings.local.example.json`](../.claude/settings.local.example.json)). Tokens expire: a sudden 404 or 403 from `gh` on a repository that worked yesterday usually means an expired token. Such a token cannot create repositories — that needs a different token or the web UI. Without access,<!-- sdd:if !autonomy-commit --> the agent pushes the branch and gives the user the link to open the PR<!-- sdd:endif --><!-- sdd:if autonomy-commit --> the user pushes the branch and opens the PR themselves<!-- sdd:endif -->.
 <!-- sdd:endif -->
 
 ## 3. Code style

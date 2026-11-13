@@ -1,0 +1,98 @@
+# sdd:note: generated only with the `github` option (which implies `ci`): the check reads and writes through the GitHub API. List under `workflow_run.workflows` the `name:` of EVERY workflow of .github/workflows/ that runs on pull_request (checks-<module>, OpenSpec, Tooling, Migrations…), this one excepted; keep the list in step when a workflow is added or renamed.
+# merge-conditions — the single check a merge depends on.
+#
+# Posts the commit status `merge-conditions` on the pull request's head commit:
+#   success  every CI workflow the diff requires succeeded on the head commit (the required set is
+#            computed from the path filters of the workflows on {{DEFAULT_BRANCH}}, so a pull request
+#            no filter covers is still judged), `review-harness` and `opsx-verify` are success on
+#            the head commit (change pull requests only), and every trigger hit of the diff is
+#            accounted for by the approved classification;
+#   pending  a required workflow or status has not finished or not arrived yet;
+#   failure  anything else, with the reason — including a required workflow the pull request deletes,
+#            renames or filters out, and a workflow it adds (gate machinery: the owner merges).
+# The description is `gates: <gates>[ - <reasons>]; base <sha7>`, the gates being `none | intent |
+# irreversible | intent+irreversible | framing | unclassified | invalid`, and `base` the commit of
+# {{DEFAULT_BRANCH}} the verdict was computed against. Only `gates: none` with `base` equal to the current head
+# of {{DEFAULT_BRANCH}} may be merged by the agent. A push to {{DEFAULT_BRANCH}} re-judges every open pull request into it
+# (`pending`, `re-judging: …`, first).
+#
+# Safety: `pull_request_target`, `workflow_run`, `status` and `push` all run the definition on the
+# default branch, so a pull request cannot edit the definition of this check; it can overwrite its
+# result (a workflow the pull request adds posts as the same github-actions[bot], and the agent's token
+# can post any status). The status guards against mistakes only: the deploy guard recomputes the
+# verdict server-side and never reads it. The job checks out the default branch only and fetches the
+# pull request head as data: its files are read with git, nothing from it is executed.
+# Matcher, schemas and tests: .sdd/bin/merge_conditions.py, docs/OPENSPEC_GUIDE.md.
+name: Merge conditions
+
+on:
+  pull_request_target:
+    # `edited` covers a pull request retargeted to the default branch.
+    types: [ opened, synchronize, reopened, ready_for_review, edited ]
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+  workflow_run:
+    # sdd:fill: the `name:` of every workflow that runs on pull_request, e.g. 'Checks (api)', 'OpenSpec', 'Tooling'
+    workflows: [ 'OpenSpec', 'Tooling' ]
+    types: [ completed ]
+  status:
+  push:
+    branches: [ '{{DEFAULT_BRANCH}}' ]
+
+permissions:
+  contents: read
+  statuses: write
+  pull-requests: read
+  actions: read
+  checks: read
+
+jobs:
+  judge:
+    # React to the agent's own statuses only (the statuses this job posts never trigger a run).
+    if: >-
+      (github.event_name == 'pull_request_target') ||
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
+      (github.event_name == 'status' && (github.event.context == 'review-harness' || github.event.context == 'opsx-verify'))
+    # On the job, not the workflow: an event the `if` skips (another app's status) never enters a
+    # group, so it cannot cancel a judgement. Every pull request event is keyed by the head commit
+    # it judges, so two judgements of one commit are serialised and the newest one (which read the
+    # latest statuses) wins; a judgement of an older head skips posting (still-head check).
+    concurrency:
+      group: merge-conditions-${{ github.event_name == 'push' && 'push' || github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.sha }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The default branch, never the pull request head.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: pip install pyyaml==6.0.2
+
+      - name: Judge the pull requests and post merge-conditions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          STATUS_SHA: ${{ github.event.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            pull_request_target) target=(--pr "$PR_NUMBER" --head-sha "$PR_HEAD_SHA") ;;
+            workflow_run)        target=(--sha "$RUN_HEAD_SHA") ;;
+            status)              target=(--sha "$STATUS_SHA") ;;
+            push)                target=(--all-open) ;;
+            *) echo "Unsupported event $EVENT_NAME"; exit 1 ;;
+          esac
+          python3 .sdd/bin/merge_conditions.py check \
+            --repo "$GITHUB_REPOSITORY" --default-branch "$DEFAULT_BRANCH" "${target[@]}"

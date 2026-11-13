@@ -13,7 +13,11 @@ How to publish a new version, and what users experience.
    claude plugin validate plugins/handoff
    bash plugins/sdd-core/skills/sdd-init/templates/claude/hooks/block-git-writes.test.sh
    bash plugins/sdd-core/hooks/check-kit-version.test.sh
+   uv run --with pyyaml python .sdd/bin/test_merge_conditions.py
    ```
+   The same suites run in CI ([`tooling.yml`](.github/workflows/tooling.yml)), which also checks
+   that `.sdd/bin/` is byte-identical to `plugins/sdd-core/skills/sdd-init/templates/sdd/bin/`:
+   change the template, then copy it.
    For a template change, also dry-run `sdd-init` on a throwaway project (one module and several
    modules if the change concerns `multi-module`) and check that no `{{…}}` or `sdd:` marker is left.
 3. **Bump `version`** in `plugins/<plugin>/.claude-plugin/plugin.json` of every plugin you changed
@@ -44,6 +48,20 @@ no longer raises, such as "$ is passed to … imported from …" or `"ui.notify"
 listed in [`.sdd/triggers.yaml`](.sdd/triggers.yaml) under `irreversible` reach users' machines or
 projects as soon as they are merged; a pull request touching one of them is merged by the owner, never
 by an agent.
+
+**How the toolbox's own merges are judged.** The toolbox runs the same check it ships:
+[`merge-conditions.yml`](.github/workflows/merge-conditions.yml) runs from `main` on every pull
+request (and again when `Tooling` completes, when the agent posts `review-harness` / `opsx-verify`,
+and for every open pull request when `main` moves), reads `.sdd/triggers.yaml` and the change's
+approved `classification.yaml` from `main`, requires
+`Tooling` (no path filter, so always) to have succeeded on the head commit, and posts the
+`merge-conditions` status with the open gates in its description. A change of this repository goes
+through the same framing pull request as a project's (`docs/<id>-framing`, merged by the owner); a pull
+request without an approved classification is `gates: unclassified` and merged by the owner. Changes
+started before the check existed (`dev-factory`) have no classification and are judged unclassified.
+The repository is public, so the ruleset on `main` can also require `merge-conditions` once it has run
+once (it can only be required after GitHub has seen it); until the guardrail's verified merge route
+ships, the owner merges every pull request anyway.
 
 ## Renaming the catalog (`sdd-kit` → `claude-toolbox`)
 
