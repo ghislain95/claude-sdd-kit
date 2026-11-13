@@ -22,7 +22,7 @@ Agents (sub-agents included) commit on the change branch; push and merge stay hu
 
 ### Branches
 - `{{DEFAULT_BRANCH}}`: stable branch. It only moves **through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->**: never a direct commit or push, hotfixes included.
-- OpenSpec change: `<type>/<change-id>` — e.g. `feat/user-invitations`, `fix/refresh-token-rotation`.
+- OpenSpec change: `<type>/<change-id>` — e.g. `feat/user-invitations`, `fix/refresh-token-rotation`. A change delivered in several pull requests names each one `<type>/<change-id>/<lot>` (e.g. `feat/user-invitations/backend`): `merge-conditions` reads the segment after `<type>/` as the change id and ignores the lot. A branch whose id does not name the change folder it touches fails the check.
 - Framing of a change: `docs/<change-id>-framing` (a reclassification: `docs/<change-id>-framing-2`, `-3`…) — the change folder only, merged before the change branch is cut.
 - Outside a change: `<type>/<scope>-<desc>` — e.g. `fix/api-input-validation`, `docs/roadmap-resync`, `chore/tooling-hook-update`.
 

@@ -127,7 +127,7 @@ merge (human)           → the agent stops at the commit on the branch
 <!-- sdd:if !github -->
 - **Git: the agent commits on the change branch; push and merge stay human** — every `git push` is blocked by the hook (`ALLOW_PUSH=0`) — following [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §2:
 <!-- sdd:endif -->
-  - branch `<type>/<change-id>` (outside a change: `<type>/<scope>-<desc>`); `{{DEFAULT_BRANCH}}` only moves through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->, hotfixes included;
+  - branch `<type>/<change-id>`, or `<type>/<change-id>/<lot>` when a change ships in several pull requests (outside a change: `<type>/<scope>-<desc>`); `{{DEFAULT_BRANCH}}` only moves through <!-- sdd:if github -->a merged PR<!-- sdd:endif --><!-- sdd:if !github -->a merge done by a human<!-- sdd:endif -->, hotfixes included;
   - Conventional Commits in {{CODE_LANG}}, scope = change id (otherwise the module), subject + body, no Claude attribution (no `Co-Authored-By`, no "Generated with Claude Code");
   - order of a change: framing commit `docs(<id>)` → apply with commit(s) `feat|fix(<id>)` per task group → review harness (fix commits) → verify → archive + post-archive → commit `chore(<id>)`<!-- sdd:if github --> → push → PR → merge (verified route, or the owner when a gate is open)<!-- sdd:endif -->;
   - `git add` with explicit paths; module tests green before a code commit (the review harness then reviews the commits, before the pull request); never `--amend`, `rebase`, `reset` to a revision or force-push; long message → `git commit -F <file>`;

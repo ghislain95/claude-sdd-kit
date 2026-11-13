@@ -359,6 +359,23 @@ class MatcherTest(unittest.TestCase):
         self.assertEqual((result["kind"], result["change"]), ("unclassified", None))
         self.assertEqual(result["errors"], ["change folder permissive does not match the branch feat/strict"])
 
+    def test_lot_branch_belongs_to_its_change(self):
+        # A change delivered in several pull requests: `<type>/<id>/<lot>`.
+        self.approve(classification())
+        self.pull_request("feat/add-export/merge-route")
+        self.repo.write("src/app.py", "print(1)\n")
+        result = self.match("feat/add-export/merge-route")
+        self.assertEqual((result["kind"], result["change"], result["errors"]), ("change", "add-export", []))
+
+    def test_lot_segment_is_never_read_as_the_change(self):
+        # `feat/other/add-export` belongs to `other`, never to `add-export`.
+        self.approve(classification())
+        self.pull_request("feat/other/add-export")
+        self.repo.write("src/app.py", "print(1)\n")
+        result = self.match("feat/other/add-export")
+        self.assertEqual(result["change"], None)
+        self.assertEqual(result["errors"], ["change folder add-export does not match the branch feat/other/add-export"])
+
     def test_several_change_folders_fail(self):
         self.approve(classification())
         self.approve(classification("other"), change="other")
