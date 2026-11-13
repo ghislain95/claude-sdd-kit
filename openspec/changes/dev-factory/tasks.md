@@ -48,7 +48,7 @@ lot; the owner merges every pull request until group 8 has shipped.
 ## 7. Guardrail with the verified merge route
 
 - [ ] 7.1 Port geomni's Python guardrail cases into `block-git-writes.test.sh` (REST merge, `--auto`, tracking a protected branch, force-with-lease) — verify: the new cases fail against the current hook
-- [ ] 7.2 Add `MERGE_METHOD` and `ALLOW_FORCE_WITH_LEASE` to the `.conf`, remove `ALLOW_PR_MERGE` and the autonomy levels from templates and `sdd-init` — verify: tests pass for both settings values
+- [ ] 7.2 Add `MERGE_METHOD` (`squash` or `merge`; `rebase` refused) and `ALLOW_FORCE_WITH_LEASE` to the `.conf`, remove `ALLOW_PR_MERGE` and the autonomy levels from templates and `sdd-init` — verify: tests pass for both settings values
 - [ ] 7.3 Implement the merge route: query head SHA and `merge-conditions` status, allow only `success` + `gates: none`, fail closed, refuse while an `in-flight` PR exists — verify: tests with a stubbed `gh` cover green/no gate, gate open, stale commit, GitHub unreachable, in-flight present; the suite still fails against allow-all and block-all hooks
 
 ## 8. Deploy guard, serialisation, rollback, report, local QA

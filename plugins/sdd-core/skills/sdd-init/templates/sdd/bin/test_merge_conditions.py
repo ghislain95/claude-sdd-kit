@@ -680,7 +680,7 @@ class CheckTest(unittest.TestCase):
     def test_pull_request_outside_every_filter_is_still_judged(self):
         sha = self.head({"docs/a.md": "x\n"})
         outcome = self.judge(sha, runs=self.green_runs(sha), statuses=GREEN)
-        self.assertEqual((outcome["state"], outcome["description"]), ("success", f"gates: none - base {self.base7()}"))
+        self.assertEqual((outcome["state"], outcome["description"]), ("success", f"gates: none; base {self.base7()}"))
 
     def test_running_workflow_is_pending(self):
         sha = self.head({"docs/a.md": "x\n"})
@@ -753,14 +753,14 @@ class CheckTest(unittest.TestCase):
         sha = self.head({"docs/a.md": "x\n"}, branch="fix/typo", classified=False)
         outcome = self.judge(sha, branch="fix/typo", runs=[run("always.yml", sha)])
         self.assertEqual((outcome["state"], outcome["description"]),
-                         ("success", f"gates: unclassified - base {self.base7()}"))
+                         ("success", f"gates: unclassified; base {self.base7()}"))
 
     def test_owner_merged_gate_is_success_with_its_gate(self):
         self.repo.write("openspec/changes/add-export/proposal.md", "# Proposal\n")
         self.repo.write("openspec/changes/add-export/classification.yaml", classification(intent=True))
         sha = self.head({"web/src/page.ts": "x\n"}, classified=False)
         outcome = self.judge(sha, runs=self.green_runs(sha) + [run("web.yml", sha, run_id=3)], statuses=GREEN)
-        self.assertEqual((outcome["state"], outcome["description"]), ("success", f"gates: intent - base {self.base7()}"))
+        self.assertEqual((outcome["state"], outcome["description"]), ("success", f"gates: intent; base {self.base7()}"))
 
     def test_description_fits_in_a_commit_status_and_keeps_the_base(self):
         files = {f"db/migrations/V{index}__a_rather_long_migration_name.sql": "x\n" for index in range(2, 12)}
@@ -858,8 +858,8 @@ class CheckTest(unittest.TestCase):
         self.assertEqual([posted[1:] for posted in stub.posted], [
             (first, "pending", f"re-judging: main moved to {base7}"),
             (second, "pending", f"re-judging: main moved to {base7}"),
-            (first, "success", f"gates: none - base {base7}"),
-            (second, "success", f"gates: unclassified - base {base7}"),
+            (first, "success", f"gates: none; base {base7}"),
+            (second, "success", f"gates: unclassified; base {base7}"),
         ])
 
     def test_crash_posts_an_error(self):

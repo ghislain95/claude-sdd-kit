@@ -724,8 +724,12 @@ def truncate(text: str, limit: int = DESCRIPTION_MAX) -> str:
 
 
 def describe(label: str, reasons, base_sha: str) -> str:
-    """`<label> - <reasons>; base <sha7>`, cut inside the reasons so that the base always survives."""
+    """`<label>; base <sha7>`, or `<label> - <reasons>; base <sha7>`, cut inside the reasons so that the
+    base always survives."""
     suffix = f"base {base_sha[:7]}"
+    reasons = list(reasons)
+    if not reasons:
+        return f"{label}; {suffix}"
     text = label + " - " + "".join(f"{reason}; " for reason in reasons)
     if len(text) + len(suffix) > DESCRIPTION_MAX:
         text = text[: DESCRIPTION_MAX - len(suffix) - 5] + "...; "
@@ -934,7 +938,7 @@ def main(argv=None) -> int:
 
     match_parser = commands.add_parser("match", help="classify a diff; prints JSON; exit 1 when not clean")
     match_parser.add_argument("--base", required=True,
-                              help="base commit, e.g. origin/main, or a merge commit's first parent <sha>^1")
+                              help="base commit, e.g. origin/main; in the deploy guard, the default branch before the merge (the push event's `before`), never <merge>^1, which a rebase merge makes wrong")
     match_parser.add_argument("--head", required=True, help="head commit or ref")
     match_parser.add_argument("--branch", required=True, help="pull request branch name, e.g. feat/<change-id>")
 

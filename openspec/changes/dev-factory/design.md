@@ -138,7 +138,8 @@ The kit's perl reader is kept (most cases, per-project `.conf`, already in the k
 
 - geomni's cases ported as tests: REST merge endpoint `PUT …/pulls/N/merge`, `gh pr merge --auto`,
   branch tracking a protected branch, `--force-with-lease` allowed when `ALLOW_FORCE_WITH_LEASE=1`.
-- `MERGE_METHOD=squash|merge|rebase`; `ALLOW_PR_MERGE` and the three autonomy levels are removed (the
+- `MERGE_METHOD=squash|merge` (`rebase` refused: after a rebase merge no single commit of the default
+  branch marks "before this pull request", which the deploy guard needs); `ALLOW_PR_MERGE` and the three autonomy levels are removed (the
   change decides, not the project). **BREAKING** for wifisense's `.conf`, handled by its adoption.
 - The single merge route: `gh pr merge <n> --<MERGE_METHOD>`. Before allowing it the hook queries
   GitHub for the PR's head SHA and the `merge-conditions` status of that SHA; it allows only `success`
@@ -152,8 +153,8 @@ Alternative rejected: keep the Python version — fewer cases, no `.conf`, not i
 
 A script shipped by the kit, `.sdd/bin/deploy-guard.sh <sha>`: finds the PR merged as `<sha>`
 (`GET /repos/{o}/{r}/commits/{sha}/pulls`), requires it merged, then **recomputes the verdict itself**
-inside the deploy pipeline — `merge_conditions.py match` with the merge commit's first parent as base
-and the PR head as head, plus the aggregate CI condition on the PR head — instead of trusting the
+inside the deploy pipeline — `merge_conditions.py match` with the default branch before the merge as
+base (the push event's `before`, never `<merge>^1`) and the PR head as head, plus the aggregate CI condition on the PR head — instead of trusting the
 `merge-conditions` status. Amended after the lot 3a review: a commit status can be overwritten by any
 workflow the pull request adds (every writer is `github-actions[bot]`) and by the agent's own token,
 so the status is an input of the client-side merge rule only, never of the server-side barrier. Any

@@ -54,10 +54,11 @@ jobs:
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
       (github.event_name == 'status' && (github.event.context == 'review-harness' || github.event.context == 'opsx-verify'))
     # On the job, not the workflow: an event the `if` skips (another app's status) never enters a
-    # group, so it cannot cancel a judgement. Keyed by pull request number for pull request events,
-    # so a new push to the branch cancels the judgement of the previous head.
+    # group, so it cannot cancel a judgement. Every pull request event is keyed by the head commit
+    # it judges, so two judgements of one commit are serialised and the newest one (which read the
+    # latest statuses) wins; a judgement of an older head skips posting (still-head check).
     concurrency:
-      group: merge-conditions-${{ github.event_name == 'push' && 'push' || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.event.workflow_run.head_sha || github.event.sha }}
+      group: merge-conditions-${{ github.event_name == 'push' && 'push' || github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.event.sha }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
