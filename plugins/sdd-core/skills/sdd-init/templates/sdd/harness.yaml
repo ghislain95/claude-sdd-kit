@@ -1,0 +1,20 @@
+# Review harness settings of {{PROJECT_NAME}} — read by /sdd-core:review-harness.
+# Schema and defaults: the sdd-core plugin's skills/review-harness/HARNESS_CONFIG.md.
+# Part of the gate machinery: a pull request that changes this file is merged by the owner.
+
+budget:
+  minutes: 90
+  agent_runs: 30
+  effort: high
+  heavy_builds: 1
+  bug_hunt_level: medium
+  rounds: 3
+
+# Conditional angles and the diff globs that select them; a missing key takes the default globs of
+# HARNESS_CONFIG.md, `[]` turns the angle off. The other angles always run.
+angles:
+  # sdd:fill: security, performance and interface globs of this project (interface: [] without a UI module)
+
+# Commands proven during the reverse-documentation, written exactly as run (schema: HARNESS_CONFIG.md).
+mechanical:
+  # sdd:fill: conventions, tests (run, mutation or null), security, performance and interface commands

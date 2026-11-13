@@ -50,14 +50,14 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`
 **Commit rules**
 - One commit = one coherent slice (a module, the tests, the docs…); no "wip" commits.
 - Staging with **explicit paths** (`git add <paths>`): never `git add -A` / `.` / `-u`, nor `git commit -a` — a commit only carries what we decided to put in it.
-- Before a **code** commit: checks of the touched module green (the same commands as CI) and `code-reviewer` review done on the diff. Before any commit touching `openspec/`: `openspec validate --all`.
+- Before a **code** commit: checks of the touched module green (the same commands as CI). The review runs on the committed work before the pull request (review harness for an OpenSpec change, `code-reviewer` otherwise). Before any commit touching `openspec/`: `openspec validate --all`.
 - Never rewrite: no `--amend`, no `rebase`, no `reset` to a revision, no force-push. A mistake is fixed with a new commit.
 - A long message, or one that quotes commands (`--amend`, `` `git pull` ``…): write it to a file and use `git commit -F <file>` (`gh pr create --body-file <file>`), rather than `-m`.
 
 ### Sequence of an OpenSpec change
 The same order as the cycle in [`CLAUDE.md`](../CLAUDE.md) §3, on the `<type>/<change-id>` branch:
 1. `docs(<id>): …` — framing: proposal, then deltas, design, tasks (one or two commits).
-2. `/opsx:apply` → `code-reviewer` review of the diff → `/opsx:verify` OK → `feat|fix|…(<id>): …`, one commit per coherent implementation slice.
+2. `/opsx:apply` with `feat|fix|…(<id>): …`, one commit per coherent implementation slice → `/sdd-core:review-harness <id>` (its fixes as further commits, its report as `docs(<id>): review report`) → `/opsx:verify` OK.
 3. `/opsx:archive` + post-archive → `chore(<id>): archive change, sync specs, post-archive`.
 <!-- sdd:if autonomy-merge -->
 4. Push the branch, PR, merge (below).
@@ -98,7 +98,7 @@ Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci -->, also run
 
 <!-- sdd:if !github -->
 ### Merge
-- No GitHub remote: the branch is reviewed (`code-reviewer` with no open BLOCKER or MAJOR; for a change, `/opsx:verify` OK and change archived), then **a human** merges it into `{{DEFAULT_BRANCH}}` as a merge commit (`git merge --no-ff <branch>`).
+- No GitHub remote: the branch is reviewed (review harness, or `code-reviewer` outside a change, with no open BLOCKER or MAJOR; for a change, `/opsx:verify` OK and change archived), then **a human** merges it into `{{DEFAULT_BRANCH}}` as a merge commit (`git merge --no-ff <branch>`).
 <!-- sdd:endif -->
 <!-- sdd:if github -->
 ### Pull Requests
@@ -106,11 +106,11 @@ Tests: `bash .claude/hooks/block-git-writes.test.sh`<!-- sdd:if ci -->, also run
 - Description in {{DOC_LANG}}: context, technical choices, impact, tests run<!-- sdd:if ui -->, screenshots<!-- sdd:endif -->. No Claude attribution.
 - 1 PR = 1 topic (one OpenSpec change, or one fix). Outside a change, no mixing of modules without a reason.
 - Green CI required: the workflows in [`.github/workflows/`](../.github/workflows/). They are path-filtered: a PR none of them concerns (docs only, for example) triggers no check — the condition is then met, provided the local checks have run.
-- Review: the `code-reviewer` review of the diff is mandatory; it counts as the approval when the developer is alone on the repository.
+- Review: the review of the diff is mandatory (review harness for a change, `code-reviewer` otherwise); it counts as the approval when the developer is alone on the repository.
 - Waiting for CI with a fine-grained token: `gh pr checks` may fail (it needs permissions such tokens often lack). Use `gh run list --branch <branch>` to find the runs, then a single `gh run watch <run-id> --exit-status` in the background — no polling loop. A path-filtered PR that triggers no check at all meets the CI condition, provided the local checks have run.
 <!-- sdd:endif -->
 <!-- sdd:if autonomy-merge -->
-- **An agent merges by itself** only if: green CI, `code-reviewer` review with no open BLOCKER or MAJOR, and — for an OpenSpec change — `/opsx:verify` OK and change archived on the branch. Otherwise it stops and asks the user.
+- **An agent merges by itself** only if: green CI, review (harness for a change, `code-reviewer` otherwise) with no open BLOCKER or MAJOR, and — for an OpenSpec change — `/opsx:verify` OK and change archived on the branch. Otherwise it stops and asks the user.
 - Merge as a **merge commit** (neither squash nor rebase), title `<subject> (#N)`: `gh pr merge <n> --merge --subject "<subject> (#<n>)"`.
 - After the merge, in the main checkout: `git switch {{DEFAULT_BRANCH}} && git pull --ff-only`, then delete the branch (`git branch -d <branch>`, `git push origin --delete <branch>`). From a worktree, `{{DEFAULT_BRANCH}}` is already checked out elsewhere: only delete the remote branch; the local branch and the worktree are cleaned up from the main checkout (`git worktree remove` then `git branch -d`).
 <!-- sdd:endif -->

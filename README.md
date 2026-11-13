@@ -34,7 +34,7 @@ A project's rules can't be copied from another project. So `/sdd-core:sdd-init` 
 vocabulary), and only generates rules and agents from what it has proven.
 
 ```
-/opsx:new → [adversarial pass] → /opsx:ff → /opsx:apply → code-reviewer → /opsx:verify
+/opsx:new → adversarial pass → /opsx:ff → /opsx:apply → review-harness → /opsx:verify
          → commit → /opsx:archive → post-archive → PR (+ merge, depending on the autonomy level)
 ```
 
@@ -82,14 +82,14 @@ skills and one session-start hook: it only speaks in a project set up with an ol
 else. `superpowers` adds a session-start hook that loads its guide to using skills; the desktop mods
 change the desktop app's display. To remove the kit:
 `claude plugin uninstall sdd-core@claude-toolbox`, then `claude plugin marketplace remove claude-toolbox`.
-Context cost: `sdd-core`'s skill descriptions add about 400 tokens to every session
+Context cost: `sdd-core`'s skill descriptions add about 650 tokens to every session
 (`claude plugin details sdd-core@claude-toolbox` shows the breakdown).
 
 ## Contents
 
 | Plugin | Contents |
 |---|---|
-| **`sdd-core`** | `/sdd-core:sdd-init` (reverse-documentation + workflow install, `--refresh` to update), `/sdd-core:retro`, `sdd-core:domain-modeling`, `/sdd-core:improve-codebase-architecture`, and the templates (agents, `CLAUDE.md`, OpenSpec rules, git hook, CI). Depends on `handoff` |
+| **`sdd-core`** | `/sdd-core:sdd-init` (reverse-documentation + workflow install, `--refresh` to update), `/sdd-core:review-harness` (full review of a change, with its eight `review-*` angles), `/sdd-core:retro`, `sdd-core:domain-modeling`, `/sdd-core:improve-codebase-architecture`, and the templates (agents, `CLAUDE.md`, OpenSpec rules, git hook, CI). Depends on `handoff` |
 | **`handoff`** | `/handoff:passation` — handoff document to resume in a fresh session; usable in any project, installed with `sdd-core` |
 | **`sdd-ui`** (optional) | `web-design-guidelines`, `break-ui`, `emil-design-eng`, `animate`, `review-animations`, `improve-animations` |
 | **Desktop mods** (optional, desktop app only) | `openspec-cockpit`, `conversation-cards`, `session-hud`, `background-tasks` — in [`mods/`](mods/README.md) |

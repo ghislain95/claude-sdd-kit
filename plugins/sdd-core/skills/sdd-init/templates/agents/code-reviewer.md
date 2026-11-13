@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: USE WHEN the user asks to "review", "re-read", "validate", "audit this code", "look at my PR", "look at my diff", or systematically after a dev agent has produced code, before /opsx:verify and before any commit. DO NOT USE to rewrite code — this agent reports, it does not fix.
+description: USE WHEN the user asks to "review", "re-read", "validate", "audit this code", "look at my PR", "look at my diff", or after a hotfix outside an OpenSpec change. Inside a change it runs as the conventions angle of /sdd-core:review-harness. DO NOT USE to rewrite code — this agent reports, it does not fix.
 tools: [Read, Grep, Bash]
 model: {{AGENT_MODEL}}
 ---

@@ -50,15 +50,18 @@ With the agent team (routing: [`CLAUDE.md`](../CLAUDE.md) §8, details: [`AGENTS
 
 1. **Framing** — `product-owner`: `proposal.md` (intent, scope, non-goals,
    testable criteria), roadmap epic referenced.
-1b. **Adversarial pass** — if the change is structural, `architect` tries to break the
-   proposal; objections are resolved in the proposal before `/opsx:ff`.
+1b. **Adversarial pass** — always, scaled: `architect` tries to break the proposal (a full
+   attempt for a structural change — new module, new contract, migration, cross-cutting choice, new
+   mechanism —, the five strongest objections for a small one); objections are
+   resolved in the proposal, or put to the user, before `/opsx:ff`.
 2. **Design** — `architect`: spec deltas (Given/When/Then, translatable 1:1 into tests) +
    `design.md` (owning module, migration yes/no, layer boundaries, decisions
    sourced at the pinned version).
 3. **Implementation** — `<module>-dev`<!-- sdd:if multi-module --> / `full-stack-dev`<!-- sdd:endif -->: `tasks.md` ticked as
    it goes; `tester` checks: 1 delta scenario = 1 test.
-4. **Verification** — `code-reviewer` on the diff, then `/opsx:verify` (compliance with the deltas,
-   tests actually run).
+4. **Verification** — `/sdd-core:review-harness <id>` (every review angle, findings adversarially
+   verified, three fix rounds at most, report in `review.md`), then `/opsx:verify` (compliance with
+   the deltas, tests actually run).
 5. **Archiving** — implementation commit(s) by the agent on the change branch (Conventional
    Commits, [`CONTRIBUTING.md`](CONTRIBUTING.md) §2), `/opsx:archive`, post-archive (`doc-writer`
    checks that `docs/` does not contradict the merged specs), commit `chore(<id>)`; finally<!-- sdd:if github --> push, PR and merge<!-- sdd:endif --><!-- sdd:if !github --> a merge by a human<!-- sdd:endif -->

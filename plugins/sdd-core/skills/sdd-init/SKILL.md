@@ -189,7 +189,12 @@ the choices the code cannot settle:
    it holds no secret: it documents the token's exact permissions). **Never create
    `settings.local.json` yourself**: in the report, tell each developer to copy the example and put
    their own token in it.
-5. Option `ui`: `templates/claude/launch.json` → `.claude/launch.json`, one configuration per UI
+5. **Review harness settings**: `templates/sdd/harness.yaml` → `.sdd/harness.yaml`. Fill `angles` with
+   this project's globs and `mechanical` with the commands proven in phase 1 (architecture tests, lint,
+   module tests, dependency audit, measured budgets). Mutation tooling: if the project has one
+   (PIT, Stryker, mutmut, cargo-mutants…), its command scoped to `{files}`; otherwise `null`, and say
+   in the report that test strength is judged without mutation evidence until one is added.
+6. Option `ui`: `templates/claude/launch.json` → `.claude/launch.json`, one configuration per UI
    module, filled from the recon (the module's dev-server script: `runtimeExecutable`,
    `runtimeArgs`, `port`). It lets Claude's preview tools start and check the UI. Keep `autoPort:
    true` unless a backend's CORS configuration expects a fixed port (then a fixed port, and say why
@@ -200,12 +205,12 @@ the choices the code cannot settle:
 Everything must pass; otherwise fix it before delivering:
 
 ```bash
-grep -rnE '(^|[^$])\{\{[A-Z_]+\}\}|sdd:(fill|if|endif|each|endeach|note)' CLAUDE.md AGENTS.md .claude/agents .claude/hooks .claude/settings.json docs openspec/config.yaml .github .gitignore .worktreeinclude .graphifyignore 2>/dev/null   # empty
+grep -rnE '(^|[^$])\{\{[A-Z_]+\}\}|sdd:(fill|if|endif|each|endeach|note)' CLAUDE.md AGENTS.md .claude/agents .claude/hooks .claude/settings.json docs openspec/config.yaml .sdd .github .gitignore .worktreeinclude .graphifyignore 2>/dev/null   # empty
 openspec validate --all
 bash .claude/hooks/block-git-writes.test.sh                      # ALL n CASES OK, whatever the autonomy level
 python3 -c "import json; json.load(open('.claude/settings.json'))"
 # YAML: the first tool available
-for f in openspec/config.yaml .github/workflows/*.yml; do ruby -ryaml -e "YAML.load_file('$f')" 2>/dev/null || python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" || echo "YAML KO: $f"; done
+for f in openspec/config.yaml .sdd/*.yaml .github/workflows/*.yml; do ruby -ryaml -e "YAML.load_file('$f')" 2>/dev/null || python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" || echo "YAML KO: $f"; done
 ```
 
 plus: every command cited in the "Before finishing" section of `CLAUDE.md` run at least once; every

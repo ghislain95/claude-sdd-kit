@@ -50,9 +50,9 @@ rules:
     - A rename or contract/type change that crosses more than one module is split into add → migrate callers → remove, each step leaving build and tests green
     # sdd:endif
     # sdd:if !ui
-    - After the implementation groups, a task runs the code-reviewer pass on the uncommitted diff
+    - After the implementation groups, a task runs /sdd-core:review-harness on the change (report in review.md)
     # sdd:endif
     # sdd:if ui
-    - After the implementation groups, a task runs the code-reviewer pass on the uncommitted diff (plus /sdd-ui:web-design-guidelines when UI files change; /sdd-ui:review-animations when motion changes — a user-invoked skill, so otherwise an agent reads the sdd-ui plugin's review-animations/SKILL.md + STANDARDS.md and applies them)
+    - After the implementation groups, a task runs /sdd-core:review-harness on the change (report in review.md; its interface angle uses the sdd-ui skills when UI files change)
     # sdd:endif
     - "Final task: run {{CHECK_COMMANDS}}, the same checks as CI, and report results"

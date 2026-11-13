@@ -103,6 +103,7 @@ Whole files under a condition (flagged by a `sdd:note` at the top): `docs/GRAPHI
 `root/AGENTS.lean.md` replaces `root/AGENTS.md` (generated under the name `AGENTS.md`) with `lean`;
 `docs/AGENT_TOOLBOX.md` → except with `lean`; `agents/devops.md` → `devops`;
 `agents/full-stack-dev.md` → `multi-module` and one module consumes the other (API + client).
+`sdd/harness.yaml` → always, generated as `.sdd/harness.yaml`.
 `claude/launch.json` → `ui` (one configuration per UI module; JSON, so no markers: built from
 the recon, not from markers). `claude/settings.local.example.json` → always, copied as is.
 
