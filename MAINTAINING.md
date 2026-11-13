@@ -51,8 +51,9 @@ by an agent.
 
 **How the toolbox's own merges are judged.** The toolbox runs the same check it ships:
 [`merge-conditions.yml`](.github/workflows/merge-conditions.yml) runs from `main` on every pull
-request (and again when `Tooling` completes or the agent posts `review-harness` / `opsx-verify`),
-reads `.sdd/triggers.yaml` and the change's approved `classification.yaml` from `main`, requires
+request (and again when `Tooling` completes, when the agent posts `review-harness` / `opsx-verify`,
+and for every open pull request when `main` moves), reads `.sdd/triggers.yaml` and the change's
+approved `classification.yaml` from `main`, requires
 `Tooling` (no path filter, so always) to have succeeded on the head commit, and posts the
 `merge-conditions` status with the open gates in its description. A change of this repository goes
 through the same framing pull request as a project's (`docs/<id>-framing`, merged by the owner); a pull

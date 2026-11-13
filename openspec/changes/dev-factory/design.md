@@ -79,7 +79,8 @@ One versioned folder per project, read by the hook, the CI and the skills:
 | `.claude/hooks/block-git-writes.conf` | guardrail settings (stays next to the hook it configures) |
 
 The gate-machinery list always includes `.sdd/**`, `.claude/hooks/**`, `.claude/settings.json`,
-`.github/workflows/**`, `vercel.json` and every `classification.yaml` already on `main`.
+`.github/**`, `.gitattributes`, `.gitmodules`, `openspec/config.yaml`, `vercel.json` and every
+`classification.yaml` touched outside a framing pull request (amended after the lot 3a review, D5).
 **Why one folder:** the adversarial pass showed rules scattered across CLAUDE.md, hook and CI drift
 apart; a single folder is the one place the gate-machinery trigger has to protect.
 
@@ -115,6 +116,22 @@ status `merge-conditions` on the head commit:
 pass. They are honour-based (the agent could post them falsely) but mechanical: forgetting them blocks
 the merge. Stated as such in the contributing guide.
 
+Amended after the lot 3a review:
+- The verdict depends on `main` (triggers, classifications, workflow filters). A `push` to the default
+  branch re-judges every open pull request into it, and the description carries the judged base
+  (`base <short sha>`); the merge route (D6) refuses when that base is not the current default-branch
+  head.
+- The status is spoofable (a workflow the PR adds can overwrite it; so can the agent's token). It
+  remains the input of the client-side merge rule — against mistakes — and the deploy guard (D7)
+  recomputes the verdict instead of reading it.
+- Built-in gate machinery covers everything that changes what CI or the check does: `.github/**`,
+  `.sdd/**`, `.claude/hooks/**`, `.claude/settings.json`, `.gitattributes`, `.gitmodules`,
+  `openspec/config.yaml`, `vercel.json`, and any `classification.yaml` added, modified or deleted
+  outside a framing pull request — not only the ones already on `main`.
+- A change pull request must touch its own change folder, and the folder and the branch name must
+  agree; touching another change's folder is an error. A missing `.sdd/triggers.yaml` on `main` is an
+  error, never "defaults only".
+
 ### D6 — The guardrail: one perl implementation, one verified merge route
 
 The kit's perl reader is kept (most cases, per-project `.conf`, already in the kit's CI). Added:
@@ -134,8 +151,14 @@ Alternative rejected: keep the Python version — fewer cases, no `.conf`, not i
 ### D7 — The deploy guard
 
 A script shipped by the kit, `.sdd/bin/deploy-guard.sh <sha>`: finds the PR merged as `<sha>`
-(`GET /repos/{o}/{r}/commits/{sha}/pulls`), requires it merged and its head commit's `merge-conditions`
-status `success` (any gates — an owner-merged gated PR passes). Exit non-zero otherwise.
+(`GET /repos/{o}/{r}/commits/{sha}/pulls`), requires it merged, then **recomputes the verdict itself**
+inside the deploy pipeline — `merge_conditions.py match` with the merge commit's first parent as base
+and the PR head as head, plus the aggregate CI condition on the PR head — instead of trusting the
+`merge-conditions` status. Amended after the lot 3a review: a commit status can be overwritten by any
+workflow the pull request adds (every writer is `github-actions[bot]`) and by the agent's own token,
+so the status is an input of the client-side merge rule only, never of the server-side barrier. Any
+gates pass (an owner-merged gated PR deploys); an `unaccounted` hit, a red or missing required CI run,
+or a direct push without a PR exit non-zero.
 
 - geomni `deploy-backend.yml`: first step of the job, plus `concurrency: deploy` so two deploys never
   overlap.

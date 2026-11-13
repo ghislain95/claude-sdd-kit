@@ -3,11 +3,21 @@
 
 Subcommands
   match     Classify a pull request's diff against `.sdd/triggers.yaml` and the approved
-            `classification.yaml`, both read from the BASE ref, never from the head. Prints JSON.
-  check     (CI) Judge the open pull request(s) of a head commit and post the `merge-conditions`
-            commit status on it: aggregate CI gate, `review-harness` / `opsx-verify` statuses and
-            the matcher's result.
+            `classification.yaml`, both read from the BASE commit, never from the head. Prints JSON.
+            Exit 0 when the verdict is clean, 1 on an unaccounted trigger hit or any error of judgement
+            (invalid classification, missing triggers file, change folder and branch disagreeing),
+            2 when it cannot judge (unknown commit, git failure). The deploy guard runs it with the
+            merge commit's first parent as `--base` and the merged pull request's head as `--head`.
+  check     (CI) Judge open pull requests and post the `merge-conditions` commit status on their head
+            commit: aggregate CI gate, `review-harness` / `opsx-verify` statuses and the matcher's
+            result. `--pr N --head-sha S` judges S and posts only while S is still the head of #N;
+            `--sha S` judges the open pull requests whose head is S; `--all-open` re-judges every open
+            pull request into the default branch (after a push to it), posting `pending` first.
   validate  Check `triggers.yaml` / `classification.yaml` files against their schema.
+
+The status description is `gates: <gates>[ - <reasons>]; base <sha7>` — `base` is the default-branch
+commit the verdict was computed against, always last, so the merge rule can compare it with the
+current head of the default branch. `error` and the `pending` posted while re-judging carry no gates.
 
 Never executes code from the pull request head: the head commit is only read as data, through git.
 Requirements: Python 3.9+, git, PyYAML; `check` also needs the `gh` CLI with a token.
@@ -33,24 +43,38 @@ GATES = ("intent", "irreversible")
 TRIGGERS_PATH = ".sdd/triggers.yaml"
 CHANGES_DIR = "openspec/changes/"
 ARCHIVE_DIR = "openspec/changes/archive/"
+WORKFLOWS_DIR = ".github/workflows/"
 CLASSIFICATION_FILE = "classification.yaml"
-# Gate machinery that is always protected, even when triggers.yaml omits it (or is missing).
+# Gate machinery that is always protected, even when triggers.yaml omits it: everything that changes
+# what CI or this check does.
 DEFAULT_MACHINERY = (
+    ".github/**",
     ".sdd/**",
     ".claude/hooks/**",
     ".claude/settings.json",
-    ".github/workflows/**",
+    "**/.gitattributes",
+    ".gitmodules",
+    "openspec/config.yaml",
     "vercel.json",
 )
-# Trigger name reported when an approved classification of the base ref is edited.
+# Trigger name reported when a pull request other than a framing one adds, changes or deletes a
+# classification (an identical move into the change's archive folder excepted).
 CLASSIFICATION_TRIGGER = "openspec/changes/**/classification.yaml"
+# An archived change folder: `openspec/changes/archive/YYYY-MM-DD-<change>/` (or `<change>/`).
+ARCHIVE_FOLDER = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
+# Branch suffixes of the framing and archive pull requests: `<type>/<id>-framing[-<n>]`, `<type>/<id>-archive`.
+BRANCH_SUFFIX = re.compile(r"-(?:framing(?:-\d+)?|archive)$")
 # Besides the moved change folder, what an archive pull request may touch.
 ARCHIVE_ALLOWED = ("openspec/specs/**", "docs/**", "ROADMAP.md", "BACKLOG.md")
+# Labels that replace the gates in the description.
+LABEL_ONLY = ("framing", "unclassified", "invalid")
 REVIEW_STATUSES = ("review-harness", "opsx-verify")
 STATUS_CONTEXT = "merge-conditions"
 SELF_WORKFLOW = "merge-conditions.yml"
 DESCRIPTION_MAX = 140
 PR_RUN_TYPES = {"opened", "synchronize", "reopened"}
+PAGE_SIZE = 100
+MAX_PAGES = 50
 
 
 # --------------------------------------------------------------------------------------------
@@ -122,9 +146,15 @@ class GitError(Exception):
     pass
 
 
+# Settings of the caller's git configuration that would change what is parsed are neutralised;
+# pathspecs are literal (a file name is never read as a pattern).
+GIT_OPTIONS = ("-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "core.quotePath=false",
+               "--literal-pathspecs")
+
+
 def git(repo: str, *args: str, check: bool = True) -> str:
     result = subprocess.run(
-        ["git", "-C", repo, *args],
+        ["git", "-C", repo, *GIT_OPTIONS, *args],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -134,13 +164,13 @@ def git(repo: str, *args: str, check: bool = True) -> str:
 
 
 def rev_parse(repo: str, ref: str) -> str:
-    return git(repo, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").strip()
+    return git(repo, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", check=False).strip()
 
 
 def show_file(repo: str, ref: str, path: str):
     """Content of `path` at `ref`, or None when absent."""
     result = subprocess.run(
-        ["git", "-C", repo, "show", f"{ref}:{path}"],
+        ["git", "-C", repo, *GIT_OPTIONS, "cat-file", "blob", f"{ref}:{path}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -190,40 +220,29 @@ def diff_entries(repo: str, base: str, head: str) -> list:
 _HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
-def added_lines(repo: str, base: str, head: str) -> dict:
-    """{path: [(line number in head, text)]} of the lines ADDED between `base` and `head`."""
+def added_lines(repo: str, base: str, head: str, path: str) -> list:
+    """[(line number in head, text)] of the lines ADDED to `path` between `base` and `head`.
+
+    One file per call, named by the `-z` list of `diff_entries`, so no header is ever parsed for a
+    path. `--text` reads every file as text, whatever `.gitattributes` says (`-diff`, `binary`).
+    """
     output = git(
-        repo, "-c", "core.quotePath=false", "diff", "-U0", "--no-color", "--no-ext-diff",
-        "--no-textconv", "--no-renames", base, head,
+        repo, "diff", "-U0", "--text", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames",
+        "--src-prefix=a/", "--dst-prefix=b/", base, head, "--", path,
     )
-    lines_by_file: dict = {}
-    path = None
-    in_header = False
+    lines = []
+    in_hunk = False
     line_number = 0
     for line in output.split("\n"):
-        if line.startswith("diff --git "):
-            in_header, path = True, None
-            continue
-        if in_header:
-            if line.startswith("+++ "):
-                target = line[4:]
-                if target.startswith('"') and target.endswith('"'):
-                    target = target[1:-1]
-                path = target[2:] if target.startswith("b/") else None
-                continue
-            if not line.startswith("@@"):
-                continue
-            in_header = False
         if line.startswith("@@"):
             found = _HUNK.match(line)
+            in_hunk = found is not None
             line_number = int(found.group(1)) if found else 0
             continue
-        if path is None:
-            continue
-        if line.startswith("+"):
-            lines_by_file.setdefault(path, []).append((line_number, line[1:]))
+        if in_hunk and line.startswith("+"):
+            lines.append((line_number, line[1:]))
             line_number += 1
-    return lines_by_file
+    return lines
 
 
 # --------------------------------------------------------------------------------------------
@@ -368,39 +387,40 @@ def _change_folder(path: str):
     return parts[0]
 
 
+def _archive_folder(path: str) -> str:
+    return path[len(ARCHIVE_DIR):].split("/", 1)[0]
+
+
 def _archive_folder_of(path: str, change: str) -> bool:
-    folder = path[len(ARCHIVE_DIR):].split("/", 1)[0]
-    return folder == change or folder.endswith("-" + change)
+    """Whether `path` is inside `change`'s archive folder: `YYYY-MM-DD-<change>/` or `<change>/`."""
+    folder = _archive_folder(path)
+    dated = ARCHIVE_FOLDER.match(folder)
+    return folder == change or (dated is not None and dated.group(1) == change)
 
 
 def _branch_candidates(branch):
-    if not branch or "/" not in branch:
+    """Change ids a branch `<type>/<id>[-framing[-<n>]|-archive]` may belong to."""
+    if not branch:
         return []
-    name = branch.split("/", 1)[1]
-    candidates = [name]
-    for suffix in ("-framing", "-archive"):
-        if name.endswith(suffix):
-            candidates.append(name[: -len(suffix)])
-    return candidates
+    name = branch.split("/", 1)[1] if "/" in branch else branch
+    stripped = BRANCH_SUFFIX.sub("", name)
+    return [name, stripped] if stripped and stripped != name else [name]
 
 
-def find_change(repo: str, base: str, files, branch):
-    """The change a pull request belongs to: the change folder it touches, else its branch name."""
-    folders = {folder for folder in (_change_folder(path) for path in files) if folder}
-    candidates = _branch_candidates(branch)
-    if len(folders) == 1:
-        return next(iter(folders)), None
-    if folders:
-        for candidate in candidates:
-            if candidate in folders:
-                return candidate, None
-        return None, f"several change folders touched ({', '.join(sorted(folders))})"
-    for candidate in candidates:
-        if show_file(repo, base, f"{CHANGES_DIR}{candidate}/{CLASSIFICATION_FILE}") is not None:
-            return candidate, None
-        if ls_tree(repo, base, f"{CHANGES_DIR}{candidate}/"):
-            return candidate, None
-    return None, None
+def find_change(files, branch):
+    """(change, error) of a pull request: the one change folder it touches, named by its branch too.
+
+    A branch name alone never selects a classification: a pull request that touches no change folder
+    is unclassified. Several folders, or a folder the branch does not name, is an error.
+    """
+    folders = sorted({folder for folder in (_change_folder(path) for path in files) if folder})
+    if not folders:
+        return None, None
+    if len(folders) > 1:
+        return None, f"several change folders touched ({', '.join(folders)})"
+    if folders[0] not in _branch_candidates(branch):
+        return None, f"change folder {folders[0]} does not match the branch {branch or '(none)'}"
+    return folders[0], None
 
 
 def is_framing(change: str, entries) -> bool:
@@ -414,8 +434,11 @@ def is_framing(change: str, entries) -> bool:
 
 
 def is_archive(change: str, entries) -> bool:
+    """Moves `openspec/changes/<change>/` into ONE archive folder of that change, nothing else but
+    `ARCHIVE_ALLOWED`."""
     prefix = f"{CHANGES_DIR}{change}/"
-    moved_out = moved_in = False
+    moved_out = False
+    folders = set()
     for entry in entries:
         if entry.path.startswith(prefix):
             if entry.status != "D":
@@ -424,41 +447,48 @@ def is_archive(change: str, entries) -> bool:
         elif entry.path.startswith(ARCHIVE_DIR):
             if entry.status == "D" or not _archive_folder_of(entry.path, change):
                 return False
-            moved_in = True
+            folders.add(_archive_folder(entry.path))
         elif not any(glob_match(glob, entry.path) for glob in ARCHIVE_ALLOWED):
             return False
-    return moved_out and moved_in
+    return moved_out and len(folders) == 1
 
 
-def classification_edits(repo: str, base: str, head: str, entries) -> list:
-    """Approved classifications of the base ref that the pull request changes or deletes.
+def classification_edits(repo: str, base: str, entries) -> list:
+    """Classifications the pull request adds, changes or deletes, whether or not on the base ref.
 
-    A file the diff touches whose head content equals the base content is no edit (a branch that
-    already carries the approved version); neither is a deletion that moves the identical file into
-    the change's archive folder (archive pull request).
+    Judged by what the merge would do to the base ref: a file whose head content equals the base
+    content is no edit (a branch that already carries the approved version), nor is a deletion absent
+    from the base ref. An approved classification moved identically into its change's archive folder
+    (archive pull request) is no edit either — both sides of the move.
     """
-    approved = {path: blob for path, blob in ls_tree(repo, base, CHANGES_DIR).items()
-                if path.endswith("/" + CLASSIFICATION_FILE)}
-    touched = {entry.path: entry for entry in entries}
-    archived = None
+    on_base = {path: blob for path, blob in ls_tree(repo, base, CHANGES_DIR).items()
+               if path.endswith("/" + CLASSIFICATION_FILE)}
+    touched = [entry for entry in entries if glob_match(CLASSIFICATION_TRIGGER, entry.path)]
+    added = {entry.path: entry.new_blob for entry in touched if entry.status != "D"}
+    moved = set()
+    for entry in touched:
+        change = _change_folder(entry.path)
+        blob = on_base.get(entry.path)
+        if entry.status != "D" or change is None or blob is None:
+            continue
+        for path, new_blob in added.items():
+            if (new_blob == blob and path.startswith(ARCHIVE_DIR) and _archive_folder_of(path, change)
+                    and path == f"{ARCHIVE_DIR}{_archive_folder(path)}/{CLASSIFICATION_FILE}"):
+                moved.update((entry.path, path))
+                break
     edits = []
-    for path, blob in sorted(approved.items()):
-        entry = touched.get(path)
-        if entry is None:
+    for entry in touched:
+        head_blob = None if entry.status == "D" else entry.new_blob
+        if entry.path in moved or on_base.get(entry.path) == head_blob:
             continue
-        if entry.status != "D":
-            if entry.new_blob != blob:
-                edits.append(path)
-            continue
-        change = _change_folder(path)
-        if change is not None:
-            if archived is None:
-                archived = ls_tree(repo, head, ARCHIVE_DIR)
-            if any(candidate.endswith("/" + CLASSIFICATION_FILE) and archived[candidate] == blob
-                   and _archive_folder_of(candidate, change) for candidate in archived):
-                continue
-        edits.append(path)
-    return edits
+        edits.append(entry.path)
+    return sorted(edits)
+
+
+def needs_lines(triggers, path: str) -> bool:
+    """Whether a content trigger reads `path`."""
+    return any(not content["paths"] or any(glob_match(glob, path) for glob in content["paths"])
+               for gate in GATES for content in triggers[gate]["content"])
 
 
 def compute_hits(triggers, files, lines_by_file, edits) -> list:
@@ -504,9 +534,9 @@ def resolve_gates(kind: str, classification, hits):
     return [gate for gate in GATES if gate in gates], unaccounted, waived
 
 
-def gates_label(kind: str, gates) -> str:
-    if kind in ("framing", "unclassified"):
-        return f"gates: {kind}"
+def gates_label(gates) -> str:
+    if len(gates) == 1 and gates[0] in LABEL_ONLY:
+        return f"gates: {gates[0]}"
     return "gates: " + ("+".join(gates) if gates else "none")
 
 
@@ -523,16 +553,22 @@ def match(repo: str, base: str, head: str, branch=None) -> dict:
     base_sha = rev_parse(repo, base)
     head_sha = rev_parse(repo, head)
     if not base_sha or not head_sha:
-        raise GitError(f"unknown ref: {base if not base_sha else head}")
+        raise GitError(f"unknown commit: {base if not base_sha else head}")
     merge_base = git(repo, "merge-base", base_sha, head_sha).strip()
-    triggers, errors = load_triggers(show_file(repo, base_sha, TRIGGERS_PATH))
+    triggers_text = show_file(repo, base_sha, TRIGGERS_PATH)
+    triggers, errors = load_triggers(triggers_text)
+    if triggers_text is None:
+        errors.append(f"{TRIGGERS_PATH} missing on the base ref")
     entries = diff_entries(repo, merge_base, head_sha)
     files = sorted({entry.path for entry in entries})
-    change, change_error = find_change(repo, base_sha, files, branch)
+    change, change_error = find_change(files, branch)
     if change_error:
         errors.append(change_error)
-    edits = classification_edits(repo, base_sha, head_sha, entries)
-    hits = compute_hits(triggers, files, added_lines(repo, merge_base, head_sha), edits)
+    framing = change is not None and is_framing(change, entries)
+    edits = [] if framing else classification_edits(repo, base_sha, entries)
+    lines_by_file = {entry.path: added_lines(repo, merge_base, head_sha, entry.path) for entry in entries
+                     if entry.status != "D" and needs_lines(triggers, entry.path)}
+    hits = compute_hits(triggers, files, lines_by_file, edits)
 
     classification = None
     if change:
@@ -544,7 +580,7 @@ def match(repo: str, base: str, head: str, branch=None) -> dict:
                 classification = False  # present on the base ref but invalid
 
     gates, unaccounted, waived = [], [], []
-    if change and is_framing(change, entries):
+    if framing:
         kind = "framing"
         proposed = show_file(repo, head_sha, f"{CHANGES_DIR}{change}/{CLASSIFICATION_FILE}")
         _, proposed_errors = load_classification(proposed or "", change)
@@ -553,6 +589,7 @@ def match(repo: str, base: str, head: str, branch=None) -> dict:
         gates = ["framing"]
     elif classification is False:
         kind = "change"
+        gates = ["invalid"]
     elif classification:
         kind = "archive" if is_archive(change, entries) else "change"
         gates, unaccounted, waived = resolve_gates(kind, classification, hits)
@@ -560,7 +597,7 @@ def match(repo: str, base: str, head: str, branch=None) -> dict:
         kind = "unclassified"
         gates = ["unclassified"]
 
-    label = gates_label(kind, gates)
+    label = gates_label(gates)
     reasons = list(errors)
     if unaccounted:
         reasons.append(unaccounted_reason(unaccounted))
@@ -627,21 +664,29 @@ def workflow_required(document, files, base_branch: str) -> bool:
     return True
 
 
+def is_workflow(path: str) -> bool:
+    """GitHub runs the YAML files directly in `.github/workflows/`, not those of its subfolders."""
+    return (path.startswith(WORKFLOWS_DIR) and path.count("/") == 2
+            and path.endswith((".yml", ".yaml")))
+
+
+def _load_workflow(repo: str, ref: str, path: str):
+    """The workflow document, or None when it is not valid YAML."""
+    try:
+        return yaml.safe_load(show_file(repo, ref, path) or "")
+    except yaml.YAMLError:
+        return None
+
+
 def required_workflows(repo: str, base: str, files, base_branch: str) -> list:
     """Workflows of the base ref that a pull request with these files must have run, by path."""
     required = []
-    for path in sorted(ls_tree(repo, base, ".github/workflows/")):
-        if path.count("/") != 2 or not path.endswith((".yml", ".yaml")):
+    for path in sorted(ls_tree(repo, base, WORKFLOWS_DIR)):
+        if not is_workflow(path) or path.rsplit("/", 1)[1] == SELF_WORKFLOW:
             continue
-        if path.rsplit("/", 1)[1] == SELF_WORKFLOW:
-            continue
-        try:
-            document = yaml.safe_load(show_file(repo, base, path) or "")
-        except yaml.YAMLError:
+        document = _load_workflow(repo, base, path)
+        if document is None or workflow_required(document, files, base_branch):
             required.append(path)  # unreadable: GitHub cannot run it either, so it never goes green
-            continue
-        if workflow_required(document, files, base_branch):
-            required.append(path)
     return required
 
 
@@ -649,23 +694,60 @@ def _workflow_name(path: str) -> str:
     return path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
 
 
+def workflow_problems(repo: str, result: dict, required, base_branch: str) -> dict:
+    """{workflow path: reason} of the pull request's own workflow edits that its runs cannot reflect.
+
+    A required workflow the pull request deletes (a rename is a deletion plus an addition) or edits so
+    that it no longer runs on it would wait forever for a run; a workflow it adds runs although nothing
+    requires it, and can post any status. Each is a reason of its own (such pull requests are gate
+    machinery: the owner merges them).
+    """
+    on_base = {path for path in ls_tree(repo, result["base"], WORKFLOWS_DIR) if is_workflow(path)}
+    problems = {}
+    for entry in diff_entries(repo, result["merge_base"], result["head"]):
+        path = entry.path
+        if not is_workflow(path):
+            continue
+        name = _workflow_name(path)
+        if path in required:
+            if entry.status == "D":
+                problems[path] = f"{name} deleted by the pull request"
+            elif not workflow_required(_load_workflow(repo, result["head"], path), result["files"], base_branch):
+                problems[path] = f"{name} no longer runs on the pull request"
+        elif entry.status != "D" and path not in on_base:
+            problems[path] = f"{name} added by the pull request"
+    return problems
+
+
 def truncate(text: str, limit: int = DESCRIPTION_MAX) -> str:
     return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
-def evaluate(result: dict, required, runs, statuses):
+def describe(label: str, reasons, base_sha: str) -> str:
+    """`<label> - <reasons>; base <sha7>`, cut inside the reasons so that the base always survives."""
+    suffix = f"base {base_sha[:7]}"
+    text = label + " - " + "".join(f"{reason}; " for reason in reasons)
+    if len(text) + len(suffix) > DESCRIPTION_MAX:
+        text = text[: DESCRIPTION_MAX - len(suffix) - 5] + "...; "
+    return text + suffix
+
+
+def evaluate(result: dict, required, runs, statuses, problems=None):
     """(state, description) of `merge-conditions` for one head commit."""
+    problems = problems or {}
     failures, waiting = list(result["errors"]), []
     if result["unaccounted"]:
         failures.append(unaccounted_reason(result["unaccounted"]))
     latest = {}
     for run in runs:
-        if run.get("event") != "pull_request" or run.get("head_sha") not in (None, result["head"]):
+        if run.get("event") != "pull_request" or run.get("head_sha") != result["head"]:
             continue
         path = run.get("path", "").split("@", 1)[0]
         if path not in latest or run.get("id", 0) > latest[path].get("id", 0):
             latest[path] = run
     for path in required:
+        if path in problems:
+            continue
         name = _workflow_name(path)
         run = latest.get(path)
         if run is None:
@@ -674,6 +756,7 @@ def evaluate(result: dict, required, runs, statuses):
             waiting.append(f"{name} running")
         elif run.get("conclusion") != "success":
             failures.append(f"{name} {run.get('conclusion')}")
+    failures.extend(problems[path] for path in sorted(problems))
     if result["kind"] == "change":
         for context in REVIEW_STATUSES:
             state = statuses.get(context)
@@ -689,8 +772,7 @@ def evaluate(result: dict, required, runs, statuses):
         state, reasons = "pending", waiting
     else:
         state, reasons = "success", []
-    description = result["label"] + (" - " + "; ".join(reasons) if reasons else "")
-    return state, truncate(description)
+    return state, describe(result["label"], reasons, result["base"])
 
 
 class GitHub:
@@ -710,6 +792,24 @@ class GitHub:
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
 
 
+def get_pages(api, path: str, key=None) -> list:
+    """Every item of a paginated list; `key` names the array when the response is an object."""
+    items = []
+    separator = "&" if "?" in path else "?"
+    for page in range(1, MAX_PAGES + 1):
+        data = api.get(f"{path}{separator}per_page={PAGE_SIZE}&page={page}")
+        batch = (data or {}).get(key) or [] if key else data or []
+        items.extend(batch)
+        if len(batch) < PAGE_SIZE:
+            return items
+    raise RuntimeError(f"{path}: more than {MAX_PAGES} pages")
+
+
+def fetch_default_branch(repo: str, default_branch: str):
+    git(repo, "fetch", "--no-tags", "--quiet", "origin",
+        f"+refs/heads/{default_branch}:refs/remotes/origin/{default_branch}")
+
+
 def fetch_pull_request(repo: str, default_branch: str, number: int, head_sha: str):
     """Fetch the base branch and the pull request head as data (no checkout, nothing executed)."""
     git(repo, "fetch", "--no-tags", "--quiet", "origin",
@@ -719,47 +819,85 @@ def fetch_pull_request(repo: str, default_branch: str, number: int, head_sha: st
         git(repo, "fetch", "--no-tags", "--quiet", "origin", head_sha)
 
 
-def check(api, repo: str, slug: str, default_branch: str, pr=None, sha=None, base_ref=None,
-          fetch: bool = True, post: bool = True, target_url=None, log=None) -> list:
-    """Judge the open pull requests of `pr` or of the head commit `sha`; post their status."""
+def _judgeable(pull, default_branch: str, log) -> bool:
+    if pull.get("state") != "open":
+        log(f"#{pull['number']}: not open, skipped")
+        return False
+    if pull["base"]["ref"] != default_branch:
+        log(f"#{pull['number']}: targets {pull['base']['ref']}, not {default_branch}; skipped")
+        return False
+    return True
+
+
+def _still_head(api, slug: str, number: int, head_sha: str, default_branch: str) -> bool:
+    """Whether `head_sha` is still the head of the open pull request #number into the default branch."""
+    pull = api.get(f"repos/{slug}/pulls/{number}") or {}
+    return (pull.get("state") == "open" and pull.get("head", {}).get("sha") == head_sha
+            and pull.get("base", {}).get("ref") == default_branch)
+
+
+def check(api, repo: str, slug: str, default_branch: str, pr=None, sha=None, all_open: bool = False,
+          base_ref=None, fetch: bool = True, post: bool = True, target_url=None, log=None) -> list:
+    """Judge open pull requests and post their status.
+
+    `pr` (with `sha`, the head the event named): that pull request, skipped when its head moved;
+    `sha` alone: the open pull requests whose head is `sha`; `all_open`: every open pull request into
+    the default branch, each first set to `pending`. A status is posted only if the judged commit is
+    still the pull request's head at that moment.
+    """
     log = log or (lambda message: print(message, file=sys.stderr))
     base_ref = base_ref or f"origin/{default_branch}"
-    if pr is not None:
-        pulls = [api.get(f"repos/{slug}/pulls/{pr}")]
+    if all_open:
+        if fetch:
+            fetch_default_branch(repo, default_branch)
+        pulls = [pull for pull in get_pages(api, f"repos/{slug}/pulls?state=open&base={default_branch}")
+                 if _judgeable(pull, default_branch, log)]
+        moved_to = rev_parse(repo, base_ref)[:7]
+        for pull in pulls:
+            if post:
+                api.post_status(slug, pull["head"]["sha"], "pending",
+                                f"re-judging: {default_branch} moved to {moved_to}", target_url)
+    elif pr is not None:
+        pull = api.get(f"repos/{slug}/pulls/{pr}")
+        if sha is not None and pull["head"]["sha"] != sha:
+            log(f"#{pr}: head moved from {sha[:12]} to {pull['head']['sha'][:12]}; a newer run judges it")
+            return []
+        pulls = [pull] if _judgeable(pull, default_branch, log) else []
     else:
-        pulls = [pull for pull in api.get(f"repos/{slug}/commits/{sha}/pulls") or []
-                 if pull.get("head", {}).get("sha") == sha]
+        pulls = [pull for pull in get_pages(api, f"repos/{slug}/commits/{sha}/pulls")
+                 if pull.get("head", {}).get("sha") == sha and _judgeable(pull, default_branch, log)]
     outcomes = []
     for pull in pulls:
         number, head_sha = pull["number"], pull["head"]["sha"]
-        if pull.get("state") != "open":
-            log(f"#{number}: not open, skipped")
-            continue
-        if pull["base"]["ref"] != default_branch:
-            log(f"#{number}: targets {pull['base']['ref']}, not {default_branch}; skipped")
-            continue
         result = None
+        required = []
         try:
             if fetch:
                 fetch_pull_request(repo, default_branch, number, head_sha)
             result = match(repo, base_ref, head_sha, pull["head"].get("ref"))
-            required = required_workflows(repo, base_ref, result["files"], default_branch)
-            runs = (api.get(f"repos/{slug}/actions/runs?head_sha={head_sha}&event=pull_request&per_page=100")
-                    or {}).get("workflow_runs", [])
-            combined = api.get(f"repos/{slug}/commits/{head_sha}/status") or {}
-            statuses = {item["context"]: item["state"] for item in combined.get("statuses", [])}
-            state, description = evaluate(result, required, runs, statuses)
+            required = required_workflows(repo, result["base"], result["files"], default_branch)
+            problems = workflow_problems(repo, result, required, default_branch)
+            runs = get_pages(api, f"repos/{slug}/actions/runs?head_sha={head_sha}&event=pull_request",
+                             "workflow_runs")
+            statuses = {item["context"]: item["state"]
+                        for item in get_pages(api, f"repos/{slug}/commits/{head_sha}/status", "statuses")}
+            state, description = evaluate(result, required, runs, statuses, problems)
         except Exception as exc:  # fail closed, with the reason where the owner looks
-            required = []
             state, description = "error", truncate(f"merge-conditions could not judge: {exc}")
         log(f"#{number} {head_sha[:12]}: {state} - {description}")
         if result is not None:
             log(json.dumps({key: result[key] for key in ("kind", "change", "gates", "hits", "unaccounted",
                                                           "waived", "errors")}, indent=2))
             log("required workflows: " + (", ".join(required) or "none"))
+        posted = False
         if post:
-            api.post_status(slug, head_sha, state, description, target_url)
-        outcomes.append({"number": number, "sha": head_sha, "state": state, "description": description})
+            if _still_head(api, slug, number, head_sha, default_branch):
+                api.post_status(slug, head_sha, state, description, target_url)
+                posted = True
+            else:
+                log(f"#{number}: {head_sha[:12]} is no longer its head; not posted")
+        outcomes.append({"number": number, "sha": head_sha, "state": state, "description": description,
+                         "posted": posted})
     return outcomes
 
 
@@ -794,10 +932,11 @@ def main(argv=None) -> int:
     parser.add_argument("-C", dest="directory", default=".", help="repository directory (default: .)")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    match_parser = commands.add_parser("match", help="classify a diff; prints JSON")
-    match_parser.add_argument("--base", required=True, help="base ref, e.g. origin/main")
+    match_parser = commands.add_parser("match", help="classify a diff; prints JSON; exit 1 when not clean")
+    match_parser.add_argument("--base", required=True,
+                              help="base commit, e.g. origin/main, or a merge commit's first parent <sha>^1")
     match_parser.add_argument("--head", required=True, help="head commit or ref")
-    match_parser.add_argument("--branch", help="pull request branch name, e.g. feat/<change-id>")
+    match_parser.add_argument("--branch", required=True, help="pull request branch name, e.g. feat/<change-id>")
 
     check_parser = commands.add_parser("check", help="judge pull requests and post the merge-conditions status")
     check_parser.add_argument("--repo", required=True, help="owner/name")
@@ -805,6 +944,9 @@ def main(argv=None) -> int:
     target = check_parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--pr", type=int)
     target.add_argument("--sha")
+    target.add_argument("--all-open", action="store_true",
+                        help="re-judge every open pull request into the default branch")
+    check_parser.add_argument("--head-sha", help="with --pr: the head commit the event named")
     check_parser.add_argument("--dry-run", action="store_true", help="print, do not post the status")
 
     validate_parser = commands.add_parser("validate", help="check triggers.yaml / classification.yaml files")
@@ -812,17 +954,25 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "match":
-        print(json.dumps(match(args.directory, args.base, args.head, args.branch), indent=2))
-        return 0
+        try:
+            result = match(args.directory, args.base, args.head, args.branch)
+        except GitError as exc:
+            print(f"merge_conditions.py: {exc}", file=sys.stderr)
+            return 2
+        print(json.dumps(result, indent=2))
+        return 1 if result["errors"] or result["unaccounted"] else 0
     if args.command == "validate":
         errors = validate_files(args.files)
         for message in errors:
             print(message, file=sys.stderr)
         return 1 if errors else 0
+    if args.head_sha and args.pr is None:
+        parser.error("--head-sha goes with --pr")
     server = os.environ.get("GITHUB_SERVER_URL")
     run_id = os.environ.get("GITHUB_RUN_ID")
     target_url = f"{server}/{args.repo}/actions/runs/{run_id}" if server and run_id else None
-    outcomes = check(GitHub(), args.directory, args.repo, args.default_branch, pr=args.pr, sha=args.sha,
+    outcomes = check(GitHub(), args.directory, args.repo, args.default_branch, pr=args.pr,
+                     sha=args.sha if args.pr is None else args.head_sha, all_open=args.all_open,
                      post=not args.dry_run, target_url=target_url)
     print(json.dumps(outcomes, indent=2))
     return 1 if any(outcome["state"] == "error" for outcome in outcomes) else 0

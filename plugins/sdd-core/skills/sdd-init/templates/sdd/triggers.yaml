@@ -31,12 +31,17 @@ irreversible:
     # sdd:fill: replace the `[]` below with patterns for what paths cannot isolate, e.g. `- { paths: [ 'web/src/**' ], pattern: 'localStorage\.setItem|sessionStorage\.setItem' }`, or keep it
     []
 
-# The gate machinery: never waivable. The five entries below are always applied, even if removed
-# here; add the project's own (release scripts, deploy configuration).
+# The gate machinery — whatever changes what CI or the check does: never waivable. The entries below
+# are built into the matcher and always applied, even if removed here; add the project's own (release
+# scripts, deploy configuration). Any classification.yaml added, changed or deleted outside a framing
+# pull request is gate machinery too.
 gate_machinery:
   paths:
+    - .github/**
     - .sdd/**
     - .claude/hooks/**
     - .claude/settings.json
-    - .github/workflows/**
+    - '**/.gitattributes'
+    - .gitmodules
+    - openspec/config.yaml
     - vercel.json

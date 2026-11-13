@@ -22,12 +22,16 @@ irreversible:
     - mods/*/.claude-plugin/plugin.json
   content: []
 
-# The gate machinery itself: never waivable. `.sdd/**`, `.claude/hooks/**`, `.claude/settings.json`,
-# `.github/workflows/**` and `vercel.json` are always applied by the matcher; listed for the reader.
+# The gate machinery itself: never waivable. The entries below are built into the matcher and always
+# applied; listed for the reader. Any classification.yaml added, changed or deleted outside a framing
+# pull request is gate machinery too.
 gate_machinery:
   paths:
+    - .github/**
     - .sdd/**
     - .claude/hooks/**
     - .claude/settings.json
-    - .github/workflows/**
+    - '**/.gitattributes'
+    - .gitmodules
+    - openspec/config.yaml
     - vercel.json

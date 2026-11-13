@@ -138,8 +138,10 @@ production. Both are YAML, both are checked by `python3 .sdd/bin/merge_condition
 - **Irreversible gate** — the change is not *code only*: a migration, a stored format (database,
   cache, browser storage, published file), a rollout step after merge, consumption of paid quota or
   capacity, infrastructure, a public endpoint others consume. Open → the owner gives the go (merges).
-- **Gate machinery** — triggers, approved classifications, hooks, agent settings, `.sdd/`, CI
-  workflows: always opens the irreversible gate, never waivable.
+- **Gate machinery** — whatever changes what CI or the check does: triggers and every `.sdd/` file,
+  any `classification.yaml` outside a framing pull request, hooks, agent settings, `.github/`,
+  `.gitattributes`, `.gitmodules`, `openspec/config.yaml`, `vercel.json`: always opens the
+  irreversible gate, never waivable.
 - Technical risk opens no gate: it raises review depth and post-deploy checks instead.
 
 ### `.sdd/triggers.yaml` — what opens a gate (per project)
@@ -156,15 +158,22 @@ irreversible:
     - paths: [ 'web/src/**' ]
       pattern: 'localStorage\.setItem|sessionStorage\.setItem'
 gate_machinery:                                       # never waivable
-  paths: [ '.sdd/**', '.claude/hooks/**', '.claude/settings.json', '.github/workflows/**', 'vercel.json' ]
+  paths: [ 'deploy/release.sh' ]                      # the project's own, on top of the built-in list
 ```
 
 - `paths`: a file the pull request adds, modifies or deletes opens the gate. `*` stops at `/`, `**`
   crosses it, `?` is zero or one of the preceding character (GitHub's syntax).
-- `content`: one hit per file, on the first added line that matches; removed lines never match.
-- `gate_machinery`: the five entries above are always applied, even when omitted; add the project's
-  own (release scripts, deploy configuration). Changing an approved `classification.yaml` of
-  `{{DEFAULT_BRANCH}}` is gate machinery too.
+- `content`: one hit per file, on the first added line that matches; removed lines never match. Every
+  file is read as text (binary files and `.gitattributes` settings included). A pattern only sees
+  one added line at a time: it misses a construct split across lines, and a change that alters
+  behaviour without adding a matching line (a removed guard, an edited constant elsewhere) — use
+  `paths` for what must never slip through.
+- `gate_machinery`: built in, always applied even when omitted: `.github/**`, `.sdd/**`,
+  `.claude/hooks/**`, `.claude/settings.json`, `**/.gitattributes`, `.gitmodules`,
+  `openspec/config.yaml`, `vercel.json`; add the project's own (release scripts, deploy
+  configuration). Adding, changing or deleting any `openspec/changes/**/classification.yaml` outside
+  a framing pull request is gate machinery too, whether or not `{{DEFAULT_BRANCH}}` already has it
+  (the archive pull request's identical move excepted).
 - Read from `{{DEFAULT_BRANCH}}` only: a pull request that edits this file is judged by the previous
   version (and opens the irreversible gate).
 
@@ -205,10 +214,18 @@ classifies a branch the same way:
 | Pull request | Recognised by | Result |
 |---|---|---|
 | framing | only files of `openspec/changes/<id>/`, `classification.yaml` among them | `gates: framing` — the owner's merge approves |
-| change | an approved classification on `{{DEFAULT_BRANCH}}` for the folder it touches or its branch `<type>/<id>` | gates = the classification's open gates + every trigger hit not waived; a hit on a gate declared closed, without a waiver, is **unaccounted** and fails the check |
-| archive | moves `openspec/changes/<id>/` into `openspec/changes/archive/` and touches only `openspec/specs/`, `docs/`, `ROADMAP.md`, `BACKLOG.md` | judged on its own diff, normally `gates: none` |
-| unclassified | no approved classification (hotfix, tooling) | `gates: unclassified` — a human merges |
+| change | touches exactly one change folder `openspec/changes/<id>/` (its `tasks.md` at least), from a branch `<type>/<id>`, and `{{DEFAULT_BRANCH}}` holds that change's classification | gates = the classification's open gates + every trigger hit not waived; a hit on a gate declared closed, without a waiver, is **unaccounted** and fails the check; an invalid approved classification gives `gates: invalid` and fails |
+| archive | moves `openspec/changes/<id>/` into one folder `openspec/changes/archive/YYYY-MM-DD-<id>/` (or `<id>/`) and touches only `openspec/specs/`, `docs/`, `ROADMAP.md`, `BACKLOG.md` | judged on its own diff, normally `gates: none` |
+| unclassified | touches no change folder (hotfix, tooling) — the branch name alone never selects a classification — or its change has no approved classification | `gates: unclassified` — a human merges |
 
-The description starts with the gates (`gates: none`, `gates: intent`, `gates: irreversible`,
-`gates: intent+irreversible`, `gates: framing`, `gates: unclassified`), followed by what is missing
-or wrong. Only `gates: none` is a change an agent may merge; any other value is merged by the owner.
+Touching several change folders, or a folder the branch does not name, is an error (the check fails),
+and so is a `.sdd/triggers.yaml` missing from `{{DEFAULT_BRANCH}}`. The description reads
+`gates: <gates>[ - <what is missing or wrong>]; base <sha7>`, the gates being `none`, `intent`,
+`irreversible`, `intent+irreversible`, `framing`, `unclassified` or `invalid`, and `base` the commit
+of `{{DEFAULT_BRANCH}}` the verdict was computed against. Only `gates: none` is a change an agent may
+merge, and only while `base` is still the head of `{{DEFAULT_BRANCH}}`; any other value is merged by
+the owner.<!-- sdd:if github --> A push to `{{DEFAULT_BRANCH}}` re-judges every open pull request into
+it (`pending`, `re-judging: …`, first). The status protects against mistakes only: a workflow the pull
+request adds, or the agent's own token, can overwrite it. The deploy guard therefore never reads it:
+it recomputes the verdict server-side (`merge_conditions.py match --base <merge>^1 --head <pull request
+head>`, exit 1 on an unaccounted hit or an error).<!-- sdd:endif -->

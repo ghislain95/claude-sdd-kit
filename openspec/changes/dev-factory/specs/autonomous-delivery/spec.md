@@ -64,8 +64,9 @@ the go or the passed QA.
 
 ### Requirement: Deploy guard
 Every deploy target SHALL refuse to deploy a commit of the protected branch that does not come from a
-merged pull request whose `merge-conditions` check was green on its head commit. This guard SHALL run
-server-side, in the deploy pipeline itself.
+merged pull request meeting the merge conditions. The guard SHALL run server-side, in the deploy
+pipeline itself, and SHALL recompute the verdict from the merged pull request rather than read the
+`merge-conditions` status, which a workflow of the pull request or the agent's token can overwrite.
 
 #### Scenario: Commit pushed to main by mistake
 - **WHEN** a commit reaches the protected branch without a merged pull request
